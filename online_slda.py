@@ -15,11 +15,21 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import sys, re, time, string, copy
+import sys, re, time, copy, subprocess
+
+packages = "numpy,scipy,sklearn".split(',')
+for pkg in packages:
+    if not pkg in sys.modules:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", pkg])
+
+
 import numpy as np
 from scipy.special import gammaln, psi, logsumexp
 from scipy.sparse import *
 import sklearn.preprocessing
+
+# Add directory
+print(os.path.dirname(os.path.abspath(__file__)))
 
 import scorpus, utilt
 

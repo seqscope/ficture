@@ -1,6 +1,12 @@
-import os, re, copy
+import os, re, copy, subprocess
 from scipy import sparse
 import sklearn.preprocessing
+
+packages = "scipy,sklearn".split(',')
+for pkg in packages:
+    if not pkg in sys.modules:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", pkg])
+
 
 class corpus:
 
