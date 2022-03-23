@@ -2,10 +2,12 @@ Use Latent Dirichlet Allocation on sliding hexagons for clustering and different
 
 **Scripts**
 Pre-process multiple tiles with layout info
-```/home/ycsi/git/factor_analysis/script/preprocess_multitile.py
+```
+/home/ycsi/git/factor_analysis/script/preprocess_multitile.py
 ```
 Run LDA with total counts (does not work for velo output)
-```/home/ycsi/git/factor_analysis/script/lda_base_multitile.py
+```
+/home/ycsi/git/factor_analysis/script/lda_base_multitile.py
 ```
 
 The above scripts include an ad hoc step to exclude regions with few reads, purely based on relative density. The filtering might not always be proper, the filtered data is stored (see below) for reference.
@@ -42,7 +44,6 @@ width_test=12
 sliding_step=6
 
 for nFactor in 4 6 8 10 12 15 18; do
-
     echo ${nFactor}
     command time -v python ${script} --experiment_id LDA_hexagon --input_path ${inpath} --output_path ${outpath} --identifier ${iden} --lane ${lane} --tile ${tile} --nFactor ${nFactor} --hex_width ${width_train} --hex_width_fit ${width_test} --n_move_hex_tile ${sliding_step} --gene_type_info ${gene_info} --gene_type_keyword ${kept_gene_type}
 
@@ -56,13 +57,19 @@ In the above example, outputs are saved here
 ```
 /analysis includes
 1. Assigning pixels to one best fitted factor \*.assign_pixel.tsv.gz
+
     Columns: unique pixel ID, X and Y in the combined rectangle field, top factor assigned, probability allocated to the top factor.
 2. Differentially expressed genes (test one factor v.s. the rest) \*.DEgene.tsv.gz
+
     Naive Chi-sq test statistics (p-value cutoff at $1e-3$ then sorted by fold change)
 3. Model fitting results (by hexagons) \*.fit_result.tsv.gz
+
     Columns:
+
     Topic_x: probabilities for each factor
     Hex_center_x(y): hexagon center cooredinate, in um
     offs_x(y) and hex_x(y) are hexagon center in axial coordinates
+
+/analysis/figure contains spatial distribution of learned factors
 
 /{lane} stores the merged/filtered intermediate data used for analysis
