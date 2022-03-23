@@ -46,7 +46,7 @@ parser.add_argument('--figure_width', type=int, default=20, help='')
 args = parser.parse_args()
 
 iden=args.identifier
-outbase=args.input_path+"/"+iden
+outbase=args.input_path
 lane=args.lane
 tile_list=args.tile.split(',')
 mu_scale = 1./args.mu_scale

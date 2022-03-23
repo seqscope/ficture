@@ -1,10 +1,11 @@
 import sys, io, os, copy, re, time, importlib, warnings, subprocess
 
-packages = "numpy,pandas,sklearn,pickle,argparse".split(',')
+packages = "numpy,pandas,sklearn,argparse".split(',')
 for pkg in packages:
     if not pkg in sys.modules:
         subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", pkg])
 
+import argparse
 import numpy as np
 import pandas as pd
 import sklearn.neighbors
@@ -12,6 +13,7 @@ import sklearn.mixture
 
 # Add parent directory
 print(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import hexagon_fn
 from hexagon_fn import *
 
@@ -36,7 +38,7 @@ args = parser.parse_args()
 
 iden=args.identifier
 path=args.input_path
-outbase=args.output_path+"/"+iden
+outbase=args.output_path
 lane=args.lane
 tile_list=args.tile.split(',')
 mu_scale = 1./args.mu_scale

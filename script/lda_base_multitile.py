@@ -1,7 +1,7 @@
 import sys, io, os, copy, re, time, importlib, warnings, subprocess
 from collections import defaultdict, Counter
 
-packages = "numpy,scipy,sklearn,pickle,argparse,plotnine,pandas".split(',')
+packages = "numpy,scipy,sklearn,argparse,plotnine,pandas".split(',')
 for pkg in packages:
     if not pkg in sys.modules:
         subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", pkg])
@@ -22,7 +22,7 @@ import sklearn.neighbors
 from sklearn.decomposition import LatentDirichletAllocation as LDA
 
 # Add parent directory
-print(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import hexagon_fn
 from hexagon_fn import *
 
@@ -55,7 +55,7 @@ args = parser.parse_args()
 
 iden=args.identifier
 path=args.input_path
-outbase=args.output_path+"/"+iden
+outbase=args.output_path
 expr_id=args.experiment_id
 lane=args.lane
 tile_list=args.tile.split(',')
