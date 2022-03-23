@@ -193,5 +193,5 @@ brc = brc.iloc[indx, ]
 brc.index = range(brc.shape[0])
 df = df[df.j.isin(brc.j)]
 
-df.to_csv(flt_f, sep='\t', index=False, compression='bz2')
+df.to_csv(flt_f, sep='\t', index=False)
 print("Finish filtering")
