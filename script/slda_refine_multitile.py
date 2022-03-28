@@ -42,6 +42,7 @@ parser.add_argument('--collapse_resolution', type=float, default=0.5, help='Coll
 parser.add_argument('--k_nn', type=int, default=12, help='')
 parser.add_argument('--max_radius', type=float, default=8, help='')
 parser.add_argument('--figure_width', type=int, default=20, help='')
+parser.add_argument('--cmap_name', type=str, default="nipy_spectral", help="Name of Matplotlib colormap to use")
 
 args = parser.parse_args()
 
@@ -93,13 +94,16 @@ lda_base_result = pd.read_csv(r_f,sep='\t')
 lda_base_result.Top_assigned = pd.Categorical(lda_base_result.Top_Topic.astype(int))
 lda_base_result['x'] = lda_base_result.Hex_center_x.values
 lda_base_result['y'] = lda_base_result.Hex_center_y.values
+
 tpop = lda_base_result[topic_header].sum(axis = 0)
 label_sort = np.argsort(tpop)
-m = L
-cmap = plt.get_cmap('hsv', m)
+cmap_name = args.cmap_name
+if args.cmap_name not in plt.colormaps():
+    cmap_name = "nipy_spectral"
+cmap = plt.get_cmap(cmap_name, L)
 clist = {}
-for i in range(m):
-    clist[label_sort[i]] = matplotlib.colors.rgb2hex(cmap(m-1-i))
+for i in range(L):
+    clist[label_sort[i]] = matplotlib.colors.rgb2hex(cmap(L-1-i))
 
 try:
     df = pd.read_csv(flt_f, sep='\t')

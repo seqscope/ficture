@@ -47,6 +47,7 @@ parser.add_argument('--n_move_hex_tile', type=int, default=-1, help='')
 parser.add_argument('--hex_width_fit', type=int, default=18, help='')
 parser.add_argument('--hex_radius_fit', type=int, default=-1, help='')
 parser.add_argument('--figure_width', type=int, default=20, help='')
+parser.add_argument('--cmap_name', type=str, default="nipy_spectral", help="Name of Matplotlib colormap to use")
 parser.add_argument('--model_only', action='store_true')
 parser.add_argument('--use_stored_model', action='store_true')
 parser.add_argument('--skip_analysis', action='store_true')
@@ -248,16 +249,18 @@ lda_base_result["Hex_center_y"] = y
 f = outbase + "/analysis/"+output_id+".fit_result.tsv"
 lda_base_result.round(5).to_csv(f,sep='\t',index=False)
 
+# Plot clustering result
+cmap_name = args.cmap_name
+if args.cmap_name not in plt.colormaps():
+    cmap_name = "nipy_spectral"
+cmap = plt.get_cmap(cmap_name, L)
 tpop = lda_base_result[topic_header].sum(axis = 0)
 label_sort = np.argsort(tpop)
+clist = [0]*L
+for i in range(L):
+    clist[label_sort[i]] = matplotlib.colors.rgb2hex(cmap(L-1-i))
 
-m = L
-cmap = plt.get_cmap('viridis', m)
-clist = [0]*m
-for i in range(m):
-    clist[label_sort[i]] = matplotlib.colors.rgb2hex(cmap(m-1-i))
-
-pt_size = (pts[:,1].max()-pts[:,1].min()) / 1250 * 0.5
+pt_size = 1000/(pts[:,1].max()-pts[:,1].min()) * 0.5
 pt_size = np.round(pt_size,2)
 plotnine.options.figure_size = (args.figure_width,args.figure_width)
 with warnings.catch_warnings(record=True):
