@@ -1,9 +1,9 @@
 import sys, io, os, copy, re, time, importlib, warnings, subprocess
 
-packages = "numpy,scipy,sklearn,pickle,argparse,pandas,plotnine,matplotlib".split(',')
-for pkg in packages:
-    if not pkg in sys.modules:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", pkg])
+# packages = "numpy,scipy,sklearn,argparse,pandas,plotnine,matplotlib".split(',')
+# for pkg in packages:
+#     if not pkg in sys.modules:
+#         subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", pkg])
 
 import pickle, argparse
 import numpy as np
@@ -21,14 +21,14 @@ from sklearn.decomposition import LatentDirichletAllocation as LDA
 import sklearn
 
 # Add parent directory
-print(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import hexagon_fn
 from hexagon_fn import *
 
 import online_slda
 import scorpus
 from online_slda import *
+import utilt
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input_path', type=str, help='')
@@ -41,8 +41,12 @@ parser.add_argument('--mu_scale', type=float, default=80, help='Coordinate to um
 parser.add_argument('--collapse_resolution', type=float, default=0.5, help='Collapse pixels within x um')
 parser.add_argument('--k_nn', type=int, default=12, help='')
 parser.add_argument('--max_radius', type=float, default=8, help='')
+parser.add_argument('--gaussian_sig', type=float, default=5, help='')
 parser.add_argument('--figure_width', type=int, default=20, help='')
 parser.add_argument('--cmap_name', type=str, default="nipy_spectral", help="Name of Matplotlib colormap to use")
+parser.add_argument('--model_f', default='', type=str, help='')
+parser.add_argument('--flt_f', default='', type=str, help='')
+parser.add_argument('--rectangle', default='', type=str, help='')
 
 args = parser.parse_args()
 
@@ -62,10 +66,19 @@ if args.filter_criteria_id != '':
 ### Basic parameterse
 k_nn = args.k_nn # Each pixel sees k grid points
 max_radius = args.max_radius
+sig = args.gaussian_sig
+
+out_suff = '_'.join([str(x) for x in ['refine', args.k_nn, int(args.max_radius), int(args.gaussian_sig)]])
+if out_suff == "refine_12_8_5":
+    out_suff = "refine"
 
 ### Input and output
 outpath = '/'.join([outbase,lane])
-flt_f = outpath+"/matrix_merged_info."+tile_iden+filter_id+".tsv.gz"
+if args.flt_f != '':
+    flt_f = args.flt_f
+else:
+    flt_f = outpath+"/matrix_merged_info."+tile_iden+filter_id+".tsv.gz"
+
 if not os.path.exists(flt_f):
     print(f"ERROR: cannot find input file.")
     sys.exit()
@@ -74,9 +87,15 @@ figure_path = outbase + "/analysis/figure"
 if not os.path.exists(figure_path):
     os.system("mkdir -p "+figure_path)
 
-m_f = outbase + '/analysis/'+args.model_iden+"."+tile_iden+".model.p"
-r_f = outbase + '/analysis/'+args.model_iden+"."+tile_iden+".fit_result.tsv"
+if args.model_f != '':
+    m_f = args.model_f
+    r_f = m_f.replace(".model.p", ".fit_result.tsv.gz")
+else:
+    m_f = outbase + '/analysis/'+args.model_iden+"."+tile_iden+".model.p"
+    r_f = outbase + '/analysis/'+args.model_iden+"."+tile_iden+".fit_result.tsv.gz"
 if not os.path.exists(m_f) or not os.path.exists(r_f):
+    print(m_f)
+    print(r_f)
     print(f"ERROR: cannot find input model file.")
     sys.exit()
 
@@ -94,6 +113,8 @@ lda_base_result = pd.read_csv(r_f,sep='\t')
 lda_base_result.Top_assigned = pd.Categorical(lda_base_result.Top_Topic.astype(int))
 lda_base_result['x'] = lda_base_result.Hex_center_x.values
 lda_base_result['y'] = lda_base_result.Hex_center_y.values
+prior_D = lda_base_result.shape[0]//2
+print("Read model file")
 
 tpop = lda_base_result[topic_header].sum(axis = 0)
 label_sort = np.argsort(tpop)
@@ -109,6 +130,12 @@ try:
     df = pd.read_csv(flt_f, sep='\t')
 except:
     df = pd.read_csv(flt_f, sep='\t', compression='bz2')
+
+if args.rectangle != '':
+    rec = args.rectangle.split(',')
+    rmin,rmax,cmin,cmax = [int(x) for x in rec]
+    indx = (df.row >= rmin) & (df.row <= rmax) & (df.col >= cmin) & (df.col <= cmax)
+    df = df.loc[indx, :]
 
 df = df[df.gene.isin(gene_kept)]
 df['x'] = df.X.values * mu_scale
@@ -145,9 +172,12 @@ print(f"Made DGE {dge_mtx.shape}")
 
 
 
-sig = 5
 x_min, y_min = pts_full.min(axis = 0).astype(int)
 x_max, y_max = pts_full.max(axis = 0).astype(int)
+indx=(lda_base_result.x>=x_min-10)&(lda_base_result.x<=x_max+10)&(lda_base_result.y>=y_min-10)&(lda_base_result.y<=y_max+10)
+lda_base_result=lda_base_result.loc[indx, :]
+print(lda_base_result.x.max()-lda_base_result.x.min(),lda_base_result.y.max()-lda_base_result.y.min())
+
 # Split into spatially close minibatches (overlapping windows)
 batch_size_um = 150 # at most x^2um
 batch_ovlp_um = 20
@@ -162,9 +192,10 @@ x_grd = np.arange( x_min, x_max+1, batch_step_x)
 y_grd = np.arange( y_min, y_max+1, batch_step_y)
 x_grd[-1] = x_max+1
 y_grd[-1] = y_max+1
+print(x_grd)
+print(y_grd)
 
-
-slda = OnlineLDA(gene_kept, L, lda_base_result.shape[0]//2, alpha=1./L, eta=_eta, verbose = 1)
+slda = OnlineLDA(gene_kept, L, prior_D, alpha=1./L, eta=_eta, verbose = 1)
 slda.init_global_parameter(_lambda)
 
 pixel_result = pd.DataFrame()
@@ -188,11 +219,7 @@ for offset in [0, 1]:
             grid_pts = copy.copy(grid_pts_full.loc[grid_indx, :])
 
             doc_pts = np.asarray(grid_pts[['x', 'y']])
-            if doc_pts.shape[0] < 50 and iter_j != len(y_grd)-1:
-                skip = 1
-                print(["Skip",x_min,x_max,y_min,y_max,doc_pts.shape[0]])
-                continue
-            if doc_pts.shape[0] == 0:
+            if doc_pts.shape[0] < 50:
                 skip = 1
                 print(["Skip",x_min,x_max,y_min,y_max,doc_pts.shape[0]])
                 continue
@@ -231,7 +258,7 @@ for offset in [0, 1]:
                                                             ['Factor_'+str(x) for x in range(slda._K)])],\
                                                  axis = 1)])
 
-            expElog_theta = np.exp(dirichlet_expectation(batch.gamma))
+            expElog_theta = np.exp(utilt.dirichlet_expectation(batch.gamma))
             expElog_theta /= expElog_theta.sum(axis = 1)[:, np.newaxis]
             tmp = pd.DataFrame({'x':doc_pts[:,0],'y':doc_pts[:,1]})
             tmp['center_id'] = grid_pts_full.loc[grid_indx, :].index.values
@@ -249,6 +276,9 @@ pixel_result['Top_Factor'] = np.asarray(pixel_result[factor_header]).argmax(axis
 pixel_result['Top_Prob'] = np.asarray(pixel_result[factor_header]).max(axis = 1)
 pixel_result['Top_assigned'] = pd.Categorical(pixel_result.Top_Factor.values, categories=range(slda._K))
 
+f = outbase + "/analysis/"+output_id+"."+out_suff+".pixel.tsv"
+pixel_result.to_csv(f,sep='\t',index=False)
+
 plotnine.options.figure_size = (args.figure_width,args.figure_width)
 with warnings.catch_warnings(record=True):
     ps = (
@@ -262,11 +292,8 @@ with warnings.catch_warnings(record=True):
         +scale_color_manual(values = clist)
         +theme_bw()
     )
-    f = figure_path + "/"+output_id+".refine.pixel.png"
+    f = figure_path + "/"+output_id+"."+out_suff+".pixel.png"
     ggsave(filename=f,plot=ps,device='png')
-
-f = outbase + "/analysis/"+output_id+".refine.pixel.tsv"
-pixel_result.to_csv(f,sep='\t',index=False)
 
 
 center_result.sort_values(by = 'Avg_size', ascending=False, inplace=True)
@@ -277,13 +304,18 @@ center_result['Top_Factor'] = np.asarray(center_result[factor_header]).argmax(ax
 center_result['Top_Prob'] = np.asarray(center_result[factor_header]).max(axis = 1)
 center_result['Top_assigned'] = pd.Categorical(center_result.Top_Factor.values, categories=range(slda._K))
 
+f = outbase + "/analysis/"+output_id+"."+out_suff+".center.tsv"
+center_result.to_csv(f,sep='\t',index=False)
+
+pt_size = 1000/(pts_full[:,1].max()-pts_full[:,1].min()) * 0.5
+pt_size = np.round(pt_size,2)
 plotnine.options.figure_size = (args.figure_width,args.figure_width)
 with warnings.catch_warnings(record=True):
     ps = (
         ggplot(center_result[center_result.Avg_size > 10],
                aes(x='y', y='x',
                    color='Top_assigned',alpha='Top_Prob'))
-        +geom_point(size = 0.5, shape='o')
+        +geom_point(size = pt_size, shape='o')
         +guides(colour = guide_legend(override_aes = {'size':4,'shape':'o'}))
         +xlab("")+ylab("")
         +guides(alpha=None)
@@ -291,8 +323,5 @@ with warnings.catch_warnings(record=True):
         +scale_color_manual(values = clist)
         +theme_bw()
     )
-    f = figure_path + "/"+output_id+".refine.center.png"
+    f = figure_path + "/"+output_id+"."+out_suff+".center.png"
     ggsave(filename=f,plot=ps,device='png')
-
-f = outbase + "/analysis/"+output_id+".refine.center.tsv"
-center_result.to_csv(f,sep='\t',index=False)
