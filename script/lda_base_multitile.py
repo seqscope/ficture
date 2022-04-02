@@ -190,6 +190,36 @@ else:
     if args.model_only:
         sys.exit()
 
+### DE gene based on learned factor profiles
+if not args.skip_analysis:
+    mtx = lda_base.components_ * (df.Count.sum()/lda_base.components_.sum()) # L x M
+    mtx = np.around(mtx, 0).astype(int)
+    gene_sum = mtx.sum(axis = 0)
+    fact_sum = mtx.sum(axis = 1)
+    tt = mtx.sum()
+    res=[]
+    tab=np.zeros((2,2))
+    for i, name in enumerate(lda_base.feature_names_in_):
+        for l in range(L):
+            if fact_sum[l] == 0:
+                continue
+            tab[0,0]=mtx[l,i]
+            tab[0,1]=gene_sum[i]-tab[0,0]
+            tab[1,0]=fact_sum[l]-tab[0,0]
+            tab[1,1]=tt-fact_sum[l]-gene_sum[i]+tab[0,0]
+            fd=tab[0,0]/fact_sum[l]/tab[0,1]*(tt-fact_sum[l])
+            chi2, p, dof, ex = scipy.stats.chi2_contingency(tab, correction=False)
+            res.append([name,l,chi2,p,fd])
+
+    chidf=pd.DataFrame(res,columns=['gene','factor','Chi2','pval','FoldChange'])
+    res=chidf.loc[(chidf.pval<1e-3)*(chidf.FoldChange>1)].sort_values(by='FoldChange',ascending=False)
+    res.sort_values(by=['factor','FoldChange'],ascending=[True,False],inplace=True)
+    res['pval'] = res.pval.map('{:,.3e}'.format)
+
+    f = outbase + "/analysis/"+output_id+".DEgene.tsv"
+    res.round(5).to_csv(f,sep='\t',index=False)
+
+
 diam = args.hex_width_fit
 radius = args.hex_radius_fit
 if radius < 0:
@@ -281,60 +311,3 @@ with warnings.catch_warnings(record=True):
 
 f = figure_path + "/"+output_id+".png"
 ggsave(filename=f,plot=ps,device='png')
-
-
-if args.skip_analysis:
-    sys.exit()
-
-
-### Assign pixels and find marker genes
-print("\nStart DE analysis\n")
-
-anchor_tree = sklearn.neighbors.BallTree(np.asarray(lda_base_result[['Hex_center_x', 'Hex_center_y']]) )
-assign = anchor_tree.query(pts, k=1, return_distance=False)
-assign = assign.squeeze()
-brc['Anchor_center'] = assign
-brc['Top_Topic'] = lda_base_result.loc[brc.Anchor_center.values, 'Top_Topic'].values
-brc['Top_Prob'] = lda_base_result.loc[brc.Anchor_center.values, 'Top_Prob'].values
-f = outbase + "/analysis/"+output_id+".assign_pixel.tsv"
-brc[['j', 'X', 'Y', 'Top_Topic', 'Top_Prob']].round(5).to_csv(f,sep='\t',index=False)
-
-c_row = brc.Top_Topic.values
-c_col = brc.index.values
-Cmtx = coo_matrix( (brc.Top_Prob.values, (c_row, c_col)), shape=(L, N) ).tocsr()
-mtx = Cmtx @ dge_mtx
-mtx.data = np.around(mtx.data).astype(int)
-
-f_ct = np.asarray(mtx.sum(axis = 0)).squeeze()
-min_ct_per_gene = 20
-indx=np.arange(mtx.shape[1])[f_ct>min_ct_per_gene]
-tmp_mtx = mtx.tocsc()[:,indx].toarray()
-gtot=np.asarray(tmp_mtx.sum(axis = 0) ).squeeze()
-tot = np.asarray(mtx.sum(axis = 1) ).squeeze()
-tt = tot.sum()
-tot = {i:tot[i] for i in range(L)}
-
-tmp_mtx = mtx.tocsc()[:,indx].toarray()
-res=[]
-tab=np.zeros((2,2))
-for i,j in enumerate(indx):
-    name = feature.gene.iloc[j]
-    for l in range(L):
-        if tot[l] == 0:
-            continue
-        tab[0,0]=tmp_mtx[l,i]
-        tab[0,1]=gtot[i]-tab[0,0]
-        tab[1,0]=tot[l]-tab[0,0]
-        tab[1,1]=tt-tot[l]-gtot[i]+tab[0,0]
-        fd=tab[0,0]/tot[l]/tab[0,1]*(tt-tot[l])
-        chi2, p, dof, ex = scipy.stats.chi2_contingency(tab, correction=False)
-        res.append([name,l,chi2,p,fd])
-
-chidf=pd.DataFrame(res,columns=['gene','factor','Chi2','pval','FoldChange'])
-res=chidf.loc[(chidf.pval<1e-3)*(chidf.FoldChange>1)].sort_values(by='FoldChange',ascending=False)
-res=res.merge(right=feature,on='gene',how='left')
-res.sort_values(by=['factor','FoldChange'],ascending=[True,False],inplace=True)
-res['pval'] = res.pval.map('{:,.3e}'.format)
-
-f = outbase + "/analysis/"+output_id+".DEgene.tsv"
-res.round(5).to_csv(f,sep='\t',index=False)

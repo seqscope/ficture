@@ -31,6 +31,8 @@ parser.add_argument('--gene_type_keyword', type=str, help='Key words (separated 
 
 parser.add_argument('--min_count_per_feature', type=int, default=50, help='')
 parser.add_argument('--min_mol_density_squm', type=int, default=1, help='')
+parser.add_argument('--hex_diam', type=int, default=18, help='')
+parser.add_argument('--hex_n_move', type=int, default=3, help='')
 parser.add_argument('--auto_rm_background_by_density',dest='auto_rm_dst', action='store_true')
 parser.add_argument('--redo_filter', action='store_true')
 
@@ -163,35 +165,44 @@ balltree = sklearn.neighbors.BallTree(pts)
 
 # ad hoc removal of background only based on density
 blur_tot = copy.copy(brc[['brc_tot', 'x', 'y']])
-diam = 24
+diam = args.hex_diam
+n_move = args.hex_n_move
 radius = diam / np.sqrt(3)
 hex_area = diam*radius*3/2
-blur_tot['hex_x'], blur_tot['hex_y'] = pixel_to_hex(np.asarray(blur_tot[['x','y']]), radius, 0.5, 0.5)
-blur_tot = blur_tot.groupby(by = ['hex_x','hex_y']).agg({'brc_tot':sum}).reset_index()
+blur_center = pd.DataFrame()
+for i in range(n_move):
+    for j in range(n_move):
+        blur_tot['hex_x'], blur_tot['hex_y'] = pixel_to_hex(np.asarray(blur_tot[['x','y']]), radius, i/n_move, j/n_move)
+        sub = blur_tot.groupby(by = ['hex_x','hex_y']).agg({'brc_tot':sum}).reset_index()
+        sub['hex_id'] = [(i,j,v['hex_x'],v['hex_y']) for k,v in sub.iterrows()]
+        blur_center = pd.concat([blur_center, sub])
 if args.auto_rm_dst:
-    gm = sklearn.mixture.GaussianMixture(n_components=2, random_state=0).fit(np.log10(blur_tot.brc_tot.values).reshape(-1,1))
+    gm = sklearn.mixture.GaussianMixture(n_components=2, random_state=0).fit(np.log10(blur_center.brc_tot.values).reshape(-1,1))
     lab_keep = np.argmax(gm.means_.squeeze())
-    lab = gm.predict(np.log10(blur_tot.brc_tot.values).reshape(-1,1))
+    lab = gm.predict(np.log10(blur_center.brc_tot.values).reshape(-1,1))
     lab = lab == lab_keep
-    blur_tot['dense_center'] = lab
+    blur_center['dense_center'] = lab
     m0=10**gm.means_.squeeze()[lab_keep]/hex_area
     m1=10**gm.means_.squeeze()[1-lab_keep]/hex_area
     print(f"Filter background density, identified density {m0:.3f} v.s. {m1:.3f}.")
     if m0 < min_mol_density_squm:
-        blur_tot['dense_center'] = blur_tot.brc_tot >= min_mol_density_squm * hex_area
+        blur_center['dense_center'] = blur_center.brc_tot >= min_mol_density_squm * hex_area
 else:
-    blur_tot['dense_center'] = blur_tot.brc_tot >= min_mol_density_squm * hex_area
+    blur_center['dense_center'] = blur_center.brc_tot >= min_mol_density_squm * hex_area
 
-if blur_tot.dense_center.sum() == 0:
+dense_center = set(blur_center.loc[blur_center.dense_center.eq(True), 'hex_id'].values)
+keep_pixel = np.zeros(blur_tot.shape[0], dtype=bool)
+for i in range(n_move):
+    for j in range(n_move):
+        x, y = pixel_to_hex(np.asarray(blur_tot[['x','y']]), radius, i/n_move, j/n_move)
+        indx = [True if (i,j,x[v],y[v]) in dense_center else False for v in range(len(x))]
+        keep_pixel = keep_pixel | np.array(indx)
+
+if keep_pixel.sum() == 0:
     print(f"WARNING: Not enough pixels in this field of view")
     sys.exit()
 
-blur_tot['hex_center_x'], blur_tot['hex_center_y'] = hex_to_pixel(blur_tot.hex_x.values,blur_tot.hex_y.values, radius, 0.5, 0.5)
-keep_pixel = balltree.query_radius(X=blur_tot.loc[blur_tot.dense_center.eq(True), ['hex_center_x','hex_center_y']], r=radius*np.sqrt(3), count_only=False, sort_results=False)
-indx = sorted(list(set([x for y in keep_pixel for x in y])) )
-brc = brc.iloc[indx, ]
-brc.index = range(brc.shape[0])
+brc = brc.loc[keep_pixel, :]
 df = df[df.j.isin(brc.j)]
-
 df.to_csv(flt_f, sep='\t', index=False)
 print("Finish filtering")
