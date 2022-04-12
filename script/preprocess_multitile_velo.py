@@ -63,9 +63,6 @@ for index, row in df.iterrows():
     j = int(row['col'])
     lanes[i][j] = str(row['lane'])
     tiles[i][j] = str(row['tile'])
-# Code the output as the tile numbers of the lower-left and upper-right corners
-tile_ll = tiles[-1][0]
-tile_ur = tiles[0][-1]
 
 ### Output
 outpath = '/'.join([outbase,lane])
@@ -74,8 +71,7 @@ filter_id = ""
 if args.filter_criteria_id != '':
     filter_id += "." + args.filter_criteria_id
 
-flt_f = outpath+"/matrix_merged_info.lane_"+lane+'.'+'_'.join([tile_ll, tile_ur])+filter_id+".tsv.gz"
-print(f"Output file: {flt_f}")
+flt_f = outpath+"/matrix_merged_info.velo.lane_"+lane+'.'+'_'.join(tile_list)+filter_id+".tsv.gz"
 
 if os.path.exists(flt_f) and not args.redo_filter:
     sys.exit()
@@ -102,23 +98,24 @@ df = pd.DataFrame()
 for itr_r in range(len(lanes)):
     for itr_c in range(len(lanes[0])):
         lane, tile = lanes[itr_r][itr_c], tiles[itr_r][itr_c]
-        mrg_f = outpath+"/"+tile+"_matrix_merged_info.tsv.gz"
+        mrg_f = outpath+"/"+tile+"_matrix_merged_info.velo.tsv.gz"
         if not os.path.exists(mrg_f):
             datapath = "/".join([path,lane,tile])
             f=datapath+"/barcodes.tsv.gz"
             if not os.path.exists(f):
                 print(f"WARNING: cannot find input file for {lane}_{tile}, missing tiles are assumed to be empty")
                 continue
-            brc = pd.read_csv(f, sep='\t|,', names=["barcode","j","v2","brc_tot","lane","tile","X","Y","ct"],
-                              usecols=["j","X","Y","brc_tot"], engine='python')
+            brc = pd.read_csv(f, sep='\t|,', names=["barcode","j","v2","brc_tot","lane","tile","X","Y","brc_tot_spl","brc_tot_unspl","brc_tot_ambig"], usecols=["j","X","Y","brc_tot","brc_tot_spl","brc_tot_unspl","brc_tot_ambig"], engine='python')
+
             f=datapath+"/matrix.mtx.gz"
-            mtx = pd.read_csv(f, sep=' ', skiprows=3,names=["i","j","Count"])
+            mtx = pd.read_csv(f, sep=' ', skiprows=3,names=["i","j","spl","unspl","ambig"])
+
             f=datapath+"/features.tsv.gz"
-            feature = pd.read_csv(f, sep='\t|,', names=["v1","gene","v3","i","gene_tot","ct"],
-                              usecols=["i","gene","gene_tot"],  engine='python')
+            feature = pd.read_csv(f, sep='\t|,', names=["v1","gene","v3","i","gene_tot","gene_tot_spl","gene_tot_unspl","gene_tot_ambig"], usecols=["i","gene","gene_tot","gene_tot_spl","gene_tot_unspl","gene_tot_ambig"],  engine='python')
             feature = feature[feature.gene_tot > 0]
-            sub = mtx.merge(right = brc[['j','X','Y','brc_tot']], on = 'j', how = 'inner')
-            sub = sub.merge(right = feature, on = 'i', how = 'inner' )
+
+            sub = mtx.merge(right = brc[['j','X','Y','brc_tot',"brc_tot_spl","brc_tot_unspl"]], on = 'j', how = 'inner')
+            sub = sub.merge(right = feature[["i","gene","gene_tot","gene_tot_spl","gene_tot_unspl"]], on = 'i', how = 'inner' )
             sub.to_csv(mrg_f,sep='\t',index=False)
         else:
             sub = pd.read_csv(mrg_f,sep='\t')
@@ -165,7 +162,6 @@ brc = copy.copy(df[['j','X','Y','brc_tot']]).drop_duplicates(subset='j')
 brc['x'] = brc.X.values * mu_scale
 brc['y'] = brc.Y.values * mu_scale
 pts = np.asarray(brc[['x','y']])
-balltree = sklearn.neighbors.BallTree(pts)
 
 # ad hoc removal of background only based on density
 blur_tot = copy.copy(brc[['brc_tot', 'x', 'y']])

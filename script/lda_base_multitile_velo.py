@@ -29,11 +29,11 @@ from hexagon_fn import *
 parser = argparse.ArgumentParser()
 parser.add_argument('--output_path', type=str, help='')
 parser.add_argument('--identifier', type=str, help='')
+parser.add_argument('--splice', default = 'spl', type=str, help='')
 parser.add_argument('--experiment_id', type=str, help='')
 parser.add_argument('--filter_criteria_id', type=str, help='Used if filtered and merged data file is to be stored.', default = '')
 parser.add_argument('--lane', type=str, help='')
-parser.add_argument('--tile', type=str, default='', help='')
-parser.add_argument('--tile_id', type=str, default='', help='')
+parser.add_argument('--tile', type=str, help='')
 parser.add_argument('--mu_scale', type=float, default=80, help='Coordinate to um translate')
 parser.add_argument('--gene_type_info', type=str, help='A file containing two columns, gene name and gene type. Used only if specific types of genes are kept.', default = '')
 parser.add_argument('--gene_type_keyword', type=str, help='Key words (separated by ,) of gene types to keep, only used is gene_type_info is provided.', default="IG,TR,protein,lnc")
@@ -43,8 +43,7 @@ parser.add_argument('--hex_radius', type=int, default=-1, help='')
 parser.add_argument('--min_pixel_per_unit', type=int, default=50, help='')
 parser.add_argument('--min_pixel_per_unit_fit', type=int, default=20, help='')
 parser.add_argument('--min_count_per_feature', type=int, default=50, help='')
-parser.add_argument('--n_move_train', type=int, default=-1, help='')
-parser.add_argument('--n_move_fit', type=int, default=-1, help='')
+parser.add_argument('--n_move_hex_tile', type=int, default=-1, help='')
 parser.add_argument('--hex_width_fit', type=int, default=18, help='')
 parser.add_argument('--hex_radius_fit', type=int, default=-1, help='')
 parser.add_argument('--figure_width', type=int, default=20, help="Width of the output figure per 1000um")
@@ -55,31 +54,22 @@ parser.add_argument('--skip_analysis', action='store_true')
 
 args = parser.parse_args()
 
-if args.tile == '' and args.tile_id == '':
-    print("ERROR: please indicate tiles either use --tile or --tile_id")
-    sys.exit()
-
 iden=args.identifier
 outbase=args.output_path
 expr_id=args.experiment_id
 lane=args.lane
 tile_list=args.tile.split(',')
-tile_id = args.tile_id
 mu_scale = 1./args.mu_scale
 
 filter_id = ""
 if args.filter_criteria_id != '':
     filter_id += "." + args.filter_criteria_id
 
-reg_iden = "lane_" + lane + "."
-if tile_id != '':
-    reg_iden += tile_id
-else:
-    reg_iden += '_'.join(tile_list)
+output_id = expr_id + "." + args.splice + ".nFactor_"+str(args.nFactor) + ".d_"+str(args.hex_width) + ".lane_"+lane+'.'+'_'.join(tile_list)
 
 ### Input and output
 outpath = '/'.join([outbase,lane])
-flt_f = outpath+"/matrix_merged_info."+reg_iden+filter_id+".tsv.gz"
+flt_f = outpath+"/matrix_merged_info.velo.lane_"+lane+'.'+'_'.join(tile_list)+filter_id+".tsv.gz"
 if not os.path.exists(flt_f):
     print(f"ERROR: cannot find input file, please run preprocessing script first.")
     sys.exit()
@@ -100,6 +90,8 @@ if args.gene_type_info != '' and os.path.exists(args.gene_type_info):
     kept_key = args.gene_type_keyword.split(',')
     kept_type = gencode.loc[gencode.Type.str.contains('|'.join(kept_key)),'Type'].unique()
     gencode = gencode.loc[ gencode.Type.isin(kept_type) ]
+    if "MT" not in kept_key:
+        gencode = gencode[~gencode.Name.str.contains('mt-')]
     gene_kept_org = set(list(gencode.Name))
 
 ### Basic parameterse
@@ -118,15 +110,19 @@ except:
 if len(gene_kept_org) > 0:
     df = df[df.gene.isin(gene_kept_org)]
 
-brc = copy.copy(df[['j','X','Y','brc_tot']]).drop_duplicates(subset='j')
+feature = df[['gene', 'gene_tot_'+args.splice]].drop_duplicates(subset='gene')
+feature.rename(columns = {'gene_tot_'+args.splice : 'gene_tot'}, inplace=True)
+feature = feature.loc[feature.gene_tot > args.min_count_per_feature, :]
+gene_kept = list(feature['gene'])
+df = df[df.gene.isin(gene_kept)]
+
+brc = copy.copy(df[['j','X','Y','brc_tot_'+args.splice]]).drop_duplicates(subset='j')
+brc.rename(columns = {'brc_tot_'+args.splice : 'brc_tot'}, inplace=True)
 brc.index = range(brc.shape[0])
 brc['x'] = brc.X.values * mu_scale
 brc['y'] = brc.Y.values * mu_scale
 pts = np.asarray(brc[['x','y']])
 balltree = sklearn.neighbors.BallTree(pts)
-
-feature = df[['gene', 'gene_tot']].drop_duplicates(subset='gene')
-gene_kept = list(feature['gene'])
 
 # Make DGE
 feature_kept = copy.copy(gene_kept)
@@ -138,7 +134,7 @@ indx_col = [ ft_dict[x] for x in df['gene']]
 N = len(barcode_kept)
 M = len(feature_kept)
 
-dge_mtx = coo_matrix((df['Count'], (indx_row, indx_col)), shape=(N, M)).tocsr()
+dge_mtx = coo_matrix((df[args.splice], (indx_row, indx_col)), shape=(N, M)).tocsr()
 print(f"Made DGE {dge_mtx.shape}")
 
 # Baseline model training
@@ -151,9 +147,7 @@ else:
 
 diam_train = diam
 
-output_id = expr_id + "." + "nFactor_"+str(L) + ".d_"+str(int(diam_train)) + "." + reg_iden
-
-n_move = args.n_move_train # sliding hexagon
+n_move = args.n_move_hex_tile # sliding hexagon
 if n_move > diam or n_move < 0:
     n_move = diam // 4
 
@@ -203,7 +197,7 @@ else:
 
 ### DE gene based on learned factor profiles
 if not args.skip_analysis:
-    mtx = lda_base.components_ * (df.Count.sum()/lda_base.components_.sum()) # L x M
+    mtx = lda_base.components_ * (df[args.splice].sum()/lda_base.components_.sum()) # L x M
     mtx = np.around(mtx, 0).astype(int)
     gene_sum = mtx.sum(axis = 0)
     fact_sum = mtx.sum(axis = 1)
@@ -212,7 +206,7 @@ if not args.skip_analysis:
     tab=np.zeros((2,2))
     for i, name in enumerate(lda_base.feature_names_in_):
         for l in range(L):
-            if fact_sum[l] == 0:
+            if mtx[l,i] == 0 or fact_sum[l] == 0:
                 continue
             tab[0,0]=mtx[l,i]
             tab[0,1]=gene_sum[i]-tab[0,0]
@@ -238,7 +232,7 @@ if radius < 0:
     radius = diam / np.sqrt(3)
 else:
     diam = radius*np.sqrt(3)
-n_move = args.n_move_fit
+n_move = args.n_move_hex_tile
 if n_move > diam or n_move < 0:
     n_move = diam // 4
 
@@ -309,13 +303,12 @@ with warnings.catch_warnings(record=True):
                                     color='Top_assigned',alpha='Top_Prob'))
         +geom_point(size = pt_size, shape='o')
         +guides(colour = guide_legend(override_aes = {'size':3,'shape':'o'}))
-        # +guides(color=None,alpha=None)
         +xlab("")+ylab("")
         +guides(alpha=None)
         +coord_fixed(ratio = 1)
         +scale_color_manual(values = clist)
         +theme_bw()
-        # +theme(legend_position='bottom')
+        +theme(legend_position='bottom')
     )
 
 f = figure_path + "/"+output_id+".png"
