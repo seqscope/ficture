@@ -152,6 +152,27 @@ class OnlineLDA:
 
         return((score_pixel, score_patch, score_gamma, score_beta, self._n * (score_patch+score_gamma) + score_beta))
 
+    def coherence_pmi(self, pw, pseudo_ct = 200, top_gene_n = 100):
+        """
+        Topic coherence (pointwise mutual information)
+        """
+        topic_pmi = []
+        top_gene_n = np.min([top_gene_n, self._M])
+        pw = pw / pw.sum()
+        for k in range(self._K):
+            indx = np.argsort(-self._expElog_beta[k, :])[:top_gene_n]
+            b = self._expElog_beta[k, indx]
+            b = np.clip(b, 1e-6, 1.-1e-6)
+            w = 1. - np.power(1.-pw[indx], pseudo_ct)
+            w = w.reshape((-1, 1)) @ w.reshape((1, -1))
+            p0 = 1.-np.power(1-b, pseudo_ct)
+            p0 = p0.reshape((-1, 1)) @ p0.reshape((1, -1))
+            pmi = np.log(p0) - np.log(w)
+            np.fill_diagonal(pmi, 0)
+            pmi = np.round(pmi.mean(), 3)
+            topic_pmi.append(pmi)
+        return topic_pmi
+
     def update_lambda(self, batch):
         """
         Process one minibatch

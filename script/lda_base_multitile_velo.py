@@ -181,9 +181,24 @@ else:
             _ = lda_base.partial_fit(mtx)
             # Evaluation (todo: use test set?
             logl = lda_base.score(mtx)
+            # Compute topic coherence
+            topic_pmi = []
+            top_gene_n = np.min(100, mtx.shape[1])
+            pseudo_ct = 200
+            for k in range(L):
+                b = lda_base.exp_dirichlet_component_[k,:]
+                b = np.clip(b, 1e-6, 1.-1e-6)
+                indx = np.argsort(-b)[:top_gene_n]
+                w = 1. - np.power(1.-feature_mf[indx], pseudo_ct)
+                w = w.reshape((-1, 1)) @ w.reshape((1, -1))
+                p0 = 1.-np.power(1-b, pseudo_ct)
+                p0 = p0.reshape((-1, 1)) @ p0.reshape((1, -1))
+                pmi = np.log(p0) - np.log(w)
+                np.fill_diagonal(pmi, 0)
+                pmi = np.round(pmi.mean(), 3)
+                topic_pmi.append(pmi)
             print(f"Epoch {epoch}, sliding offset {offs_x}, {offs_y}. Fit data matrix {mtx.shape}, log likelihood {logl:.3E}.")
-            theta = lda_base.transform(mtx)
-
+            print(*topic_pmi, sep = ", ")
             epoch += 1
             offs_y += 1
 

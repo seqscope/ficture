@@ -8,13 +8,14 @@ import sys, io, os, copy, re, time, importlib, warnings, subprocess
 import pickle, argparse
 import numpy as np
 import pandas as pd
-from random import shuffle
+from random import shuffle, choices
 
 import matplotlib.pyplot as plt
 from plotnine import *
 import plotnine
 import matplotlib
 
+import scipy
 from scipy.sparse import *
 import sklearn.neighbors
 from sklearn.decomposition import LatentDirichletAllocation as LDA
@@ -47,6 +48,13 @@ parser.add_argument('--cmap_name', type=str, default="nipy_spectral", help="Name
 parser.add_argument('--model_f', default='', type=str, help='')
 parser.add_argument('--flt_f', default='', type=str, help='')
 parser.add_argument('--rectangle', default='', type=str, help='')
+parser.add_argument('--batch_size_um', type=int, default=80, help='')
+parser.add_argument('--batch_ovlp_um', type=int, default=10, help='')
+parser.add_argument('--global_prior_scale', type=float, default=-1, help='')
+parser.add_argument('--eta_scale', type=float, default=10, help='')
+parser.add_argument('--grid_size', type=float, default=2, help='')
+parser.add_argument('--weighted_G_kernel', action='store_true')
+parser.add_argument('--skip_visual', action='store_true')
 
 args = parser.parse_args()
 
@@ -107,7 +115,7 @@ gd = {x:i for i,x in enumerate(lda_base.feature_names_in_)}
 m_indx = [gd[x] for x in gene_kept]
 _lambda = lda_base.components_[:, m_indx]
 _eta = lda_base.components_[:, m_indx].mean(axis = 0)
-_eta = _eta / _eta.sum() * 100
+_eta = _eta / _eta.sum() * args.eta_scale
 
 lda_base_result = pd.read_csv(r_f,sep='\t')
 lda_base_result.Top_assigned = pd.Categorical(lda_base_result.Top_Topic.astype(int))
@@ -115,6 +123,19 @@ lda_base_result['x'] = lda_base_result.Hex_center_x.values
 lda_base_result['y'] = lda_base_result.Hex_center_y.values
 prior_D = lda_base_result.shape[0]//2
 print("Read model file")
+
+# Decide if want to sub-sample grid points
+doc_pts = np.asarray(lda_base_result[['x','y']])
+indx = choices(range(doc_pts.shape[0]), k=1000)
+balltree_ref = sklearn.neighbors.BallTree(doc_pts)
+dv, iv = balltree_ref.query(X=doc_pts[indx, :], k=3, return_distance=True, sort_results=False)
+dv = np.asarray(dv).reshape(-1)
+gs = np.median(dv[dv>0])
+down_sample = 1
+while gs * down_sample < args.grid_size:
+    down_sample += 1
+n_step = int(max_radius / (gs*down_sample) * 3)
+
 
 tpop = lda_base_result[topic_header].sum(axis = 0)
 label_sort = np.argsort(tpop)
@@ -168,9 +189,14 @@ M = len(feature_kept)
 
 dge_mtx = coo_matrix((df['Count'], (indx_row, indx_col)), shape=(N, M)).tocsr()
 print(f"Made DGE {dge_mtx.shape}")
+feature_ct = np.asarray(dge_mtx.sum(axis = 0)).reshape((1, -1))
 
+if args.global_prior_scale > 0:
+    _lambda = sklearn.preprocessing.normalize(lda_base.components_[:, m_indx], norm='l1', axis=0)
+    _lambda = _lambda * (feature_ct * args.global_prior_scale)
 
-
+feature_ct = feature_ct.reshape(-1)
+feature_ct = feature_ct / feature_ct.sum()
 
 x_min, y_min = pts_full.min(axis = 0).astype(int)
 x_max, y_max = pts_full.max(axis = 0).astype(int)
@@ -179,52 +205,52 @@ lda_base_result=lda_base_result.loc[indx, :]
 print(lda_base_result.x.max()-lda_base_result.x.min(),lda_base_result.y.max()-lda_base_result.y.min())
 
 # Split into spatially close minibatches (overlapping windows)
-batch_size_um = 150 # at most x^2um
-batch_ovlp_um = 20
-batch_step_um = batch_size_um - batch_ovlp_um
-n_batch_x = int((x_max - x_min - batch_ovlp_um)/batch_step_um) + 1
-n_batch_y = int((y_max - y_min - batch_ovlp_um)/batch_step_um) + 1
-batch_size_x = int((x_max - x_min - batch_ovlp_um)/n_batch_x)+1
-batch_size_y = int((y_max - y_min - batch_ovlp_um)/n_batch_y)+1
-batch_step_x = batch_size_x - batch_ovlp_um
-batch_step_y = batch_size_y - batch_ovlp_um
+batch_step_um = args.batch_size_um - args.batch_ovlp_um
+n_batch_x = int((x_max - x_min - args.batch_ovlp_um)/batch_step_um) + 1
+n_batch_y = int((y_max - y_min - args.batch_ovlp_um)/batch_step_um) + 1
+batch_size_x = int((x_max - x_min - args.batch_ovlp_um)/n_batch_x)+1
+batch_size_y = int((y_max - y_min - args.batch_ovlp_um)/n_batch_y)+1
+batch_step_x = batch_size_x - args.batch_ovlp_um
+batch_step_y = batch_size_y - args.batch_ovlp_um
 x_grd = np.arange( x_min, x_max+1, batch_step_x)
 y_grd = np.arange( y_min, y_max+1, batch_step_y)
 x_grd[-1] = x_max+1
 y_grd[-1] = y_max+1
-print(x_grd)
-print(y_grd)
+print(batch_size_x, batch_size_y)
+print(x_grd, y_grd)
 
 slda = OnlineLDA(gene_kept, L, prior_D, alpha=1./L, eta=_eta, verbose = 1)
 slda.init_global_parameter(_lambda)
+slda._updatect = lda_base.n_batch_iter_
 
 pixel_result = pd.DataFrame()
 center_result = pd.DataFrame()
-for offset in [0, 1]:
-    grid_pts_full = copy.copy(lda_base_result[(lda_base_result.offs_x.values%2==offset)&(lda_base_result.offs_y.values%2==offset)])
+for offset in range(down_sample):
+    grid_pts_full = copy.copy(lda_base_result[(lda_base_result.offs_x.values%down_sample==offset)&(lda_base_result.offs_y.values%down_sample==offset)])
     grid_pts_full.index = range(grid_pts_full.shape[0])
     for iter_i in range(1, len(x_grd)):
         skip = 0
-        x_min = x_grd[iter_i-1] - batch_ovlp_um//2
-        x_max = x_grd[iter_i]   + batch_ovlp_um//2
+        x_min = x_grd[iter_i-1] - args.batch_ovlp_um//2
+        x_max = x_grd[iter_i]   + args.batch_ovlp_um//2
         for iter_j in range(1, len(y_grd)):
             if skip == 0:
-                y_min = y_grd[iter_j-1] - batch_ovlp_um//2
-            y_max = y_grd[iter_j]   + batch_ovlp_um//2
+                y_min = y_grd[iter_j-1] - args.batch_ovlp_um//2
+            y_max = y_grd[iter_j]   + args.batch_ovlp_um//2
 
             grid_indx = (grid_pts_full.x >= x_min) & (grid_pts_full.x <= x_max) & (grid_pts_full.y >= y_min) & (grid_pts_full.y <= y_max)
-            pixel_indx= (pts_full[:,0]>=x_min)&(pts_full[:,0]<=x_max)&(pts_full[:,1]>=y_min)&(pts_full[:,1]<=y_max)
-
-            pts = copy.copy(pts_full[pixel_indx, :])
             grid_pts = copy.copy(grid_pts_full.loc[grid_indx, :])
-
             doc_pts = np.asarray(grid_pts[['x', 'y']])
-            if doc_pts.shape[0] < 50:
+
+            pixel_indx= (pts_full[:,0]>=x_min)&(pts_full[:,0]<=x_max)&(pts_full[:,1]>=y_min)&(pts_full[:,1]<=y_max)
+            pts = copy.copy(pts_full[pixel_indx, :])
+
+            if pts.shape[0] < 100 or doc_pts.shape[0] < 50:
                 skip = 1
                 print(["Skip",x_min,x_max,y_min,y_max,doc_pts.shape[0]])
                 continue
+
             skip = 0
-            print([iter_i,iter_j,x_min,x_max,y_min,y_max,doc_pts.shape[0]])
+            bt = sklearn.neighbors.BallTree(pts)
             balltree_ref = sklearn.neighbors.BallTree(doc_pts)
             p_mtx = np.asarray(grid_pts[topic_header])
 
@@ -232,18 +258,44 @@ for offset in [0, 1]:
             n = doc_pts.shape[0]
             d_size = N/n
 
-            dist, indx_assign = balltree_ref.query(X=pts, k=k_nn, return_distance=True, sort_results=False)
-            indx_row = [i for i in range(len(indx_assign)) for j in range(len(indx_assign[i]))]
-            indx_col = [item for sublist in indx_assign for item in sublist]
-            dist = np.array([item for sublist in dist for item in sublist])
+            if args.weighted_G_kernel:
+                # Density weighted Gaussian kernel
+                indx, dist = bt.query_radius(X = doc_pts, r = 3, return_distance = True)
+                r_indx = [i for i,x in enumerate(indx) for y in range(len(x))]
+                c_indx = [x for y in indx for x in y]
+                cmtx = coo_matrix((np.ones(len(r_indx),dtype=bool),(r_indx,c_indx)),shape=(n,N)).tocsr()
+                v = dge_mtx[pixel_indx,:].sum(axis = 1).reshape(-1, 1)
+                dens = np.asarray(cmtx @ v).squeeze()
 
-            psi_org = coo_matrix((dist, (indx_row, indx_col)), shape=[N, n]).tocsr()
-            psi_org.data = np.exp( -dist**2 / sig**2 / 2 )
+                indx_assign, dist = balltree_ref.query_radius(X=pts, r=max_radius, return_distance=True, sort_results=False)
+                indx_row = [i for i in range(len(indx_assign)) for j in range(len(indx_assign[i]))]
+                indx_col = [item for sublist in indx_assign for item in sublist]
+                dist = np.array([item for sublist in dist for item in sublist])
+                dist = coo_matrix((dist, (indx_row, indx_col)), shape=[N, n]).tocsr()
+                dist.data = np.exp( -dist.data**2 / sig**2 / 2 )
+                dist = sklearn.preprocessing.normalize(dist, norm = 'max', axis = 1)
+
+                dv = [dens[x] for i,x in enumerate(indx_col)]
+                psi_org = coo_matrix((dv, (indx_row, indx_col)), shape=[N, n]).tocsr()
+                psi_org = sklearn.preprocessing.normalize(psi_org, norm = 'max', axis = 1) * 2
+                psi_org = psi_org.multiply( dist )
+                psi_org.data[psi_org.data < 0.05] = 0
+
+            else:
+                # Distance weighted KNN kernel
+                dist, indx_assign = balltree_ref.query(X=pts, k=k_nn, return_distance=True, sort_results=False)
+                indx_row = [i for i in range(len(indx_assign)) for j in range(len(indx_assign[i]))]
+                indx_col = [item for sublist in indx_assign for item in sublist]
+                dist = np.array([item for sublist in dist for item in sublist])
+                psi_org = coo_matrix((dist, (indx_row, indx_col)), shape=[N, n]).tocsr()
+                psi_org.data = np.exp( -psi_org.data**2 / sig**2 / 2 )
+
             psi_org.data[psi_org.data > max_radius] = 0
             psi_org.eliminate_zeros()
-
             # psi_org = sklearn.preprocessing.normalize(psi_org, norm='l1', axis=1)
+            med_nn = int(np.median(np.asarray((psi_org > 0).sum(axis = 1)).reshape(-1)))
             psi_org = sklearn.preprocessing.normalize(psi_org, norm='max', axis=1)
+
             phi_org = psi_org @ p_mtx
             phi_org = sklearn.preprocessing.normalize(phi_org, norm='l1', axis=1)
             # phi_org = sklearn.preprocessing.normalize(phi_org, norm='max', axis=1)
@@ -252,11 +304,13 @@ for offset in [0, 1]:
             batch.init_from_matrix(dge_mtx[pixel_indx,:], doc_pts, psi_org, m_phi=phi_org, m_gamma=p_mtx*d_size/3)
 
             scores = slda.update_lambda(batch)
+            med_su = int(np.median(np.asarray(batch.psi.sum(axis = 0)).reshape(-1)))
+
             pixel_result = pd.concat([pixel_result,
-                                      pd.concat([copy.copy(brc.loc[pixel_indx, ['j']]).reset_index(),\
-                                                 pd.DataFrame(batch.phi, columns =\
-                                                            ['Factor_'+str(x) for x in range(slda._K)])],\
-                                                 axis = 1)])
+                              pd.concat([copy.copy(brc.loc[pixel_indx, ['j']]).reset_index(),\
+                              pd.DataFrame(batch.phi, columns =\
+                                           ['Factor_'+str(x) for x in range(slda._K)])],\
+                                           axis = 1)])
 
             expElog_theta = np.exp(utilt.dirichlet_expectation(batch.gamma))
             expElog_theta /= expElog_theta.sum(axis = 1)[:, np.newaxis]
@@ -268,6 +322,9 @@ for offset in [0, 1]:
                 tmp['Factor_'+str(v)] = expElog_theta[:, v]
             center_result = pd.concat([center_result, tmp])
 
+            topic_pmi = slda.coherence_pmi(feature_ct)
+            print( ", ".join([str(x) for x in [iter_i,iter_j,med_nn,med_su,doc_pts.shape[0]] ]) + ". Topic coherence:" )
+            print(*topic_pmi, sep = ", ")
 
 factor_header = ['Factor_'+str(x) for x in range(slda._K)]
 pixel_result = pixel_result.groupby(by=['j'], as_index=False).agg({x:np.mean for x in factor_header})
@@ -279,6 +336,53 @@ pixel_result['Top_assigned'] = pd.Categorical(pixel_result.Top_Factor.values, ca
 f = outbase + "/analysis/"+output_id+"."+out_suff+".pixel.tsv"
 pixel_result.to_csv(f,sep='\t',index=False)
 
+N = pixel_result.shape[0]
+
+### DE gene based on pixel assignment
+mtx = coo_matrix((np.ones(N), (pixel_result.Top_Factor.values, range(N))), shape=[L, N]).tocsr() @ dge_mtx # L x M
+gene_sum = np.asarray(mtx.sum(axis = 0)).reshape(-1)
+fact_sum = np.asarray(mtx.sum(axis = 1)).reshape(-1)
+tt = mtx.sum()
+res=[]
+tab=np.zeros((2,2))
+for i, name in enumerate(feature_kept):
+    for l in range(L):
+        if fact_sum[l] == 0:
+            continue
+        tab[0,0]=mtx[l,i]
+        tab[0,1]=gene_sum[i]-tab[0,0]
+        tab[1,0]=fact_sum[l]-tab[0,0]
+        tab[1,1]=tt-fact_sum[l]-gene_sum[i]+tab[0,0]
+        fd=tab[0,0]/fact_sum[l]/tab[0,1]*(tt-fact_sum[l])
+        chi2, p, dof, ex = scipy.stats.chi2_contingency(tab, correction=False)
+        res.append([name,l,chi2,p,fd])
+
+chidf=pd.DataFrame(res,columns=['gene','factor','Chi2','pval','FoldChange'])
+res=chidf.loc[(chidf.pval<1e-3)*(chidf.FoldChange>1)].sort_values(by='FoldChange',ascending=False)
+res = res.merge(right = feature, on = 'gene', how = 'inner')
+res.sort_values(by=['factor','FoldChange'],ascending=[True,False],inplace=True)
+res['pval'] = res.pval.map('{:,.3e}'.format)
+
+f = outbase + "/analysis/"+output_id+"."+out_suff+".DEgene.tsv.gz"
+res.round(5).to_csv(f,sep='\t',index=False)
+
+
+center_result.sort_values(by = 'Avg_size', ascending=False, inplace=True)
+center_info = center_result[['center_id', 'x', 'y']].drop_duplicates(subset=['center_id'])
+center_result = center_result.groupby(by=['center_id']).agg({x:np.mean for x in factor_header + ['Avg_size']}).reset_index()
+center_result = center_result.merge(right = center_info, on=['center_id'], how='inner')
+center_result['Top_Factor'] = np.asarray(center_result[factor_header]).argmax(axis = 1)
+center_result['Top_Prob'] = np.asarray(center_result[factor_header]).max(axis = 1)
+center_result['Top_assigned'] = pd.Categorical(center_result.Top_Factor.values, categories=range(slda._K))
+
+f = outbase + "/analysis/"+output_id+"."+out_suff+".center.tsv"
+center_result.to_csv(f,sep='\t',index=False)
+
+
+if args.skip_visual:
+    sys.exit()
+
+### Pixel level visualization
 plotnine.options.figure_size = (args.figure_width,args.figure_width)
 with warnings.catch_warnings(record=True):
     ps = (
@@ -295,18 +399,7 @@ with warnings.catch_warnings(record=True):
     f = figure_path + "/"+output_id+"."+out_suff+".pixel.png"
     ggsave(filename=f,plot=ps,device='png')
 
-
-center_result.sort_values(by = 'Avg_size', ascending=False, inplace=True)
-center_info = center_result[['center_id', 'x', 'y']].drop_duplicates(subset=['center_id'])
-center_result = center_result.groupby(by=['center_id']).agg({x:np.mean for x in factor_header + ['Avg_size']}).reset_index()
-center_result = center_result.merge(right = center_info, on=['center_id'], how='inner')
-center_result['Top_Factor'] = np.asarray(center_result[factor_header]).argmax(axis = 1)
-center_result['Top_Prob'] = np.asarray(center_result[factor_header]).max(axis = 1)
-center_result['Top_assigned'] = pd.Categorical(center_result.Top_Factor.values, categories=range(slda._K))
-
-f = outbase + "/analysis/"+output_id+"."+out_suff+".center.tsv"
-center_result.to_csv(f,sep='\t',index=False)
-
+### Center level visualization
 pt_size = 1000/(pts_full[:,1].max()-pts_full[:,1].min()) * 0.5
 pt_size = np.round(pt_size,2)
 plotnine.options.figure_size = (args.figure_width,args.figure_width)
