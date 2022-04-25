@@ -51,6 +51,8 @@ k1 = int(k1*k2 / math.gcd(k1, k2))
 for k2 in K_list[2:]:
     k1 = int(k1*k2 / math.gcd(k1, k2))
 n = k1
+if n < np.max(K_list) * 4:
+    n = np.max(K_list) * 4
 print(n)
 
 cmap_name = args.cmap_name
@@ -70,7 +72,7 @@ while not os.path.exists(f):
     print(k1)
     i += 1
     if i >= len(K_list):
-        sys.exit()
+        sys.exit("Cannot find model file")
     k1=K_list[i]
     f=args.input_model_template.replace("NFACTOR", str(k1) )
 
@@ -78,7 +80,9 @@ K_list = K_list[i:]
 if len(K_list) <= 1:
     sys.exit()
 
-c1 = [x for x in range(0,n,n//k1)]
+step = n//k1
+c1 = [x for x in range(step//2,n,step)]
+print(k1, c1)
 factor_color_code[k1] = {i:x for i,x in enumerate(c1)}
 i = 0
 while k1 < K_list[-1]:
@@ -86,7 +90,8 @@ while k1 < K_list[-1]:
     k2=K_list[i]
     f=args.input_model_template.replace("NFACTOR", str(k1) )
     if not os.path.exists(f):
-        sys.exit("Cannot find model file")
+        print(f"Cannot find model file for {k1}")
+        continue
     m1 = pickle.load( open( f, "rb" ) )
     f=args.input_model_template.replace("NFACTOR", str(k2) )
     if not os.path.exists(f):
@@ -95,7 +100,8 @@ while k1 < K_list[-1]:
     m2 = pickle.load( open( f, "rb" ) )
     gene_list = sorted(list(set(m1.feature_names_in_).intersection( set(m2.feature_names_in_) )))
     if len(gene_list) == 0:
-        sys.exit("ERROR: cannot find shared genes")
+        print(f"ERROR: cannot find shared genes for {k2} and {k1}")
+        continue
     gd = {x:i for i,x in enumerate(m1.feature_names_in_)}
     indx_1=[gd[x] for x in gene_list]
     gd = {x:i for i,x in enumerate(m2.feature_names_in_)}
@@ -127,7 +133,9 @@ code_df.to_csv(f, sep='\t', index=False)
 df.Color=pd.Categorical(df.Color)
 df_arrow.Color=pd.Categorical(df_arrow.Color)
 
-plotnine.options.figure_size = (12, 6)
+fig_h = np.max([4, len(K_list)])
+fig_w = np.max([fig_h, fig_h * len(K_list) // 3])
+plotnine.options.figure_size = (fig_w, fig_h)
 with warnings.catch_warnings(record=True):
     ps = (
         ggplot(df, aes(color='Color'))

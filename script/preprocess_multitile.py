@@ -28,8 +28,9 @@ parser.add_argument('--tile', type=str, help='')
 parser.add_argument('--mu_scale', type=float, default=80, help='Coordinate to um translate')
 parser.add_argument('--gene_type_info', type=str, help='A file containing two columns, gene name and gene type. Used only if specific types of genes are kept.', default = '')
 parser.add_argument('--gene_type_keyword', type=str, help='Key words (separated by ,) of gene types to keep, only used is gene_type_info is provided.', default="IG,TR,protein,lnc")
+parser.add_argument('--rm_gene_keyword', type=str, help='Key words (separated by ,) of gene names to remove, only used is gene_type_info is provided.', default="")
 
-parser.add_argument('--min_count_per_feature', type=int, default=50, help='')
+parser.add_argument('--min_count_per_feature', type=int, default=20, help='')
 parser.add_argument('--min_mol_density_squm', type=int, default=1, help='')
 parser.add_argument('--hex_diam', type=int, default=18, help='')
 parser.add_argument('--hex_n_move', type=int, default=3, help='')
@@ -91,6 +92,10 @@ if args.gene_type_info != '' and os.path.exists(args.gene_type_info):
     kept_key = args.gene_type_keyword.split(',')
     kept_type = gencode.loc[gencode.Type.str.contains('|'.join(kept_key)),'Type'].unique()
     gencode = gencode.loc[ gencode.Type.isin(kept_type) ]
+    if args.rm_gene_keyword != "":
+        rm_list = args.rm_gene_keyword.split(",")
+        for x in rm_list:
+            gencode = gencode.loc[ ~gencode.Name.str.contains(x) ]
     gene_kept = list(gencode.Name)
 
 ### Basic parameterse
@@ -156,7 +161,7 @@ df['X'] = (nrows-df.row-1)*xr + df.X.values - xbin_min
 df['Y'] = df.col.values*yr + df.Y.values - ybin_min
 df['j'] = df.X.astype(str) + '_' + df.Y.astype(str)
 
-feature = df[['gene', 'gene_tot']].drop_duplicates(subset='gene')
+feature = df[['gene', 'Count']].groupby(by = 'gene', as_index=False).agg({'Count':sum}).rename(columns = {'Count':'gene_tot'})
 feature = feature[(feature.gene_tot > min_count_per_feature)]
 gene_kept = list(feature['gene'])
 df = df[df.gene.isin(gene_kept)]

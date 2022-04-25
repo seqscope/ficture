@@ -33,7 +33,8 @@ parser.add_argument('--splice', default = 'spl', type=str, help='')
 parser.add_argument('--experiment_id', type=str, help='')
 parser.add_argument('--filter_criteria_id', type=str, help='Used if filtered and merged data file is to be stored.', default = '')
 parser.add_argument('--lane', type=str, help='')
-parser.add_argument('--tile', type=str, help='')
+parser.add_argument('--tile', type=str, default='', help='')
+parser.add_argument('--tile_id', type=str, default='', help='')
 parser.add_argument('--mu_scale', type=float, default=80, help='Coordinate to um translate')
 parser.add_argument('--gene_type_info', type=str, help='A file containing two columns, gene name and gene type. Used only if specific types of genes are kept.', default = '')
 parser.add_argument('--gene_type_keyword', type=str, help='Key words (separated by ,) of gene types to keep, only used is gene_type_info is provided.', default="IG,TR,protein,lnc")
@@ -43,7 +44,8 @@ parser.add_argument('--hex_radius', type=int, default=-1, help='')
 parser.add_argument('--min_pixel_per_unit', type=int, default=50, help='')
 parser.add_argument('--min_pixel_per_unit_fit', type=int, default=20, help='')
 parser.add_argument('--min_count_per_feature', type=int, default=50, help='')
-parser.add_argument('--n_move_hex_tile', type=int, default=-1, help='')
+parser.add_argument('--n_move_train', type=int, default=-1, help='')
+parser.add_argument('--n_move_fit', type=int, default=-1, help='')
 parser.add_argument('--hex_width_fit', type=int, default=18, help='')
 parser.add_argument('--hex_radius_fit', type=int, default=-1, help='')
 parser.add_argument('--figure_width', type=int, default=20, help="Width of the output figure per 1000um")
@@ -54,24 +56,40 @@ parser.add_argument('--skip_analysis', action='store_true')
 
 args = parser.parse_args()
 
+if args.tile == '' and args.tile_id == '':
+    print("ERROR: please indicate tiles either use --tile or --tile_id")
+    sys.exit()
+
 iden=args.identifier
 outbase=args.output_path
 expr_id=args.experiment_id
 lane=args.lane
-tile_list=args.tile.split(',')
+tile_id = args.tile_id
 mu_scale = 1./args.mu_scale
+if tile_id == '':
+    tile_id = '_'.join(args.tile.split(','))
 
+reg_iden = "lane_" + lane + "." + tile_id
 filter_id = ""
 if args.filter_criteria_id != '':
     filter_id += "." + args.filter_criteria_id
 
-output_id = expr_id + "." + args.splice + ".nFactor_"+str(args.nFactor) + ".d_"+str(args.hex_width) + ".lane_"+lane+'.'+'_'.join(tile_list)
+radius=args.hex_radius
+diam=args.hex_width
+if radius < 0:
+    radius = diam / np.sqrt(3)
+else:
+    diam = int(radius*np.sqrt(3))
+diam_train = diam
+
+output_id = expr_id + "." + args.splice + ".nFactor_"+str(args.nFactor) + ".d_"+str(diam_train) + "." + reg_iden
+print(f"Output id: {output_id}")
 
 ### Input and output
 outpath = '/'.join([outbase,lane])
-flt_f = outpath+"/matrix_merged_info.velo.lane_"+lane+'.'+'_'.join(tile_list)+filter_id+".tsv.gz"
+flt_f = outpath+"/matrix_merged_info.velo."+reg_iden+filter_id+".tsv.gz"
 if not os.path.exists(flt_f):
-    print(f"ERROR: cannot find input file, please run preprocessing script first.")
+    print(f"ERROR: cannot find input file \n {flt_f}, please run preprocessing script first.")
     sys.exit()
 
 figure_path = outbase + "/analysis/figure"
@@ -99,7 +117,6 @@ b_size = 256 # minibatch size
 L=args.nFactor
 min_pixel_per_unit=args.min_pixel_per_unit
 min_pixel_per_unit_fit=args.min_pixel_per_unit_fit
-min_count_per_feature=args.min_count_per_feature
 
 ### Read data
 try:
@@ -110,8 +127,7 @@ except:
 if len(gene_kept_org) > 0:
     df = df[df.gene.isin(gene_kept_org)]
 
-feature = df[['gene', 'gene_tot_'+args.splice]].drop_duplicates(subset='gene')
-feature.rename(columns = {'gene_tot_'+args.splice : 'gene_tot'}, inplace=True)
+feature = df[['gene', args.splice]].groupby(by = 'gene', as_index=False).agg({args.splice:sum}).rename(columns = {args.splice:'gene_tot'})
 feature = feature.loc[feature.gene_tot > args.min_count_per_feature, :]
 gene_kept = list(feature['gene'])
 df = df[df.gene.isin(gene_kept)]
@@ -136,18 +152,12 @@ M = len(feature_kept)
 
 dge_mtx = coo_matrix((df[args.splice], (indx_row, indx_col)), shape=(N, M)).tocsr()
 print(f"Made DGE {dge_mtx.shape}")
+feature_mf = np.asarray(dge_mtx.sum(axis = 0)).reshape(-1)
+feature_mf = feature_mf / feature_mf.sum()
 
 # Baseline model training
-radius=args.hex_radius
-diam=args.hex_width
-if radius < 0:
-    radius = diam / np.sqrt(3)
-else:
-    diam = int(radius*np.sqrt(3))
 
-diam_train = diam
-
-n_move = args.n_move_hex_tile # sliding hexagon
+n_move = args.n_move_train # sliding hexagon
 if n_move > diam or n_move < 0:
     n_move = diam // 4
 
@@ -183,7 +193,7 @@ else:
             logl = lda_base.score(mtx)
             # Compute topic coherence
             topic_pmi = []
-            top_gene_n = np.min(100, mtx.shape[1])
+            top_gene_n = np.min([100, mtx.shape[1]])
             pseudo_ct = 200
             for k in range(L):
                 b = lda_base.exp_dirichlet_component_[k,:]
@@ -191,7 +201,7 @@ else:
                 indx = np.argsort(-b)[:top_gene_n]
                 w = 1. - np.power(1.-feature_mf[indx], pseudo_ct)
                 w = w.reshape((-1, 1)) @ w.reshape((1, -1))
-                p0 = 1.-np.power(1-b, pseudo_ct)
+                p0 = 1.-np.power(1-b[indx], pseudo_ct)
                 p0 = p0.reshape((-1, 1)) @ p0.reshape((1, -1))
                 pmi = np.log(p0) - np.log(w)
                 np.fill_diagonal(pmi, 0)
@@ -247,7 +257,7 @@ if radius < 0:
     radius = diam / np.sqrt(3)
 else:
     diam = radius*np.sqrt(3)
-n_move = args.n_move_hex_tile
+n_move = args.n_move_fit
 if n_move > diam or n_move < 0:
     n_move = diam // 4
 

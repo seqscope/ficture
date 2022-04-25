@@ -63,19 +63,26 @@ iden=args.identifier
 outbase=args.output_path
 expr_id=args.experiment_id
 lane=args.lane
-tile_list=args.tile.split(',')
 tile_id = args.tile_id
 mu_scale = 1./args.mu_scale
+if tile_id == '':
+    tile_id = '_'.join(args.tile.split(','))
 
+reg_iden = "lane_" + lane + "." + tile_id
 filter_id = ""
 if args.filter_criteria_id != '':
     filter_id += "." + args.filter_criteria_id
 
-reg_iden = "lane_" + lane + "."
-if tile_id != '':
-    reg_iden += tile_id
+radius=args.hex_radius
+diam=args.hex_width
+if radius < 0:
+    radius = diam / np.sqrt(3)
 else:
-    reg_iden += '_'.join(tile_list)
+    diam = int(radius*np.sqrt(3))
+diam_train = diam
+
+output_id = expr_id + ".nFactor_"+str(args.nFactor) + ".d_"+str(int(diam_train)) + "." + reg_iden
+print(f"Output id: {output_id}")
 
 ### Input and output
 outpath = '/'.join([outbase,lane])
@@ -107,7 +114,6 @@ b_size = 256 # minibatch size
 L=args.nFactor
 min_pixel_per_unit=args.min_pixel_per_unit
 min_pixel_per_unit_fit=args.min_pixel_per_unit_fit
-min_count_per_feature=args.min_count_per_feature
 
 ### Read data
 try:
@@ -118,15 +124,17 @@ except:
 if len(gene_kept_org) > 0:
     df = df[df.gene.isin(gene_kept_org)]
 
+feature = df[['gene', 'Count']].groupby(by = 'gene', as_index=False).agg({'Count':sum}).rename(columns = {'Count':'gene_tot'})
+feature = feature.loc[feature.gene_tot > args.min_count_per_feature, :]
+gene_kept = list(feature['gene'])
+df = df[df.gene.isin(gene_kept)]
+
 brc = copy.copy(df[['j','X','Y','brc_tot']]).drop_duplicates(subset='j')
 brc.index = range(brc.shape[0])
 brc['x'] = brc.X.values * mu_scale
 brc['y'] = brc.Y.values * mu_scale
 pts = np.asarray(brc[['x','y']])
 balltree = sklearn.neighbors.BallTree(pts)
-
-feature = df[['gene', 'gene_tot']].drop_duplicates(subset='gene')
-gene_kept = list(feature['gene'])
 
 # Make DGE
 feature_kept = copy.copy(gene_kept)
@@ -143,17 +151,8 @@ print(f"Made DGE {dge_mtx.shape}")
 feature_mf = np.asarray(dge_mtx.sum(axis = 0)).reshape(-1)
 feature_mf = feature_mf / feature_mf.sum()
 
+
 # Baseline model training
-radius=args.hex_radius
-diam=args.hex_width
-if radius < 0:
-    radius = diam / np.sqrt(3)
-else:
-    diam = int(radius*np.sqrt(3))
-
-diam_train = diam
-
-output_id = expr_id + "." + "nFactor_"+str(L) + ".d_"+str(int(diam_train)) + "." + reg_iden
 
 n_move = args.n_move_train # sliding hexagon
 if n_move > diam or n_move < 0:
@@ -191,7 +190,7 @@ else:
             logl = lda_base.score(mtx)
             # Compute topic coherence
             topic_pmi = []
-            top_gene_n = np.min(100, mtx.shape[1])
+            top_gene_n = np.min([100, mtx.shape[1]])
             pseudo_ct = 200
             for k in range(L):
                 b = lda_base.exp_dirichlet_component_[k,:]
@@ -199,7 +198,7 @@ else:
                 indx = np.argsort(-b)[:top_gene_n]
                 w = 1. - np.power(1.-feature_mf[indx], pseudo_ct)
                 w = w.reshape((-1, 1)) @ w.reshape((1, -1))
-                p0 = 1.-np.power(1-b, pseudo_ct)
+                p0 = 1.-np.power(1-b[indx], pseudo_ct)
                 p0 = p0.reshape((-1, 1)) @ p0.reshape((1, -1))
                 pmi = np.log(p0) - np.log(w)
                 np.fill_diagonal(pmi, 0)
@@ -255,7 +254,9 @@ if radius < 0:
     radius = diam / np.sqrt(3)
 else:
     diam = radius*np.sqrt(3)
-n_move = args.n_move_fit
+
+if args.n_move_fit > 0:
+    n_move = args.n_move_fit
 if n_move > diam or n_move < 0:
     n_move = diam // 4
 
@@ -332,7 +333,7 @@ with warnings.catch_warnings(record=True):
         +coord_fixed(ratio = 1)
         +scale_color_manual(values = clist)
         +theme_bw()
-        # +theme(legend_position='bottom')
+        +theme(legend_position='bottom')
     )
 
 f = figure_path + "/"+output_id+".png"

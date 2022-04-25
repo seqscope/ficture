@@ -103,8 +103,8 @@ class OnlineLDA:
         expElog_theta = np.exp(Elog_theta)
         if batch.phi is None:
             batch.phi = batch.psi @ expElog_theta
-            # batch.phi = sklearn.preprocessing.normalize(batch.phi, norm='l1', axis=1)
-            batch.phi = sklearn.preprocessing.normalize(batch.phi, norm='max', axis=1)
+            batch.phi = sklearn.preprocessing.normalize(batch.phi, norm='l1', axis=1)
+            # batch.phi = sklearn.preprocessing.normalize(batch.phi, norm='max', axis=1)
 
         gamma_old = copy.copy(batch.alpha)
         meanchange = self._tol + 1

@@ -87,14 +87,16 @@ def match_factors(mtx1, mtx2, c1, n, cmap, mode='beta'):
 
     model = sklearn.cluster.SpectralBiclustering(n_clusters=(k1,k1), method="bistochastic").fit(Q+1e-5)
     prio = (-Q.sum(axis = 0)).argsort() # sorted from most consistent to less consistent
-    step = n//k1
+    step = n//(k1*2)
 
     dup = [1] * len(c1)
     c1_ref = copy.copy(c1)
     c2 = [-1]*k2
     for i,k in enumerate(prio):
         c2[k] = c1_ref[indx2[k][0]]
-        c1_ref[indx2[k][0]] += step - int(step / (2*dup[indx2[k][0]]))
+        even = dup[indx2[k][0]] % 2
+        odd  = dup[indx2[k][0]] + even
+        c1_ref[indx2[k][0]] += int(step * (-1)**(even) * (1-1/odd))
         dup[indx2[k][0]] += 1
 
     indx1 = np.array(c1).argsort()
