@@ -31,7 +31,6 @@ from hexagon_fn import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--output_path', type=str, help='')
-parser.add_argument('--identifier', type=str, help='')
 parser.add_argument('--experiment_id', type=str, help='')
 parser.add_argument('--filter_criteria_id', type=str, help='Used if filtered and merged data file is to be stored.', default = '')
 parser.add_argument('--lane', type=str, help='')
@@ -56,6 +55,7 @@ parser.add_argument('--hex_width_fit', type=int, default=18, help='')
 parser.add_argument('--hex_radius_fit', type=int, default=-1, help='')
 parser.add_argument('--figure_width', type=int, default=20, help="Width of the output figure per 1000um")
 parser.add_argument('--cmap_name', type=str, default="turbo", help="Name of Matplotlib colormap to use")
+parser.add_argument('--identifier', type=str, help='', default='')
 parser.add_argument('--model_only', action='store_true')
 parser.add_argument('--use_stored_model', action='store_true')
 parser.add_argument('--skip_analysis', action='store_true')
@@ -68,7 +68,6 @@ if args.tile == '' and args.tile_id == '':
     print("ERROR: please indicate tiles either use --tile or --tile_id")
     sys.exit()
 
-iden=args.identifier
 outbase=args.output_path
 expr_id=args.experiment_id
 lane=args.lane
