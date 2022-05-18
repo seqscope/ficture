@@ -72,7 +72,7 @@ layout.sort_values(by = ['lane', 'row', 'col'], inplace=True)
 tile_list = layout.tile.astype(str).values
 df = layout.merge(right = mani[["lane", "tile", 'xmin', 'xmax', 'ymin', 'ymax']], on = ["lane", "tile"], how = "left")
 if args.tile != '':
-    df = df[df.tile.isin(kept_list)]
+    df = df[df.tile.astype(str).isin(kept_list)]
 df.row = df.row - df.row.min()
 df.col = df.col - df.col.min()
 nrows = df.row.max() + 1
@@ -258,13 +258,6 @@ for i in range(n_move):
         indx = [True if (i,j,x[v],y[v]) in dense_center else False for v in range(len(x))]
         df.loc[df.j.isin( brc.loc[indx, 'j'] ), output_header].to_csv(flt_f, mode='a', sep='\t', index=False, header=False)
         df = df[~df.j.isin( brc.loc[indx, 'j'] )]
-        # keep_pixel = keep_pixel | np.array(indx)
         print(i, j)
 
-# if keep_pixel.sum() == 0:
-#     sys.exit("Not enough pixels in this field of view")
-
-# df = df[df.j.isin( brc.loc[keep_pixel, 'j'] )]
-# df = df[['X','Y','gene','gn','gt','spl','unspl','ambig','lane','tile']]
-# df.to_csv(flt_f, sep='\t', index=False)
 print(f"Finish filtering")

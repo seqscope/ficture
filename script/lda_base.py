@@ -37,8 +37,8 @@ parser.add_argument('--rm_gene_keyword', type=str, help='Key words (separated by
 parser.add_argument('--nFactor', type=int, default=10, help='')
 parser.add_argument('--hex_width', type=int, default=24, help='')
 parser.add_argument('--hex_radius', type=int, default=-1, help='')
-parser.add_argument('--min_pixel_per_unit', type=int, default=50, help='')
-parser.add_argument('--min_pixel_per_unit_fit', type=int, default=20, help='')
+parser.add_argument('--min_ct_per_unit', type=int, default=50, help='')
+parser.add_argument('--min_ct_per_unit_fit', type=int, default=20, help='')
 parser.add_argument('--min_count_per_feature', type=int, default=50, help='')
 parser.add_argument('--n_move_train', type=int, default=-1, help='')
 parser.add_argument('--n_move_fit', type=int, default=-1, help='')
@@ -97,20 +97,18 @@ if args.gene_type_info != '' and os.path.exists(args.gene_type_info):
 ### Basic parameterse
 b_size = 256 # minibatch size
 L=args.nFactor
-min_pixel_per_unit=args.min_pixel_per_unit
-min_pixel_per_unit_fit=args.min_pixel_per_unit_fit
 topic_header = ['Topic_'+str(x) for x in range(L)]
 
 ### Read data
 try:
-    df = pd.read_csv(args.input, sep='\t')
+    df = pd.read_csv(args.input, sep='\t', usecols = ['X','Y','gene',args.key])
 except:
-    df = pd.read_csv(args.input, sep='\t', compression='bz2')
+    df = pd.read_csv(args.input, sep='\t', compression='bz2', usecols = ['X','Y','gene',args.key])
 
 if len(gene_kept_org) > 0:
     df = df[df.gene.isin(gene_kept_org)]
 
-df.drop_duplicates(subset=['tile','X','Y','gene'], inplace=True)
+df.drop_duplicates(subset=['X','Y','gene'], inplace=True)
 feature = df[['gene', args.key]].groupby(by = 'gene', as_index=False).agg({args.key:sum}).rename(columns = {args.key:'gene_tot'})
 feature = feature.loc[feature.gene_tot > args.min_count_per_feature, :]
 gene_kept = list(feature['gene'])
@@ -119,26 +117,29 @@ df['j'] = df.X.astype(str) + '_' + df.Y.astype(str)
 
 brc = df.groupby(by = ['j','X','Y']).agg({args.key: sum}).reset_index()
 brc.index = range(brc.shape[0])
+pixel_ct = brc[args.key].values
 pts = np.asarray(brc[['X','Y']]) * mu_scale
 balltree = sklearn.neighbors.BallTree(pts)
 print(f"Read data with {brc.shape[0]} pixels and {len(gene_kept)} genes.")
+df.drop(columns = ['X', 'Y'], inplace=True)
 
 # Make DGE
 feature_kept = copy.copy(gene_kept)
 barcode_kept = list(brc.j.values)
+del brc
+gc.collect()
 bc_dict = {x:i for i,x in enumerate( barcode_kept ) }
 ft_dict = {x:i for i,x in enumerate( feature_kept ) }
 indx_row = [ bc_dict[x] for x in df['j']]
 indx_col = [ ft_dict[x] for x in df['gene']]
 N = len(barcode_kept)
 M = len(feature_kept)
-dge_mtx = coo_matrix((df[args.key], (indx_row, indx_col)), shape=(N, M)).tocsr()
+dge_mtx = coo_matrix((df[args.key].values, (indx_row, indx_col)), shape=(N, M)).tocsr()
 feature_mf = np.asarray(dge_mtx.sum(axis = 0)).reshape(-1)
 feature_mf = feature_mf / feature_mf.sum()
 total_molecule=df[args.key].sum()
 print(f"Made DGE {dge_mtx.shape}")
 del df
-del brc
 gc.collect()
 
 # Baseline model training
@@ -160,9 +161,9 @@ else:
         while offs_y < n_move:
             x,y = pixel_to_hex(pts, radius, offs_x/n_move, offs_y/n_move)
             hex_crd = list(zip(x,y))
-            ct = Counter(hex_crd)
-            ct = {k:v for k,v in ct.items() if v >= min_pixel_per_unit}
-            hex_list = list(ct.keys())
+            ct = pd.DataFrame({'hex_id':hex_crd, 'tot':pixel_ct}).groupby(by = 'hex_id').agg({'tot': sum}).reset_index()
+            ct = set(ct.loc[ct.tot >= args.min_ct_per_unit, 'hex_id'].values)
+            hex_list = list(ct)
             shuffle(hex_list)
             hex_dict = {x:i for i,x in enumerate(hex_list)}
             sub = pd.DataFrame({'crd':hex_crd,'cCol':range(N)})
@@ -170,38 +171,40 @@ else:
             sub['cRow'] = sub.crd.map(hex_dict)
             n_hex = len(hex_dict)
             n_minib = n_hex // b_size
-            grd_minib = np.range(0, n_hex, b_size)
+            grd_minib = list(range(0, n_hex, b_size))
             grd_minib[-1] = n_hex - 1
             st_minib = 0
             n_minib = len(grd_minib) - 1
+            print(f"{n_minib}, {n_hex}")
             while st_minib < n_minib:
-                indx_minib = range(grd_minib[st_minib], grd_minib[st_minib+1])
-                indx_minib = sub.cRow.isin(indx_minib)
-                nhex_minib = sum(indx_minib)
-                mtx = coo_matrix((np.ones(nhex_minib, dtype=bool), (sub.loc[indx_minib, 'cRow'].values, sub.loc[indx_minib, 'cCol'].values)), shape=(nhex_minib, N) ).tocsr() @ dge_mtx
+                indx_minib = (sub.cRow >= grd_minib[st_minib]) & (sub.cRow < grd_minib[st_minib+1])
+                npixel_minib = sum(indx_minib)
+                nhex_minib = sub.loc[indx_minib, 'cRow'].max() - grd_minib[st_minib] + 1
+                mtx = coo_matrix((np.ones(npixel_minib, dtype=bool), (sub.loc[indx_minib, 'cRow'].values-grd_minib[st_minib], sub.loc[indx_minib, 'cCol'].values)), shape=(nhex_minib, N) ).tocsr() @ dge_mtx
                 st_minib += 1
                 _ = lda_base.partial_fit(mtx)
-                print(f"Epoch {epoch}, minibatch {st_minib}. Fit data matrix {mtx.shape}.")
-            # Evaluation (todo: use test set?
-            logl = lda_base.score(mtx)
-            # Compute topic coherence
-            topic_pmi = []
-            top_gene_n = np.min([100, mtx.shape[1]])
-            pseudo_ct = 200
-            for k in range(L):
-                b = lda_base.exp_dirichlet_component_[k,:]
-                b = np.clip(b, 1e-6, 1.-1e-6)
-                indx = np.argsort(-b)[:top_gene_n]
-                w = 1. - np.power(1.-feature_mf[indx], pseudo_ct)
-                w = w.reshape((-1, 1)) @ w.reshape((1, -1))
-                p0 = 1.-np.power(1-b[indx], pseudo_ct)
-                p0 = p0.reshape((-1, 1)) @ p0.reshape((1, -1))
-                pmi = np.log(p0) - np.log(w)
-                np.fill_diagonal(pmi, 0)
-                pmi = np.round(pmi.mean(), 3)
-                topic_pmi.append(pmi)
-            print(f"Epoch {epoch}, sliding offset {offs_x}, {offs_y}. Fit data matrix {mtx.shape}, log likelihood {logl:.3E}.")
-            print(*topic_pmi, sep = ", ")
+
+                # Evaluation (todo: use test set?
+                logl = lda_base.score(mtx)
+                # Compute topic coherence
+                topic_pmi = []
+                top_gene_n = np.min([100, mtx.shape[1]])
+                pseudo_ct = 200
+                for k in range(L):
+                    b = lda_base.exp_dirichlet_component_[k,:]
+                    b = np.clip(b, 1e-6, 1.-1e-6)
+                    indx = np.argsort(-b)[:top_gene_n]
+                    w = 1. - np.power(1.-feature_mf[indx], pseudo_ct)
+                    w = w.reshape((-1, 1)) @ w.reshape((1, -1))
+                    p0 = 1.-np.power(1-b[indx], pseudo_ct)
+                    p0 = p0.reshape((-1, 1)) @ p0.reshape((1, -1))
+                    pmi = np.log(p0) - np.log(w)
+                    np.fill_diagonal(pmi, 0)
+                    pmi = np.round(pmi.mean(), 3)
+                    topic_pmi.append(pmi)
+                print(f"Epoch {epoch}, minibatch {st_minib}/{n_minib}. Fit data matrix {mtx.shape}, log likelihood {logl:.3E}.")
+                print(*topic_pmi, sep = ", ")
+            print(f"Epoch {epoch}, sliding offset {offs_x}, {offs_y}. Fit data with {n_hex} units.")
             epoch += 1
             offs_y += 1
         offs_y = 0
@@ -255,33 +258,40 @@ if n_move > diam or n_move < 0:
 lda_base_result_full = []
 
 # Apply fitted model
+b_size = 512
 offs_x = 0
 offs_y = 0
 while offs_x < n_move:
     while offs_y < n_move:
-        t0=time.time()
         x,y = pixel_to_hex(pts, radius, offs_x/n_move, offs_y/n_move)
         hex_crd = list(zip(x,y))
-        hex_dict = {x:i for i,x in enumerate(list(set(hex_crd)))}
-        c_row = [hex_dict[x] for x in hex_crd]
-        c_col = range(pts.shape[0])
-        Cmtx = coo_matrix( (np.ones(len(c_col), dtype=bool), (c_row, c_col)), shape=(len(hex_dict), N) ).tocsr()
-        ct = np.asarray(Cmtx.sum(axis = 1)).squeeze()
-        indx = ct >= min_pixel_per_unit_fit
+        hex_list = list(set(hex_crd))
+        hex_dict = {x:i for i,x in enumerate(hex_list)}
+        sub = pd.DataFrame({'cRow':[hex_dict[x] for x in hex_crd], 'cCol':list(range(N))})
+        n_hex = len(hex_dict)
+        n_minib = n_hex // b_size
+        grd_minib = list(range(0, n_hex, b_size))
+        grd_minib[-1] = n_hex - 1
+        st_minib = 0
+        n_minib = len(grd_minib) - 1
+        print(f"{n_minib}, {n_hex}")
+        while st_minib < n_minib:
+            indx_minib = (sub.cRow >= grd_minib[st_minib]) & (sub.cRow < grd_minib[st_minib+1])
+            npixel_minib = sum(indx_minib)
+            nhex_minib = grd_minib[st_minib+1] - grd_minib[st_minib]
+            hex_crd_sub = [hex_list[x+grd_minib[st_minib]] for x in range(nhex_minib)]
+            hex_crd[grd_minib[st_minib]:grd_minib[st_minib+1]]
 
-        hex_crd = [0]*Cmtx.shape[0]
-        for k,v in hex_dict.items():
-            hex_crd[v] = k
-        mtx = Cmtx @ dge_mtx
-        n_unit = mtx.shape[0]
-        prep_time = time.time()-t0
-
-        # perp = lda_base.perplexity(mtx)
-        logl = lda_base.score(mtx)
-        print(f"Offsets: {offs_x},{offs_y}, log likelihood {logl:.2E}")
-        theta = lda_base.transform(mtx)
-        lda_base_result_full += [ [offs_x, offs_y, hex_crd[i][0],hex_crd[i][1]] + list(theta[i,]) for i in range(len(hex_crd)) if indx[i] ]
+            mtx = coo_matrix((np.ones(npixel_minib, dtype=bool), (sub.loc[indx_minib, 'cRow'].values-grd_minib[st_minib], sub.loc[indx_minib, 'cCol'].values)), shape=(nhex_minib, N) ).tocsr() @ dge_mtx
+            ct = np.asarray(mtx.sum(axis = 1)).squeeze()
+            indx = ct >= args.min_ct_per_unit_fit
+            logl = lda_base.score(mtx)
+            theta = lda_base.transform(mtx)
+            lda_base_result_full += [ [offs_x, offs_y, hex_crd_sub[i][0],hex_crd_sub[i][1]] + list(theta[i,]) for i in range(theta.shape[0]) if indx[i] ]
+            print(f"Minibatch {st_minib} with {sum(indx)} units, log likelihood {logl:.2E}")
+            st_minib += 1
         offs_y += 1
+        print(f"{offs_x}, {offs_y}")
     offs_y = 0
     offs_x += 1
 
@@ -292,8 +302,8 @@ lda_base_result['Top_Prob'] = lda_base_result.loc[:, topic_header].max(axis = 1)
 lda_base_result['Top_assigned'] = pd.Categorical(lda_base_result.Top_Topic)
 
 # Transform back to pixel location
-x,y = hex_to_pixel(lda_base_result.hex_x.values,lda_base_result.hex_y.values,
-                   radius,lda_base_result.offs_x.values/n_move,lda_base_result.offs_y.values/n_move)
+x,y = hex_to_pixel(lda_base_result.hex_x.values,\
+                   lda_base_result.hex_y.values, radius, lda_base_result.offs_x.values/n_move, lda_base_result.offs_y.values/n_move)
 
 lda_base_result["Hex_center_x"] = x
 lda_base_result["Hex_center_y"] = y
@@ -329,16 +339,3 @@ with warnings.catch_warnings(record=True):
 
 f = figure_path + "/"+output_id+".png"
 ggsave(filename=f,plot=ps,device='png',limitsize=False)
-
-
-
-# for iter_i in range(1, len(x_grd)):
-#     skip = 0
-#     x_min = x_grd[iter_i-1]
-#     x_max = x_grd[iter_i]   + args.batch_ovlp_um
-#     for iter_j in range(1, len(y_grd)):
-#         if skip == 0:
-#             y_min = y_grd[iter_j-1]
-#         y_max = y_grd[iter_j] + args.batch_ovlp_um
-#         indx = brc.index[(brc.x > x_min) & (brc.x <= x_max) & (brc.y > y_min) & (brc.y <= y_max)]
-#         pts = pts_full[indx, :]
