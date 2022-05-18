@@ -1,10 +1,4 @@
 import sys, io, os, copy, re, time, importlib, warnings, subprocess
-
-# packages = "numpy,scipy,sklearn,argparse,pandas,plotnine,matplotlib".split(',')
-# for pkg in packages:
-#     if not pkg in sys.modules:
-#         subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", pkg])
-
 import pickle, argparse
 import numpy as np
 import pandas as pd
