@@ -6,6 +6,7 @@ import pandas as pd
 import sklearn.neighbors
 import sklearn.mixture
 from random import choices
+from collections import defaultdict,Counter
 
 # Add parent directory
 print(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -29,7 +30,7 @@ parser.add_argument('--gene_type_keyword', type=str, help='Key words (separated 
 parser.add_argument('--rm_gene_keyword', type=str, help='Key words (separated by ,) of gene names to remove, only used is gene_type_info is provided.', default="")
 
 parser.add_argument('--min_count_per_feature', type=int, default=20, help='')
-parser.add_argument('--min_mol_density_squm', type=float, default=0.3, help='')
+parser.add_argument('--min_mol_density_squm', type=float, default=0.1, help='')
 parser.add_argument('--hex_diam', type=int, default=12, help='')
 parser.add_argument('--hex_n_move', type=int, default=6, help='')
 parser.add_argument('--hard_rm_background_by_density',dest='hard_rm_dst', action='store_true')
@@ -49,7 +50,8 @@ outpath = '/'.join([outbase,lane])
 if not os.path.exists(outpath):
     arg="mkdir -p "+outpath
     os.system(arg)
-flt_f = outpath+"/matrix_merged."+args.identifier+".tsv.gz"
+flt_f = outpath+"/matrix_merged."+args.identifier+".tsv"
+print(f"Output file:\n{flt_f}")
 if os.path.exists(flt_f) and not args.redo_filter:
     sys.exit("Output file already exists. Do you want to --redo_filter?")
 
@@ -130,7 +132,15 @@ if args.gene_type_info != '' and os.path.exists(args.gene_type_info):
             gencode = gencode.loc[ ~gencode.Name.str.contains(x) ]
     gene_kept = list(gencode.Name)
 
-df = pd.DataFrame()
+# Spatial bin
+diam = args.hex_diam
+n_move = args.hex_n_move
+radius = diam / np.sqrt(3)
+hex_area = diam*radius*3/2
+ct_header = ['gn', 'gt', 'spl', 'unspl', 'ambig']
+feature_total_ct = defaultdict(int)
+blur_center = pd.DataFrame()
+# df = pd.DataFrame()
 ntile = 0
 for itr_r in range(len(lanes)):
     for itr_c in range(len(lanes[0])):
@@ -170,57 +180,49 @@ for itr_r in range(len(lanes)):
         sub.drop(columns = ['i', 'j'], inplace=True)
         sub['X'] = (nrows - itr_r - 1) * xr + sub.X.values - xbin_min
         sub['Y'] = itr_c * yr + sub.Y.values - ybin_min
-        sub['lane'] = lane
-        sub['tile'] = tile
+        sub['j'] = lane + '_' + tile + '_' + sub.X.astype(str) + '_' + sub.Y.astype(str)
         if len(gene_kept) > 0:
             sub = sub.loc[sub.gene.isin(gene_kept), :]
-        df = pd.concat([df, sub])
+
+        feature = sub[['gene']+ct_header].groupby(by = 'gene', as_index=False).agg({x:sum for x in ct_header})
+        feature['velo'] = feature.spl.values + feature.unspl.values + feature.ambig.values
+        feature['gene_tot'] = feature[['gn','gt','velo']].max(axis = 1)
+        for k,v in feature.iterrows():
+            feature_total_ct[v['gene']] += v['gene_tot']
+
+        if args.filter_based_on == 'gn':
+            brc = sub[['j','X','Y','gn']].groupby(by = ['j','X','Y'], as_index=False).agg({'gn':sum}).rename(columns = {'gn':'brc_tot'})
+        elif args.filter_based_on == 'velo':
+            brc = sub[['j','X','Y','spl','unspl','ambig']].groupby(by = ['j','X','Y'], as_index=False).agg({x:sum for x in ['spl','unspl','ambig']})
+            brc['brc_tot'] = brc.spl.values + brc.unspl.values + brc.ambig.values
+        else:
+            brc = sub[['j','X','Y','gt']].groupby(by = ['j','X','Y'], as_index=False).agg({'gt':sum}).rename(columns = {'gt':'brc_tot'})
+        brc['x'] = brc.X.values * mu_scale
+        brc['y'] = brc.Y.values * mu_scale
+        brc = brc[['j','brc_tot','x','y']]
+        n_cnt = 0
+        for i in range(n_move):
+            for j in range(n_move):
+                brc['hex_x'], brc['hex_y'] = pixel_to_hex(np.asarray(brc[['x','y']]), radius, i/n_move, j/n_move)
+                cnt = brc.groupby(by = ['hex_x','hex_y']).agg({'brc_tot':sum}).reset_index()
+                cnt['hex_id'] = [(i,j,v['hex_x'],v['hex_y']) for k,v in cnt.iterrows()]
+                cnt = cnt.loc[cnt.brc_tot > hex_area * 0.05, ["hex_id", "brc_tot"]]
+                n_cnt += cnt.shape[0]
+                blur_center = pd.concat([blur_center, cnt])
+
+        # df = pd.concat([df, sub])
         ntile += 1
-        print(f"Read data for {lane}_{tile}, {sub.shape}, {mrg_f}")
+        print(f"Read data for {lane}_{tile}, {sub.shape}. Record {n_cnt} centers (total {blur_center.shape[0]} so far)")
 
-df['j'] = df.lane.astype(str) + '_' + df.tile.astype(str) + '_' + df.X.astype(str) + '_' + df.Y.astype(str)
-print(f"Read data {df.shape}")
+if blur_center.shape[0] == 0:
+    sys.exist("Did not find enough pixels")
 
-ct_header = ['gn', 'gt', 'spl', 'unspl', 'ambig']
-feature = df[['gene']+ct_header].groupby(by = 'gene', as_index=False).agg({x:sum for x in ct_header}).rename(columns = {x:'gene_tot_' + x for x in ct_header})
-feature['gene_tot_velo'] = feature.gene_tot_spl.values + feature.gene_tot_unspl.values + feature.gene_tot_ambig.values
-feature = feature[(feature.gene_tot_gt > args.min_count_per_feature) | (feature.gene_tot_gn > args.min_count_per_feature) | (feature.gene_tot_velo > args.min_count_per_feature)]
-gene_kept = list(feature['gene'])
-
-df = df[df.gene.isin(gene_kept)]
-
-if args.filter_based_on == 'gn':
-    brc = df[['j','X','Y','gn']].groupby(by = ['j','X','Y'], as_index=False).agg({'gn':sum}).rename(columns = {'gn':'brc_tot'})
-elif args.filter_based_on == 'velo':
-    brc = df[['j','X','Y','spl','unspl','ambig']].groupby(by = ['j','X','Y'], as_index=False).agg({x:sum for x in ['spl','unspl','ambig']})
-    brc['brc_tot'] = brc.spl.values + brc.unspl.values + brc.ambig.values
-else:
-    brc = df[['j','X','Y','gt']].groupby(by = ['j','X','Y'], as_index=False).agg({'gt':sum}).rename(columns = {'gt':'brc_tot'})
-
-brc['x'] = brc.X.values * mu_scale
-brc['y'] = brc.Y.values * mu_scale
-brc = brc[['j','brc_tot','x','y']]
-
-# ad hoc removal of background only based on density
-diam = args.hex_diam
-n_move = args.hex_n_move
-radius = diam / np.sqrt(3)
-hex_area = diam*radius*3/2
-blur_center = pd.DataFrame()
-for i in range(n_move):
-    for j in range(n_move):
-        brc['hex_x'], brc['hex_y'] = pixel_to_hex(np.asarray(brc[['x','y']]), radius, i/n_move, j/n_move)
-        sub = brc.groupby(by = ['hex_x','hex_y']).agg({'brc_tot':sum}).reset_index()
-        sub['hex_id'] = [(i,j,v['hex_x'],v['hex_y']) for k,v in sub.iterrows()]
-        # sub['x'], sub['y'] = hex_to_pixel(sub.hex_x.values, sub.hex_y.values, radius, i/n_move, j/n_move)
-        sub = sub.loc[sub.brc_tot > hex_area * 0.05, ["hex_id", "brc_tot"]]
-        blur_center = pd.concat([blur_center, sub])
-        print(i, j)
+gene_kept = [k for k,v in feature_total_ct.items() if v > args.min_count_per_feature]
 
 if args.hard_rm_dst:
     blur_center['dense_center'] = blur_center.brc_tot >= args.min_mol_density_squm * hex_area
 else:
-    max_sample = 20000
+    max_sample = 50000
     x = np.log10(blur_center.brc_tot.values).reshape(-1,1)
     if x.shape[0] > max_sample:
         x = x[choices(range(x.shape[0]), k=max_sample), :]
@@ -245,19 +247,52 @@ else:
     if m1 > m0 * 0.5 or m0 < args.min_mol_density_squm:
         blur_center['dense_center'] = blur_center.brc_tot >= args.min_mol_density_squm * hex_area
 
+density_cut = blur_center.loc[ blur_center.dense_center.eq(True), 'brc_tot'].min()
+
+
 output_header = ['X','Y','gene','gn','gt','spl','unspl','ambig','lane','tile']
 header=pd.DataFrame([], columns = output_header)
 header.to_csv(flt_f, sep='\t', index=False)
+n_pixel = 0
+for itr_r in range(len(lanes)):
+    for itr_c in range(len(lanes[0])):
+        lane, tile = lanes[itr_r][itr_c], tiles[itr_r][itr_c]
+        if tile not in kept_list:
+            continue
+        mrg_f = outpath+"/"+tile+".matrix_merged.tsv.gz"
+        if os.path.exists(mrg_f):
+            try:
+                sub = pd.read_csv(mrg_f,sep='\t')
+            except:
+                continue
+        sub['X'] = (nrows - itr_r - 1) * xr + sub.X.values - xbin_min
+        sub['Y'] = itr_c * yr + sub.Y.values - ybin_min
+        sub['lane'] = lane
+        sub['tile'] = tile
+        sub = sub.loc[sub.gene.isin(gene_kept), :]
 
-blur_center = blur_center[blur_center.dense_center.eq(True)]
-dense_center = set(blur_center.hex_id.values)
-# keep_pixel = np.zeros(brc.shape[0], dtype=bool)
-for i in range(n_move):
-    for j in range(n_move):
-        x, y = pixel_to_hex(np.asarray(brc[['x','y']]), radius, i/n_move, j/n_move)
-        indx = [True if (i,j,x[v],y[v]) in dense_center else False for v in range(len(x))]
-        df.loc[df.j.isin( brc.loc[indx, 'j'] ), output_header].to_csv(flt_f, mode='a', sep='\t', index=False, header=False)
-        df = df[~df.j.isin( brc.loc[indx, 'j'] )]
-        print(i, j)
+        if args.filter_based_on == 'gn':
+            brc = sub[['j','X','Y','gn']].groupby(by = ['j','X','Y'], as_index=False).agg({'gn':sum}).rename(columns = {'gn':'brc_tot'})
+        elif args.filter_based_on == 'velo':
+            brc = sub[['j','X','Y','spl','unspl','ambig']].groupby(by = ['j','X','Y'], as_index=False).agg({x:sum for x in ['spl','unspl','ambig']})
+            brc['brc_tot'] = brc.spl.values + brc.unspl.values + brc.ambig.values
+        else:
+            brc = sub[['j','X','Y','gt']].groupby(by = ['j','X','Y'], as_index=False).agg({'gt':sum}).rename(columns = {'gt':'brc_tot'})
+        brc['x'] = brc.X.values * mu_scale
+        brc['y'] = brc.Y.values * mu_scale
+        brc = brc[['j','brc_tot','x','y']]
+        brc["kept"] = False
+        for i in range(n_move):
+            for j in range(n_move):
+                brc['hex_x'], brc['hex_y'] = pixel_to_hex(np.asarray(brc[['x','y']]), radius, i/n_move, j/n_move)
+                brc['hex_id'] = [(i,j,v['hex_x'],v['hex_y']) for k,v in brc.iterrows()]
+                cnt = brc.groupby(by = 'hex_id').agg({'brc_tot':sum}).reset_index()
+                cnt = cnt[cnt.brc_tot > density_cut]
+                cnt = set(cnt.hex_id.values)
+                brc.loc[brc.hex_id.isin(cnt), 'kept'] = True
+        sub = sub.loc[sub.j.isin( brc.loc[brc.kept.eq(True), 'j'] ), output_header]
+        n_pixel += sub.shape[0]
+        sub.to_csv(flt_f, mode='a', sep='\t', index=False, header=False)
+        print(f"Write data for {lane}_{tile}, {sub.shape}. (total {n_pixel} so far)")
 
 print(f"Finish filtering")

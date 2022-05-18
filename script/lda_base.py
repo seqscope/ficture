@@ -26,7 +26,6 @@ parser.add_argument('--output_path', type=str, help='')
 parser.add_argument('--identifier', type=str, help='')
 parser.add_argument('--experiment_id', type=str, help='')
 parser.add_argument('--lane', type=str, default = '', help='')
-parser.add_argument('--tile_id', type=str, default='', help='')
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
 
 parser.add_argument('--key', default = 'gt', type=str, help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced, velo: velo total')
@@ -66,8 +65,6 @@ else:
     diam = int(radius*np.sqrt(3))
 diam_train = diam
 output_suffix = args.key + ".nFactor_"+str(args.nFactor) + ".d_"+str(diam_train)
-if args.tile_id != '' and args.lane != '':
-    output_suffix += ".lane_" + args.lane + "." + args.tile_id
 
 ### Input and output
 if not os.path.exists(args.input):
@@ -148,6 +145,7 @@ if n_move > diam or n_move < 0:
     n_move = diam // 4
 
 model_f = outbase + "/analysis/"+output_id+ ".model.p"
+print(f"Output file {model_f}")
 if args.use_stored_model and os.path.exists(model_f):
     lda_base = pickle.load( open( model_f, "rb" ) )
     if args.model_only:
@@ -171,15 +169,19 @@ else:
             sub['cRow'] = sub.crd.map(hex_dict)
             n_hex = len(hex_dict)
             n_minib = n_hex // b_size
+            print(f"{n_minib}, {n_hex}")
+            if n_hex < b_size // 4:
+                offs_y += 1
+                continue
             grd_minib = list(range(0, n_hex, b_size))
             grd_minib[-1] = n_hex - 1
             st_minib = 0
             n_minib = len(grd_minib) - 1
-            print(f"{n_minib}, {n_hex}")
             while st_minib < n_minib:
                 indx_minib = (sub.cRow >= grd_minib[st_minib]) & (sub.cRow < grd_minib[st_minib+1])
                 npixel_minib = sum(indx_minib)
                 nhex_minib = sub.loc[indx_minib, 'cRow'].max() - grd_minib[st_minib] + 1
+                print(f"... ... {st_minib}, {nhex_minib}")
                 mtx = coo_matrix((np.ones(npixel_minib, dtype=bool), (sub.loc[indx_minib, 'cRow'].values-grd_minib[st_minib], sub.loc[indx_minib, 'cCol'].values)), shape=(nhex_minib, N) ).tocsr() @ dge_mtx
                 st_minib += 1
                 _ = lda_base.partial_fit(mtx)
@@ -252,6 +254,8 @@ if radius < 0:
 else:
     diam = radius*np.sqrt(3)
 n_move = args.n_move_fit
+if args.n_move_fit < 0 and args.n_move_train > 0:
+    n_move = args.n_move_train
 if n_move > diam or n_move < 0:
     n_move = diam // 4
 
