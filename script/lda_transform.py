@@ -12,8 +12,8 @@ import matplotlib
 
 from scipy.sparse import *
 import scipy.stats
-import sklearn.neighbors
 import sklearn.preprocessing
+import sklearn.neighbors
 from sklearn.decomposition import LatentDirichletAllocation as LDA
 
 # Add parent directory
@@ -23,10 +23,9 @@ from hexagon_fn import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
-parser.add_argument('--output_path', type=str, help='')
-parser.add_argument('--identifier', type=str, help='')
-parser.add_argument('--experiment_id', type=str, help='')
-parser.add_argument('--lane', type=str, default = '', help='')
+parser.add_argument('--model', type=str, help='')
+parser.add_argument('--output_figure', type=str, help='')
+parser.add_argument('--output_table', type=str, help='')
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
 
 parser.add_argument('--key', default = 'gt', type=str, help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced, velo: velo total')
@@ -34,30 +33,26 @@ parser.add_argument('--gene_type_info', type=str, help='A file containing two co
 parser.add_argument('--gene_type_keyword', type=str, help='Key words (separated by ,) of gene types to keep, only used is gene_type_info is provided.', default="IG,TR,protein,lnc")
 parser.add_argument('--rm_gene_keyword', type=str, help='Key words (separated by ,) of gene names to remove, only used is gene_type_info is provided.', default="")
 
-parser.add_argument('--nFactor', type=int, default=10, help='')
-parser.add_argument('--hex_width', type=int, default=24, help='')
+parser.add_argument('--hex_width', type=int, default=12, help='')
 parser.add_argument('--hex_radius', type=int, default=-1, help='')
-parser.add_argument('--min_ct_per_unit', type=int, default=50, help='')
-parser.add_argument('--min_ct_per_unit_fit', type=int, default=20, help='')
-parser.add_argument('--min_count_per_feature', type=int, default=50, help='')
-parser.add_argument('--n_move_train', type=int, default=-1, help='')
-parser.add_argument('--n_move_fit', type=int, default=-1, help='')
-parser.add_argument('--hex_width_fit', type=int, default=18, help='')
-parser.add_argument('--hex_radius_fit', type=int, default=-1, help='')
+parser.add_argument('--min_ct_per_unit', type=int, default=20, help='')
+parser.add_argument('--min_count_per_feature', type=int, default=1, help='')
+parser.add_argument('--n_move', type=int, default=-1, help='')
 parser.add_argument('--thread', type=int, default=1, help='')
 
 parser.add_argument('--figure_width', type=int, default=20, help="Width of the output figure per figure_scale_per_tile um")
 parser.add_argument('--figure_scale_per_tile', type=int, default=3000, help="Final figure will have size scaling with figure_width x n_tiles")
 parser.add_argument('--cmap_name', type=str, default="nipy_spectral", help="Name of Matplotlib colormap to use")
-parser.add_argument('--use_specific_model', type=str, default="", help="(Temporary) A file containing pre-trained LDA model object")
-
-parser.add_argument('--model_only', action='store_true')
-parser.add_argument('--use_stored_model', action='store_true')
-parser.add_argument('--skip_analysis', action='store_true')
 
 args = parser.parse_args()
 
-outbase=args.output_path
+try:
+    lda_base = pickle.load( open( args.model, "rb" ) )
+except:
+    sys.exit("Please provide a proper model object")
+L = lda_base.components_.shape[0]
+feature_kept = lda_base.feature_names_in_
+feature_kept_indx = list(range(len(feature_kept)))
 mu_scale = 1./args.mu_scale
 
 radius=args.hex_radius
@@ -66,20 +61,11 @@ if radius < 0:
     radius = diam / np.sqrt(3)
 else:
     diam = int(radius*np.sqrt(3))
-diam_train = diam
-output_suffix = args.key + ".nFactor_"+str(args.nFactor) + ".d_"+str(diam_train)
 
 ### Input and output
 if not os.path.exists(args.input):
     print(f"ERROR: cannot find input file \n {args.input}, please run preprocessing script first.")
     sys.exit()
-
-output_id = args.identifier + "." + args.experiment_id + "." + output_suffix
-print(f"Output id: {output_id}")
-figure_path = outbase + "/analysis/figure"
-if not os.path.exists(figure_path):
-    arg="mkdir -p "+figure_path
-    os.system(arg)
 
 ### If work on subset of genes
 gene_kept_org = set()
@@ -93,10 +79,10 @@ if args.gene_type_info != '' and os.path.exists(args.gene_type_info):
         for x in rm_list:
             gencode = gencode.loc[ ~gencode.Name.str.contains(x) ]
     gene_kept_org = set(list(gencode.Name))
+    feature_kept_indx = [i for i,x in enumerate(feature_kept) if x in gene_kept_org]
 
 ### Basic parameterse
 b_size = 256 # minibatch size
-L=args.nFactor
 topic_header = ['Topic_'+str(x) for x in range(L)]
 
 ### Read data
@@ -105,15 +91,25 @@ try:
 except:
     df = pd.read_csv(args.input, sep='\t', compression='bz2', usecols = ['X','Y','gene',args.key])
 
+df = df[df.gene.isin(feature_kept)]
 if len(gene_kept_org) > 0:
     df = df[df.gene.isin(gene_kept_org)]
-
-# df.drop_duplicates(subset=['X','Y','gene'], inplace=True)
+df.drop_duplicates(subset=['X','Y','gene'], inplace=True)
 feature = df[['gene', args.key]].groupby(by = 'gene', as_index=False).agg({args.key:sum}).rename(columns = {args.key:'gene_tot'})
 feature = feature.loc[feature.gene_tot > args.min_count_per_feature, :]
-gene_kept = list(feature['gene'])
+gene_kept = set(feature['gene'])
 df = df[df.gene.isin(gene_kept)]
 df['j'] = df.X.astype(str) + '_' + df.Y.astype(str)
+
+feature_kept_indx = [i for i,x in enumerate(feature_kept) if x in gene_kept]
+feature_kept = [feature_kept[i] for i in feature_kept_indx]
+lda_base.components_ = lda_base.components_[:, feature_kept_indx]
+lda_base.exp_dirichlet_component_ = sklearn.preprocessing.normalize(lda_base.exp_dirichlet_component_[:, feature_kept_indx], norm='l1', axis=1)
+lda_base.feature_names_in_ = feature_kept
+lda_base.n_features_in_ = len(feature_kept)
+lda_base.doc_topic_prior_ = 1./L
+lda_base.topic_word_prior_= 1./L
+print(f"Keep {len(feature_kept)} informative genes")
 
 brc = df.groupby(by = ['j','X','Y']).agg({args.key: sum}).reset_index()
 brc.index = range(brc.shape[0])
@@ -124,7 +120,6 @@ print(f"Read data with {brc.shape[0]} pixels and {len(gene_kept)} genes.")
 df.drop(columns = ['X', 'Y'], inplace=True)
 
 # Make DGE
-feature_kept = copy.copy(gene_kept)
 barcode_kept = list(brc.j.values)
 del brc
 gc.collect()
@@ -142,131 +137,12 @@ print(f"Made DGE {dge_mtx.shape}")
 del df
 gc.collect()
 
-# Baseline model training
-n_move = args.n_move_train # sliding hexagon
+
+n_move = args.n_move
 if n_move > diam or n_move < 0:
     n_move = diam // 4
 
-model_f = outbase + "/analysis/"+output_id+ ".model.p"
-print(f"Output file {model_f}")
-if args.use_specific_model !="" and os.path.exists(args.use_specific_model):
-    lda_base = pickle.load( open( args.use_specific_model, "rb" ) )
-elif args.use_stored_model and os.path.exists(model_f):
-    if args.model_only:
-        sys.exit()
-    lda_base = pickle.load( open( model_f, "rb" ) )
-else:
-    lda_base = LDA(n_components=L, learning_method='online', batch_size=b_size, n_jobs = args.thread, verbose = 0)
-    epoch = 0
-    offs_x = 0
-    offs_y = 0
-    while offs_x < n_move:
-        while offs_y < n_move:
-            x,y = pixel_to_hex(pts, radius, offs_x/n_move, offs_y/n_move)
-            hex_crd = list(zip(x,y))
-            ct = pd.DataFrame({'hex_id':hex_crd, 'tot':pixel_ct}).groupby(by = 'hex_id').agg({'tot': sum}).reset_index()
-            mid_ct = np.median(ct.loc[ct.tot >= args.min_ct_per_unit, 'tot'].values)
-            ct = set(ct.loc[ct.tot >= args.min_ct_per_unit, 'hex_id'].values)
-            hex_list = list(ct)
-            shuffle(hex_list)
-            hex_dict = {x:i for i,x in enumerate(hex_list)}
-            sub = pd.DataFrame({'crd':hex_crd,'cCol':range(N)})
-            sub = sub[sub.crd.isin(ct)]
-            sub['cRow'] = sub.crd.map(hex_dict)
-            n_hex = len(hex_dict)
-            n_minib = n_hex // b_size
-            print(f"{n_minib}, {n_hex}, median count per unit {mid_ct}")
-            if n_hex < b_size // 4:
-                offs_y += 1
-                continue
-            grd_minib = list(range(0, n_hex, b_size))
-            grd_minib[-1] = n_hex - 1
-            st_minib = 0
-            n_minib = len(grd_minib) - 1
-            while st_minib < n_minib:
-                indx_minib = (sub.cRow >= grd_minib[st_minib]) & (sub.cRow < grd_minib[st_minib+1])
-                npixel_minib = sum(indx_minib)
-                nhex_minib = sub.loc[indx_minib, 'cRow'].max() - grd_minib[st_minib] + 1
-                print(f"... ... {st_minib}, {nhex_minib}")
-                mtx = coo_matrix((np.ones(npixel_minib, dtype=bool), (sub.loc[indx_minib, 'cRow'].values-grd_minib[st_minib], sub.loc[indx_minib, 'cCol'].values)), shape=(nhex_minib, N) ).tocsr() @ dge_mtx
-                st_minib += 1
-                _ = lda_base.partial_fit(mtx)
-
-                # Evaluation (todo: use test set?
-                logl = lda_base.score(mtx)
-                # Compute topic coherence
-                topic_pmi = []
-                top_gene_n = np.min([100, mtx.shape[1]])
-                pseudo_ct = 200
-                for k in range(L):
-                    b = lda_base.exp_dirichlet_component_[k,:]
-                    b = np.clip(b, 1e-6, 1.-1e-6)
-                    indx = np.argsort(-b)[:top_gene_n]
-                    w = 1. - np.power(1.-feature_mf[indx], pseudo_ct)
-                    w = w.reshape((-1, 1)) @ w.reshape((1, -1))
-                    p0 = 1.-np.power(1-b[indx], pseudo_ct)
-                    p0 = p0.reshape((-1, 1)) @ p0.reshape((1, -1))
-                    pmi = np.log(p0) - np.log(w)
-                    np.fill_diagonal(pmi, 0)
-                    pmi = np.round(pmi.mean(), 3)
-                    topic_pmi.append(pmi)
-                print(f"Epoch {epoch}, minibatch {st_minib}/{n_minib}. Fit data matrix {mtx.shape}, log likelihood {logl:.3E}.")
-                print(*topic_pmi, sep = ", ")
-            print(f"Epoch {epoch}, sliding offset {offs_x}, {offs_y}. Fit data with {n_hex} units.")
-            epoch += 1
-            offs_y += 1
-        offs_y = 0
-        offs_x += 1
-
-    lda_base.feature_names_in_ = feature_kept
-    pickle.dump( lda_base, open( model_f, "wb" ) )
-    if args.model_only:
-        sys.exit()
-
-### DE gene based on learned factor profiles
-if not args.skip_analysis:
-    mtx = sklearn.preprocessing.normalize(lda_base.components_, axis = 0, norm='l1') # L x M
-    mtx = mtx * np.array(feature.gene_tot.values).reshape((1, -1))
-    gene_sum = mtx.sum(axis = 0)
-    fact_sum = mtx.sum(axis = 1)
-    tt = mtx.sum()
-    res=[]
-    tab=np.zeros((2,2))
-    for i, name in enumerate(lda_base.feature_names_in_):
-        for l in range(L):
-            if mtx[l,i] == 0 or fact_sum[l] == 0:
-                continue
-            tab[0,0]=mtx[l,i]
-            tab[0,1]=gene_sum[i]-tab[0,0]
-            tab[1,0]=fact_sum[l]-tab[0,0]
-            tab[1,1]=tt-fact_sum[l]-gene_sum[i]+tab[0,0]
-            fd=tab[0,0]/fact_sum[l]/tab[0,1]*(tt-fact_sum[l])
-            chi2, p, dof, ex = scipy.stats.chi2_contingency(tab, correction=False)
-            res.append([name,l,chi2,p,fd])
-
-    chidf=pd.DataFrame(res,columns=['gene','factor','Chi2','pval','FoldChange'])
-    res=chidf.loc[(chidf.pval<1e-3)*(chidf.FoldChange>1)].sort_values(by='FoldChange',ascending=False)
-    res = res.merge(right = feature, on = 'gene', how = 'inner')
-    res.sort_values(by=['factor','FoldChange'],ascending=[True,False],inplace=True)
-    res['pval'] = res.pval.map('{:,.3e}'.format)
-
-    f = outbase + "/analysis/"+output_id+".DEgene.tsv.gz"
-    res.round(5).to_csv(f,sep='\t',index=False)
-
-diam = args.hex_width_fit
-radius = args.hex_radius_fit
-if radius < 0:
-    radius = diam / np.sqrt(3)
-else:
-    diam = radius*np.sqrt(3)
-n_move = args.n_move_fit
-if args.n_move_fit < 0 and args.n_move_train > 0:
-    n_move = args.n_move_train
-if n_move > diam or n_move < 0:
-    n_move = diam // 4
-
-res_f = outbase + "/analysis/"+output_id+"_"+str(args.hex_width_fit)+".fit_result.tsv"
-# lda_base_result_full = []
+res_f = args.output_table
 wf = open(res_f, 'w')
 out_header = "offs_x,offs_y,hex_x,hex_y".split(',')+['Topic_'+str(x) for x in range(L)]
 out_header = '\t'.join(out_header)
@@ -299,19 +175,17 @@ while offs_x < n_move:
 
             mtx = coo_matrix((np.ones(npixel_minib, dtype=bool), (sub.loc[indx_minib, 'cRow'].values-grd_minib[st_minib], sub.loc[indx_minib, 'cCol'].values)), shape=(nhex_minib, N) ).tocsr() @ dge_mtx
             ct = np.asarray(mtx.sum(axis = 1)).squeeze()
-            indx = ct >= args.min_ct_per_unit_fit
+            indx = ct >= args.min_ct_per_unit
             logl = lda_base.score(mtx)
             theta = lda_base.transform(mtx)
             lines = [ [offs_x, offs_y, hex_crd_sub[i][0],hex_crd_sub[i][1]] + list(np.around(theta[i,], 5)) for i in range(theta.shape[0]) if indx[i] ]
             lines = ['\t'.join([str(x) for x in y])+'\n' for y in lines]
             _ = wf.writelines(lines)
 
-            # lda_base_result_full += [ [offs_x, offs_y, hex_crd_sub[i][0],hex_crd_sub[i][1]] + list(theta[i,]) for i in range(theta.shape[0]) if indx[i] ]
-
             print(f"Minibatch {st_minib} with {sum(indx)} units, log likelihood {logl:.2E}")
             st_minib += 1
-        offs_y += 1
         print(f"{offs_x}, {offs_y}")
+        offs_y += 1
     offs_y = 0
     offs_x += 1
 
@@ -324,8 +198,6 @@ gc.collect()
 dtp = {x:int for x in ['off_x','offs_y','hex_x','hex_y']}
 dtp.update({"Topic_"+str(x):float for x in range(L)})
 lda_base_result = pd.read_csv(res_f, sep='\t', dtype=dtp)
-
-# lda_base_result = pd.DataFrame(lda_base_result_full, columns = "offs_x,offs_y,hex_x,hex_y".split(',')+['Topic_'+str(x) for x in range(L)])
 
 lda_base_result['Top_Topic'] = np.argmax(np.asarray(lda_base_result.loc[:, topic_header ]), axis = 1)
 lda_base_result['Top_Prob'] = lda_base_result.loc[:, topic_header].max(axis = 1)
@@ -365,5 +237,4 @@ with warnings.catch_warnings(record=True):
         +theme(legend_position='bottom')
     )
 
-f = figure_path + "/"+output_id+"_"+str(args.hex_width_fit)+".png"
-ggsave(filename=f,plot=ps,device='png',limitsize=False)
+ggsave(filename=args.output_figure,plot=ps,device='png',limitsize=False)

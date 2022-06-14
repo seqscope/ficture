@@ -14,7 +14,8 @@ parser.add_argument('--cmap_name', default='turbo', type=str, help="Specify harm
 parser.add_argument('--in_pref', type=str, default='', help="Input file prefix, with the number of factors replaced by string NFACTOR")
 parser.add_argument('--in_pref2', type=str, default='', help="Input file prefix, with the number of factors replaced by string NFACTOR")
 parser.add_argument('--path', type=str, help="")
-parser.add_argument('--figure_width', type=int, default=15, help="Width of the output figure per 1000um")
+parser.add_argument('--figure_width', type=int, default=20, help="Width of the output figure per figure_scale_per_tile um")
+parser.add_argument('--figure_scale_per_tile', type=int, default=3000, help="Final figure will have size scaling with figure_width x n_tiles")
 parser.add_argument('--code_suff', default='', type=str, help="Specify output identifier")
 args = parser.parse_args()
 
@@ -48,8 +49,8 @@ if args.in_pref != '':
         lda_base_result=pd.read_csv(f,sep='\t')
         lda_base_result['Top_assigned']= lda_base_result.Top_assigned.map(lambda x : str(k)+'_'+str(x))
         y_max,y_min = lda_base_result.Hex_center_y.max(), lda_base_result.Hex_center_y.min()
-        pt_size = np.round(1000 / (y_max-y_min) * 0.3, 2)
-        fig_size = int( (y_max - y_min) / 1000 * args.figure_width )
+        pt_size = 0.01
+        fig_size = int( (y_max - y_min) / args.figure_scale_per_tile * args.figure_width )
         print(np.round(y_max - y_min, 0), fig_size, pt_size)
 
         if args.color_map != '':
@@ -110,7 +111,7 @@ for f in files:
         continue
     pixel_result = pd.read_csv(f,sep='\t')
     pixel_result['Top_assigned'] = pixel_result.Top_assigned.map(lambda x : str(k)+'_'+str(x))
-    fig_size = int( (pixel_result.y.max() - pixel_result.y.min()) / 1000 * args.figure_width )
+    fig_size = int( (pixel_result.y.max() - pixel_result.y.min()) / args.figure_scale_per_tile * args.figure_width )
 
     if args.color_map != '':
         plotnine.options.figure_size = (fig_size, fig_size)
@@ -118,7 +119,7 @@ for f in files:
             ps = (
                 ggplot(pixel_result,
                        aes(x='y', y='x', color='Top_assigned',alpha='Top_Prob'))
-                +geom_point(size = 0.1, shape='+')
+                +geom_point(size = 0.01, shape='+')
                 +guides(colour = guide_legend(override_aes = {'size':4,'shape':'o'}))
                 +xlab("")+ylab("")
                 +guides(alpha=None)
@@ -138,7 +139,7 @@ for f in files:
         ps = (
             ggplot(pixel_result,
                    aes(x='y', y='x', color='Top_assigned',alpha='Top_Prob'))
-            +geom_point(size = 0.1, shape='+')
+            +geom_point(size = 0.02, shape='+')
             +guides(colour = guide_legend(override_aes = {'size':4,'shape':'o'}))
             +xlab("")+ylab("")
             +guides(alpha=None)
@@ -164,9 +165,8 @@ for f in files:
     center_result = pd.read_csv(f,sep='\t')
     center_result['Top_assigned'] = center_result.Top_assigned.map(lambda x : str(k)+'_'+str(x))
 
-    pt_size = 1000/(center_result.y.max()-center_result.y.min()) * 0.3
-    pt_size = np.round(pt_size,2)
-    fig_size = int( (center_result.y.max() - center_result.y.min()) / 1000 * args.figure_width )
+    pt_size = 0.01
+    fig_size = int( (center_result.y.max() - center_result.y.min()) / args.figure_scale_per_tile * args.figure_width )
 
     if args.color_map != '':
         plotnine.options.figure_size = (fig_size, fig_size)
