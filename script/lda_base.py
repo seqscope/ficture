@@ -33,6 +33,7 @@ parser.add_argument('--key', default = 'gt', type=str, help='gt: genetotal, gn: 
 parser.add_argument('--gene_type_info', type=str, help='A file containing two columns, gene name and gene type. Used only if specific types of genes are kept.', default = '')
 parser.add_argument('--gene_type_keyword', type=str, help='Key words (separated by ,) of gene types to keep, only used is gene_type_info is provided.', default="IG,TR,protein,lnc")
 parser.add_argument('--rm_gene_keyword', type=str, help='Key words (separated by ,) of gene names to remove, only used is gene_type_info is provided.', default="")
+parser.add_argument('--subset_tile', type=str, default = '', help='')
 
 parser.add_argument('--nFactor', type=int, default=10, help='')
 parser.add_argument('--hex_width', type=int, default=24, help='')
@@ -101,9 +102,16 @@ topic_header = ['Topic_'+str(x) for x in range(L)]
 
 ### Read data
 try:
-    df = pd.read_csv(args.input, sep='\t', usecols = ['X','Y','gene',args.key])
+    df = pd.read_csv(args.input, sep='\t', usecols = ['X','Y','gene',args.key, 'tile'])
 except:
-    df = pd.read_csv(args.input, sep='\t', compression='bz2', usecols = ['X','Y','gene',args.key])
+    df = pd.read_csv(args.input, sep='\t', compression='bz2', usecols = ['X','Y','gene',args.key, 'tile'])
+
+### If working on a subset of tiles
+if args.subset_tile != '':
+    kept_tile = [int(x) for x in args.subset_tile.split(',')]
+    df.tile = df.tile.astype(int)
+    df = df.loc[df.tile.isin(kept_tile), :]
+    df.drop(columns = 'tile', inplace=True)
 
 if len(gene_kept_org) > 0:
     df = df[df.gene.isin(gene_kept_org)]
