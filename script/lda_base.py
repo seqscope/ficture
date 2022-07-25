@@ -230,7 +230,7 @@ else:
     pickle.dump( lda_base, open( model_f, "wb" ) )
     out_f = model_f.replace("model.p", "model_matrix.tsv.gz")
     pd.concat([pd.DataFrame({'gene':model.feature_names_in_}),\
-               pd.DataFrame(sklearn.preprocessing.normalize(lda_base.components_, axis = 0, norm='l1').T,\
+               pd.DataFrame(sklearn.preprocessing.normalize(lda_base.components_, axis = 1, norm='l1').T,\
                columns = ["Factor_"+str(k) for k in range(L)], dtype='float64')],\
                axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.4e')
     if args.model_only:

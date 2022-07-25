@@ -4,6 +4,11 @@ import pandas as pd
 import sklearn
 from random import shuffle
 
+def safe_log(X):
+    res = copy.copy(X)
+    res[res <= 0] = 1
+    return np.log(res)
+
 class ARTM:
     '''
     '''
@@ -149,7 +154,13 @@ class ARTM:
                 self.ntw = (1. - rhot) * self.ntw + rhot * ntw_tilde # K x M
             self.phi = self.ntw + self.tau['smooth_phi'] * self.kl_ref['phi'] * self.mask_b + self.tau['sparse_phi'] * self.kl_ref['phi'] * self.mask_s
             if self.tau['decorr_phi'] != 0:
-                self.phi += self.tau['decorr_phi'] * (self.mask_s * np.einsum('tw,s,sw->tw',self.phi, self.mask_s.reshape(-1), self.phi))
+                # self.phi += self.tau['decorr_phi'] * (self.mask_s * np.einsum('tw,s,sw->tw',self.phi, self.mask_s.reshape(-1), self.phi))
+                for k in range(self.K):
+                    phi_avg = safe_log(.5 * (self.phi + self.phi[k, :])).sum(axis = 0)
+                    phi_avg-= safe_log(self.phi[k, :])
+                    self.phi[k, :] += self.tau['decorr_phi'] * self.phi[k, :] *\
+                                      (-(self.K - 1) * (safe_log(self.phi[k,:]) + .5)+\
+                                      .5 * phi_avg)
             self.phi = np.clip(self.phi, 0, np.inf)
             rsum = self.phi.sum(axis = 1)
             indx = rsum > 0
@@ -184,8 +195,9 @@ class ARTM:
                 print((self.phi > 0).sum(axis = 1))
             self.ct_minibatch += 1
             st += self.b_size
+            self.theta[subset_indx, :] = theta
 
-    def fit(mtx, theta, stochastic = True, batch_size = 256, clear = False, max_iter = None, min_iter = None, verbose = None, phi = None):
+    def fit(self, mtx, theta, stochastic = True, batch_size = 256, clear = False, max_iter = None, min_iter = None, verbose = None, phi = None):
         # initialize model based on data if not initialized
         assert mtx.shape[1] == self.M, "Input does not match vocabulary"
         self.n = mtx.shape[0]

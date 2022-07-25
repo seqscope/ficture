@@ -17,7 +17,6 @@ import sklearn.preprocessing
 
 # Add parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# import artm_fn
 from artm_fn import *
 from hexagon_fn import *
 
