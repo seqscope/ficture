@@ -1,5 +1,4 @@
 import sys, io, os, copy, re, gc, time, importlib, warnings, subprocess
-from collections import defaultdict, Counter
 import pickle, argparse
 import numpy as np
 import pandas as pd
@@ -18,7 +17,6 @@ from sklearn.decomposition import LatentDirichletAllocation as LDA
 
 # Add parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import hexagon_fn
 from hexagon_fn import *
 
 parser = argparse.ArgumentParser()
@@ -29,7 +27,7 @@ parser.add_argument('--experiment_id', type=str, help='')
 parser.add_argument('--lane', type=str, default = '', help='')
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
 
-parser.add_argument('--key', default = 'gt', type=str, help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced, velo: velo total')
+parser.add_argument('--key', default = 'gn', type=str, help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced, velo: velo total')
 parser.add_argument('--gene_type_info', type=str, help='A file containing two columns, gene name and gene type. Used only if specific types of genes are kept.', default = '')
 parser.add_argument('--gene_type_keyword', type=str, help='Key words (separated by ,) of gene types to keep, only used is gene_type_info is provided.', default="IG,TR,protein,lnc")
 parser.add_argument('--rm_gene_keyword', type=str, help='Key words (separated by ,) of gene names to remove, only used is gene_type_info is provided.', default="")
@@ -229,7 +227,7 @@ else:
     lda_base.feature_names_in_ = feature_kept
     pickle.dump( lda_base, open( model_f, "wb" ) )
     out_f = model_f.replace("model.p", "model_matrix.tsv.gz")
-    pd.concat([pd.DataFrame({'gene':model.feature_names_in_}),\
+    pd.concat([pd.DataFrame({'gene': lda_base.feature_names_in_}),\
                pd.DataFrame(sklearn.preprocessing.normalize(lda_base.components_, axis = 1, norm='l1').T,\
                columns = ["Factor_"+str(k) for k in range(L)], dtype='float64')],\
                axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.4e')
@@ -279,7 +277,6 @@ if n_move > diam or n_move < 0:
     n_move = diam // 4
 
 res_f = outbase + "/analysis/"+output_id+"_"+str(args.hex_width_fit)+".fit_result.tsv"
-# lda_base_result_full = []
 wf = open(res_f, 'w')
 out_header = "offs_x,offs_y,hex_x,hex_y".split(',')+['Topic_'+str(x) for x in range(L)]
 out_header = '\t'.join(out_header)
@@ -319,8 +316,6 @@ while offs_x < n_move:
             lines = ['\t'.join([str(x) for x in y])+'\n' for y in lines]
             _ = wf.writelines(lines)
 
-            # lda_base_result_full += [ [offs_x, offs_y, hex_crd_sub[i][0],hex_crd_sub[i][1]] + list(theta[i,]) for i in range(theta.shape[0]) if indx[i] ]
-
             print(f"Minibatch {st_minib} with {sum(indx)} units, log likelihood {logl:.2E}")
             st_minib += 1
         offs_y += 1
@@ -338,8 +333,6 @@ dtp = {x:int for x in ['off_x','offs_y','hex_x','hex_y']}
 dtp.update({"Topic_"+str(x):float for x in range(L)})
 lda_base_result = pd.read_csv(res_f, sep='\t', dtype=dtp)
 
-# lda_base_result = pd.DataFrame(lda_base_result_full, columns = "offs_x,offs_y,hex_x,hex_y".split(',')+['Topic_'+str(x) for x in range(L)])
-
 lda_base_result['Top_Topic'] = np.argmax(np.asarray(lda_base_result.loc[:, topic_header ]), axis = 1)
 lda_base_result['Top_Prob'] = lda_base_result.loc[:, topic_header].max(axis = 1)
 lda_base_result['Top_assigned'] = pd.Categorical(lda_base_result.Top_Topic)
@@ -351,6 +344,7 @@ x,y = hex_to_pixel(lda_base_result.hex_x.values,\
 lda_base_result["Hex_center_x"] = x
 lda_base_result["Hex_center_y"] = y
 
+# Output estimates
 lda_base_result.round(5).to_csv(res_f,sep='\t',index=False)
 
 # Plot clustering result
