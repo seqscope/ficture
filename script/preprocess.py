@@ -1,4 +1,4 @@
-import sys, io, os, copy, re, time, importlib, warnings
+import sys, os
 import subprocess as sp
 import argparse
 import numpy as np
@@ -6,24 +6,24 @@ import pandas as pd
 import sklearn.neighbors
 import sklearn.mixture
 from random import choices
-from collections import defaultdict,Counter
+from collections import defaultdict
 
 # Add parent directory
 print(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import hexagon_fn
 from hexagon_fn import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input_path', type=str, help='')
 parser.add_argument('--output_path', type=str, help='')
-parser.add_argument('--identifier', type=str, help='1stID-2ndZ-Specoes-L')
+parser.add_argument('--identifier', type=str, help='1stID-2ndZ-Species-L')
 parser.add_argument("--meta_data", type=str, help="Per tile meta data menifest.tsv")
 parser.add_argument("--layout", type=str, help="Layout file of tiles to draw [lane] [tile] [row] [col] format in each line")
 parser.add_argument('--lane', type=str, help='')
 parser.add_argument('--tile', type=str, help='',default='')
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
-parser.add_argument('--filter_based_on', type=str, default='gt', help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced, velo: velo total')
+parser.add_argument('--filter_based_on', type=str, default='gn', help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced, velo: velo total')
+parser.add_argument('--empty_tile_kb', type=float, default=5, help='Temporary')
 
 parser.add_argument('--gene_type_info', type=str, help='A file containing two columns, gene name and gene type. Used only if specific types of genes are kept.', default = '')
 parser.add_argument('--gene_type_keyword', type=str, help='Key words (separated by ,) of gene types to keep, only used is gene_type_info is provided.', default="IG,TR,protein,lnc")
@@ -31,6 +31,7 @@ parser.add_argument('--rm_gene_keyword', type=str, help='Key words (separated by
 
 parser.add_argument('--min_count_per_feature', type=int, default=20, help='')
 parser.add_argument('--min_mol_density_squm', type=float, default=0.1, help='')
+parser.add_argument('--min_abs_mol_density_squm', type=float, default=0.1, help='')
 parser.add_argument('--hex_diam', type=int, default=12, help='')
 parser.add_argument('--hex_n_move', type=int, default=6, help='')
 parser.add_argument('--hard_rm_background_by_density',dest='hard_rm_dst', action='store_true')
@@ -109,15 +110,15 @@ if args.tile == '':
     tab.loc[indx, "Kb"] = tab.loc[indx, "Kb"].values * 1e3
     indx = tab.Size.map(lambda x : x[-1]=='G')
     tab.loc[indx, "Kb"] = tab.loc[indx, "Kb"].values * 1e6
-    if tab.Kb.iloc[-1] < 100:
-        # If the barcode.tsv.gz of the largest tile is too small
-        sys.exit("Did not locate informative tiles")
-    tab = tab[tab.Kb > 10]
+    # if tab.Kb.iloc[-1] < 100:
+    #     # If the barcode.tsv.gz of the largest tile is too small
+    #     sys.exit("Did not locate informative tiles")
+    tab = tab[tab.Kb > args.empty_tile_kb]
     tab["tile"] = tab.File.map(lambda x : os.path.dirname(x).split("/")[-1])
     tab.sort_values(by = "Kb", inplace=True)
     fc = tab.Kb.iloc[1:].values / tab.Kb.iloc[:-1].values
     cut_indx = fc.argmax()
-    kept_list = sorted(tab.tile.iloc[(cut_indx+1):].values )
+    kept_list = sorted(tab.tile.iloc[(cut_indx+1):].values)
 
 ### If work on subset of genes
 gene_kept = []
@@ -137,13 +138,13 @@ diam = args.hex_diam
 n_move = args.hex_n_move
 radius = diam / np.sqrt(3)
 hex_area = diam*radius*3/2
-ct_header = ['gn', 'gt', 'spl', 'unspl', 'ambig']
+ct_header = ['gn', 'gt', 'spl', 'unspl', 'ambig', 'velo']
 feature_total_ct = defaultdict(int)
 blur_center = pd.DataFrame()
-# df = pd.DataFrame()
 ntile = 0
+kept_list2 = []
 for itr_r in range(len(lanes)):
-    for itr_c in range(len(lanes[0])):
+    for itr_c in range(len(lanes[itr_r])):
         lane, tile = lanes[itr_r][itr_c], tiles[itr_r][itr_c]
         if tile not in kept_list:
             continue
@@ -159,16 +160,18 @@ for itr_r in range(len(lanes)):
             try:
                 datapath = "/".join([path,lane,tile])
                 f=datapath+"/barcodes.tsv.gz"
-                brc = pd.read_csv(f, sep='\t|,', names=["barcode","j","v2","lane","tile","X","Y",\
-                       "brc_tot_gn","brc_tot_gt",\
-                       "brc_tot_spl","brc_tot_unspl","brc_tot_ambig"],\
-                       usecols=["j","X","Y"], engine='python')
+                brc = pd.read_csv(f, sep='\t|,', names=["barcode","j","v2",\
+                    "lane","tile","X","Y","brc_tot_gn","brc_tot_gt",\
+                    "brc_tot_spl","brc_tot_unspl","brc_tot_ambig"],\
+                    usecols=["j","X","Y"], engine='python')
                 f=datapath+"/matrix.mtx.gz"
-                mtx = pd.read_csv(f, sep=' ', skiprows=3, names=["i","j","gn","gt","spl","unspl","ambig"])
+                mtx = pd.read_csv(f, sep=' ', skiprows=3, names=["i","j",\
+                    "gn","gt","spl","unspl","ambig"])
                 f=datapath+"/features.tsv.gz"
-                feature = pd.read_csv(f, sep='\t|,', names=["v1","gene","i","gene_tot_gn","gene_tot_gt",\
-                       "gene_tot_spl","gene_tot_unspl","gene_tot_ambig"],\
-                       usecols=["i","gene"],  engine='python')
+                feature = pd.read_csv(f, sep='\t|,', names=["gene_id","gene",\
+                    "i","gene_tot_gn","gene_tot_gt",\
+                    "gene_tot_spl","gene_tot_unspl","gene_tot_ambig"],\
+                    usecols=["i","gene","gene_id"],  engine='python')
             except:
                 print(f"WARNING: cannot read file for lane {lane} tile {tile}")
                 continue
@@ -181,22 +184,14 @@ for itr_r in range(len(lanes)):
         sub['X'] = (nrows - itr_r - 1) * xr + sub.X.values - xbin_min
         sub['Y'] = itr_c * yr + sub.Y.values - ybin_min
         sub['j'] = lane + '_' + tile + '_' + sub.X.astype(str) + '_' + sub.Y.astype(str)
+        sub['velo'] = sub.spl.values + sub.unspl.values + sub.ambig.values
         if len(gene_kept) > 0:
             sub = sub.loc[sub.gene.isin(gene_kept), :]
 
-        feature = sub[['gene']+ct_header].groupby(by = 'gene', as_index=False).agg({x:sum for x in ct_header})
-        feature['velo'] = feature.spl.values + feature.unspl.values + feature.ambig.values
-        feature['gene_tot'] = feature[['gn','gt','velo']].max(axis = 1)
+        feature = sub[['gene','gene_id']+ct_header].groupby(by = ['gene','gene_id'], as_index=False).agg({x:sum for x in ct_header})
         for k,v in feature.iterrows():
-            feature_total_ct[v['gene']] += v['gene_tot']
-
-        if args.filter_based_on == 'gn':
-            brc = sub[['j','X','Y','gn']].groupby(by = ['j','X','Y'], as_index=False).agg({'gn':sum}).rename(columns = {'gn':'brc_tot'})
-        elif args.filter_based_on == 'velo':
-            brc = sub[['j','X','Y','spl','unspl','ambig']].groupby(by = ['j','X','Y'], as_index=False).agg({x:sum for x in ['spl','unspl','ambig']})
-            brc['brc_tot'] = brc.spl.values + brc.unspl.values + brc.ambig.values
-        else:
-            brc = sub[['j','X','Y','gt']].groupby(by = ['j','X','Y'], as_index=False).agg({'gt':sum}).rename(columns = {'gt':'brc_tot'})
+            feature_total_ct[v['gene']] += v[args.filter_based_on]
+        brc = sub[['j','X','Y',args.filter_based_on]].groupby(by = ['j','X','Y'], as_index=False).agg({args.filter_based_on:sum}).rename(columns = {args.filter_based_on:'brc_tot'})
         brc['x'] = brc.X.values * mu_scale
         brc['y'] = brc.Y.values * mu_scale
         brc = brc[['j','brc_tot','x','y']]
@@ -210,8 +205,8 @@ for itr_r in range(len(lanes)):
                 n_cnt += cnt.shape[0]
                 blur_center = pd.concat([blur_center, cnt])
 
-        # df = pd.concat([df, sub])
         ntile += 1
+        kept_list2.append(tile)
         print(f"Read data for {lane}_{tile}, {sub.shape}. Record {n_cnt} centers (total {blur_center.shape[0]} so far)")
 
 if blur_center.shape[0] == 0:
@@ -233,7 +228,7 @@ else:
     m0=(10**gm.means_.squeeze()[lab_keep])/hex_area
     m1=(10**gm.means_.squeeze()[1-lab_keep])/hex_area
     print(f"Filter background density, log scale, identified density {m0:.3f} v.s. {m1:.3f} molecule/um^2.")
-    if m1 > m0 * 0.5 or m0 < args.min_mol_density_squm:
+    if m1 > m0 * 0.5 or m0 < args.min_abs_mol_density_squm:
         x = blur_center.brc_tot.values.reshape(-1,1)
         if x.shape[0] > max_sample:
             x = x[choices(range(x.shape[0]), k=max_sample), :]
@@ -244,40 +239,48 @@ else:
         m0=gm.means_.squeeze()[lab_keep]/hex_area
         m1=gm.means_.squeeze()[1-lab_keep]/hex_area
         print(f"Filter background density, original scale, identified density {m0:.3f} v.s. {m1:.3f} molecule/um^2.")
-    if m1 > m0 * 0.5 or m0 < args.min_mol_density_squm:
-        blur_center['dense_center'] = blur_center.brc_tot >= args.min_mol_density_squm * hex_area
+    if m1 > m0 * 0.5 or m0 < args.min_abs_mol_density_squm:
+        print(f"Filtering background may have failed: identified density {m0:.3f} v.s. {m1:.3f} molecule/um^2.")
+        blur_center['dense_center'] = blur_center.brc_tot >= args.min_abs_mol_density_squm * hex_area
 
-density_cut = blur_center.loc[ blur_center.dense_center.eq(True), 'brc_tot'].min()
+density_cut = blur_center.loc[blur_center.dense_center.eq(True), 'brc_tot'].min()
 
-
-output_header = ['X','Y','gene','gn','gt','spl','unspl','ambig','lane','tile']
+output_header = ['X','Y','gene','gene_id','gn','gt','spl','unspl','ambig','lane','tile']
 header=pd.DataFrame([], columns = output_header)
 header.to_csv(flt_f, sep='\t', index=False)
 n_pixel = 0
 for itr_r in range(len(lanes)):
     for itr_c in range(len(lanes[0])):
         lane, tile = lanes[itr_r][itr_c], tiles[itr_r][itr_c]
-        if tile not in kept_list:
+        if tile not in kept_list2:
             continue
-        mrg_f = outpath+"/"+tile+".matrix_merged.tsv.gz"
-        if os.path.exists(mrg_f):
-            try:
-                sub = pd.read_csv(mrg_f,sep='\t')
-            except:
-                continue
+        if args.save_file_by_tile:
+            mrg_f = outpath+"/"+tile+".matrix_merged.tsv.gz"
+            sub = pd.read_csv(mrg_f,sep='\t')
+        else:
+            datapath = "/".join([path,lane,tile])
+            f=datapath+"/barcodes.tsv.gz"
+            brc = pd.read_csv(f, sep='\t|,', names=["barcode","j","v2",\
+                "lane","tile","X","Y","brc_tot_gn","brc_tot_gt",\
+                "brc_tot_spl","brc_tot_unspl","brc_tot_ambig"],\
+                usecols=["j","X","Y"], engine='python')
+            f=datapath+"/matrix.mtx.gz"
+            mtx = pd.read_csv(f, sep=' ', skiprows=3, names=["i","j",\
+                "gn","gt","spl","unspl","ambig"])
+            f=datapath+"/features.tsv.gz"
+            feature = pd.read_csv(f, sep='\t|,', names=["gene_id","gene",\
+                "i","gene_tot_gn","gene_tot_gt",\
+                "gene_tot_spl","gene_tot_unspl","gene_tot_ambig"],\
+                usecols=["i","gene","gene_id"],  engine='python')
+            sub = mtx.merge(right = brc, on = 'j', how = 'inner')
+            sub = sub.merge(right = feature, on = 'i', how = 'inner' )
+        sub.drop(columns = ['i', 'j'], inplace=True)
         sub['X'] = (nrows - itr_r - 1) * xr + sub.X.values - xbin_min
         sub['Y'] = itr_c * yr + sub.Y.values - ybin_min
-        sub['lane'] = lane
-        sub['tile'] = tile
+        sub['j'] = lane + '_' + tile + '_' + sub.X.astype(str) + '_' + sub.Y.astype(str)
+        sub['velo'] = sub.spl.values + sub.unspl.values + sub.ambig.values
         sub = sub.loc[sub.gene.isin(gene_kept), :]
-
-        if args.filter_based_on == 'gn':
-            brc = sub[['j','X','Y','gn']].groupby(by = ['j','X','Y'], as_index=False).agg({'gn':sum}).rename(columns = {'gn':'brc_tot'})
-        elif args.filter_based_on == 'velo':
-            brc = sub[['j','X','Y','spl','unspl','ambig']].groupby(by = ['j','X','Y'], as_index=False).agg({x:sum for x in ['spl','unspl','ambig']})
-            brc['brc_tot'] = brc.spl.values + brc.unspl.values + brc.ambig.values
-        else:
-            brc = sub[['j','X','Y','gt']].groupby(by = ['j','X','Y'], as_index=False).agg({'gt':sum}).rename(columns = {'gt':'brc_tot'})
+        brc = sub[['j','X','Y',args.filter_based_on]].groupby(by = ['j','X','Y'], as_index=False).agg({args.filter_based_on:sum}).rename(columns = {args.filter_based_on:'brc_tot'})
         brc['x'] = brc.X.values * mu_scale
         brc['y'] = brc.Y.values * mu_scale
         brc = brc[['j','brc_tot','x','y']]
@@ -287,9 +290,10 @@ for itr_r in range(len(lanes)):
                 brc['hex_x'], brc['hex_y'] = pixel_to_hex(np.asarray(brc[['x','y']]), radius, i/n_move, j/n_move)
                 brc['hex_id'] = [(i,j,v['hex_x'],v['hex_y']) for k,v in brc.iterrows()]
                 cnt = brc.groupby(by = 'hex_id').agg({'brc_tot':sum}).reset_index()
-                cnt = cnt[cnt.brc_tot > density_cut]
-                cnt = set(cnt.hex_id.values)
+                cnt = set(cnt.loc[cnt.brc_tot > density_cut, 'hex_id'].values)
                 brc.loc[brc.hex_id.isin(cnt), 'kept'] = True
+        sub['lane'] = lane
+        sub['tile'] = tile
         sub = sub.loc[sub.j.isin( brc.loc[brc.kept.eq(True), 'j'] ), output_header]
         n_pixel += sub.shape[0]
         sub.to_csv(flt_f, mode='a', sep='\t', index=False, header=False)

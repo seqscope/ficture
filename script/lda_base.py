@@ -1,13 +1,11 @@
-import sys, io, os, copy, re, gc, time, importlib, warnings, subprocess
+import sys, os, copy, gc, warnings
 import pickle, argparse
 import numpy as np
 import pandas as pd
 from random import shuffle
 
 import matplotlib.pyplot as plt
-from plotnine import *
-import plotnine
-import matplotlib
+from PIL import Image
 
 from scipy.sparse import *
 import scipy.stats
@@ -38,7 +36,7 @@ parser.add_argument('--hex_width', type=int, default=24, help='')
 parser.add_argument('--hex_radius', type=int, default=-1, help='')
 parser.add_argument('--min_ct_per_unit', type=int, default=50, help='')
 parser.add_argument('--min_ct_per_unit_fit', type=int, default=20, help='')
-parser.add_argument('--min_count_per_feature', type=int, default=50, help='')
+parser.add_argument('--min_count_per_feature', type=int, default=1, help='')
 parser.add_argument('--n_move_train', type=int, default=-1, help='')
 parser.add_argument('--n_move_fit', type=int, default=-1, help='')
 parser.add_argument('--hex_width_fit', type=int, default=18, help='')
@@ -46,10 +44,13 @@ parser.add_argument('--hex_radius_fit', type=int, default=-1, help='')
 parser.add_argument('--thread', type=int, default=1, help='')
 
 parser.add_argument('--figure_width', type=int, default=20, help="Width of the output figure per figure_scale_per_tile um")
-parser.add_argument('--figure_scale_per_tile', type=int, default=3000, help="Final figure will have size scaling with figure_width x n_tiles")
 parser.add_argument('--cmap_name', type=str, default="nipy_spectral", help="Name of Matplotlib colormap to use")
-parser.add_argument('--use_specific_model', type=str, default="", help="(Temporary) A file containing pre-trained LDA model object")
+parser.add_argument('--plot_um_per_pixel', type=float, default=4, help="Size of the output pixels in um")
+parser.add_argument("--plot_top", default=False, action='store_true', help="")
+parser.add_argument("--plot_fit", default=False, action='store_true', help="")
+parser.add_argument("--tif", default=False, action='store_true', help="Store as 16-bit tif instead of png")
 
+parser.add_argument('--use_specific_model', type=str, default="", help="(Temporary) A file containing pre-trained LDA model object")
 parser.add_argument('--model_only', action='store_true')
 parser.add_argument('--use_stored_model', action='store_true')
 parser.add_argument('--skip_analysis', action='store_true')
@@ -347,30 +348,44 @@ lda_base_result["Hex_center_y"] = y
 # Output estimates
 lda_base_result.round(5).to_csv(res_f,sep='\t',index=False)
 
+
+
 # Plot clustering result
 cmap_name = args.cmap_name
 if args.cmap_name not in plt.colormaps():
-    cmap_name = "nipy_spectral"
-cmap = plt.get_cmap(cmap_name, L)
-clist = [matplotlib.colors.rgb2hex(cmap(i)) for i in range(L)]
+    cmap_name = "turbo"
 
-pt_size = 0.01
-fig_width = int( (pts[:,1].max()-pts[:,1].min())/args.figure_scale_per_tile * args.figure_width )
-plotnine.options.figure_size = (fig_width, fig_width)
-with warnings.catch_warnings(record=True):
-    ps = (
-        ggplot(lda_base_result,
-               aes(x='Hex_center_y', y='Hex_center_x',
-                                    color='Top_assigned',alpha='Top_Prob'))
-        +geom_point(size = pt_size, shape='o')
-        +guides(colour = guide_legend(override_aes = {'size':3,'shape':'o'}))
-        +xlab("")+ylab("")
-        +guides(alpha=None)
-        +coord_fixed(ratio = 1)
-        +scale_color_manual(values = clist)
-        +theme_bw()
-        +theme(legend_position='bottom')
-    )
+dt = np.uint16 if args.tif else np.uint8
+K = args.nFactor
 
-f = figure_path + "/"+output_id+"_"+str(args.hex_width_fit)+".png"
-ggsave(filename=f,plot=ps,device='png',limitsize=False)
+cmap = plt.get_cmap('turbo', K)
+cmtx = np.array([cmap(i) for i in range(K)] )[:, :3]
+np.random.shuffle(cmtx)
+
+lda_base_result.rename(columns = {'Hex_center_x':'x', 'Hex_center_y':'y'}, inplace=True)
+if args.plot_fit:
+    lda_base_result.x -= lda_base_result.x.min()
+    lda_base_result.y -= lda_base_result.y.min()
+lda_base_result['x_indx'] = np.round(lda_base_result.x.values / args.plot_um_per_pixel, 0).astype(int)
+lda_base_result['y_indx'] = np.round(lda_base_result.y.values / args.plot_um_per_pixel, 0).astype(int)
+
+if args.plot_top:
+    amax = np.array(lda_base_result[topic_header]).argmax(axis = 1)
+    lda_base_result[topic_header] = coo_array((np.ones(lda_base_result.shape[0],dtype=np.int8), (range(lda_base_result.shape[0]), amax)), shape=(lda_base_result.shape[0], K)).toarray()
+
+lda_base_result = lda_base_result.groupby(by = ['x_indx', 'y_indx']).agg({ x:np.mean for x in topic_header }).reset_index()
+h, w = lda_base_result[['x_indx','y_indx']].max(axis = 0) + 1
+
+rgb_mtx = np.clip(np.around(np.array(lda_base_result[topic_header]) @ cmtx * 255).astype(dt),0,255)
+img = np.zeros( (h, w, 3), dtype=dt)
+for r in range(3):
+    img[:, :, r] = coo_array((rgb_mtx[:, r], (lda_base_result.x_indx.values, lda_base_result.y_indx.values)), shape=(h,w), dtype = dt).toarray()
+
+if args.tif:
+    img_rgb = Image.fromarray(img, mode="I;16")
+else:
+    img_rgb = Image.fromarray(img)
+
+outf = figure_path + "/"+output_id+"_"+str(args.hex_width_fit)
+outf += ".tif" if args.tif else ".png"    
+img_rgb.save(outf)
