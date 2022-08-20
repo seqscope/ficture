@@ -39,10 +39,7 @@ if not os.path.exists(args.output_path):
     os.system(arg)
 
 ### Read data
-try:
-    df = pd.read_csv(args.input, sep='\t', usecols = ['X','Y','gene','gene_id',args.key])
-except:
-    df = pd.read_csv(args.input, sep='\t', compression='bz2', usecols = ['X','Y','gene',args.key])
+df = pd.read_csv(gzip.open(args.input,'rb'), sep='\t', usecols = ['X','Y','gene','gene_id',args.key])
 
 # gene_name_to_id = {}
 # with gzip.open(args.gene_id_info, 'rt') as rf:

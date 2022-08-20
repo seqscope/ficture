@@ -44,7 +44,7 @@ if not os.path.exists(args.output_path):
     os.system(arg)
 
 ### Menifest
-mani=pd.read_csv(args.meta_data, sep='\t')
+mani=pd.read_csv(gzip.open(args.meta_data, 'rb'), sep='\t')
 mani["lane"] = mani["id"].map(lambda x : x.split('_')[0]).astype(int)
 mani["tile"] = mani["id"].map(lambda x : x.split('_')[1]).astype(int)
 mani = mani[mani.lane.eq(int(lane))]
@@ -82,17 +82,17 @@ print(f"Read layout info. lane {lane}, tile {tile_ll}-{tile_ur}")
 
 
 f = path + "/barcodes.tsv.gz"
-brc = pd.read_csv(f, sep='\t|,', names=["barcode","j","v2",\
+brc = pd.read_csv(gzip.open(f, 'rb'), sep='\t|,', names=["barcode","j","v2",\
     "lane","tile","X","Y","brc_tot_gn","brc_tot_gt",\
     "brc_tot_spl","brc_tot_unspl","brc_tot_ambig"],\
     usecols=["j","lane","tile","X","Y"], engine='python')
 f = path + "/matrix.mtx.gz"
-df = pd.read_csv(f, sep=' ', skiprows=3, names=["i","j",\
+df = pd.read_csv(gzip.open(f, 'rb'), sep=' ', skiprows=3, names=["i","j",\
     "gn","gt","spl","unspl","ambig"],\
     usecols=["i","j",args.key])
 df = df.merge(right = brc, on = 'j', how = 'inner')
 f = path+"/features.tsv.gz"
-feature = pd.read_csv(f, sep='\t|,', names=["gene_id","gene",\
+feature = pd.read_csv(gzip.open(f, 'rb'), sep='\t|,', names=["gene_id","gene",\
     "i","gene_tot_gn","gene_tot_gt",\
     "gene_tot_spl","gene_tot_unspl","gene_tot_ambig"],\
     usecols=["i","gene","gene_id"],  engine='python')

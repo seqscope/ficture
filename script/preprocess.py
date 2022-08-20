@@ -1,4 +1,4 @@
-import sys, os
+import sys, os, gzip
 import subprocess as sp
 import argparse
 import numpy as np
@@ -57,7 +57,7 @@ if os.path.exists(flt_f) and not args.redo_filter:
     sys.exit("Output file already exists. Do you want to --redo_filter?")
 
 ### Menifest
-mani=pd.read_csv(args.meta_data, sep='\t')
+mani=pd.read_csv(gzip.open(args.meta_data, 'rb'), sep='\t')
 mani["lane"] = mani["id"].map(lambda x : x.split('_')[0]).astype(int)
 mani["tile"] = mani["id"].map(lambda x : x.split('_')[1]).astype(int)
 mani = mani[mani.lane.eq(int(lane))]
@@ -152,7 +152,7 @@ for itr_r in range(len(lanes)):
         to_merge = True
         if os.path.exists(mrg_f):
             try:
-                sub = pd.read_csv(mrg_f,sep='\t')
+                sub = pd.read_csv(gzip.open(mrg_f, 'rb'), sep='\t')
                 to_merge = False
             except:
                 to_merge = True
@@ -160,15 +160,18 @@ for itr_r in range(len(lanes)):
             try:
                 datapath = "/".join([path,lane,tile])
                 f=datapath+"/barcodes.tsv.gz"
-                brc = pd.read_csv(f, sep='\t|,', names=["barcode","j","v2",\
+                brc = pd.read_csv(gzip.open(f, 'rb'),\
+                    sep='\t|,', names=["barcode","j","v2",\
                     "lane","tile","X","Y","brc_tot_gn","brc_tot_gt",\
                     "brc_tot_spl","brc_tot_unspl","brc_tot_ambig"],\
                     usecols=["j","X","Y"], engine='python')
                 f=datapath+"/matrix.mtx.gz"
-                mtx = pd.read_csv(f, sep=' ', skiprows=3, names=["i","j",\
+                mtx = pd.read_csv(gzip.open(f, 'rb'),\
+                    sep=' ', skiprows=3, names=["i","j",\
                     "gn","gt","spl","unspl","ambig"])
                 f=datapath+"/features.tsv.gz"
-                feature = pd.read_csv(f, sep='\t|,', names=["gene_id","gene",\
+                feature = pd.read_csv(gzip.open(f, 'rb'),\
+                    sep='\t|,', names=["gene_id","gene",\
                     "i","gene_tot_gn","gene_tot_gt",\
                     "gene_tot_spl","gene_tot_unspl","gene_tot_ambig"],\
                     usecols=["i","gene","gene_id"],  engine='python')
@@ -245,7 +248,7 @@ else:
 
 density_cut = blur_center.loc[blur_center.dense_center.eq(True), 'brc_tot'].min()
 
-output_header = ['X','Y','gene','gene_id','gn','gt','spl','unspl','ambig','lane','tile']
+output_header = ['#lane','tile','Y','X','gene','gene_id','gn','gt','spl','unspl','ambig']
 header=pd.DataFrame([], columns = output_header)
 header.to_csv(flt_f, sep='\t', index=False)
 n_pixel = 0
@@ -256,19 +259,22 @@ for itr_r in range(len(lanes)):
             continue
         if args.save_file_by_tile:
             mrg_f = outpath+"/"+tile+".matrix_merged.tsv.gz"
-            sub = pd.read_csv(mrg_f,sep='\t')
+            sub = pd.read_csv(gzip.open(mrg_f, 'rb'),sep='\t')
         else:
             datapath = "/".join([path,lane,tile])
             f=datapath+"/barcodes.tsv.gz"
-            brc = pd.read_csv(f, sep='\t|,', names=["barcode","j","v2",\
+            brc = pd.read_csv(gzip.open(f, 'rb'),\
+                sep='\t|,', names=["barcode","j","v2",\
                 "lane","tile","X","Y","brc_tot_gn","brc_tot_gt",\
                 "brc_tot_spl","brc_tot_unspl","brc_tot_ambig"],\
                 usecols=["j","X","Y"], engine='python')
             f=datapath+"/matrix.mtx.gz"
-            mtx = pd.read_csv(f, sep=' ', skiprows=3, names=["i","j",\
+            mtx = pd.read_csv(gzip.open(f, 'rb'),\
+                sep=' ', skiprows=3, names=["i","j",\
                 "gn","gt","spl","unspl","ambig"])
             f=datapath+"/features.tsv.gz"
-            feature = pd.read_csv(f, sep='\t|,', names=["gene_id","gene",\
+            feature = pd.read_csv(gzip.open(f, 'rb'),\
+                sep='\t|,', names=["gene_id","gene",\
                 "i","gene_tot_gn","gene_tot_gt",\
                 "gene_tot_spl","gene_tot_unspl","gene_tot_ambig"],\
                 usecols=["i","gene","gene_id"],  engine='python')
@@ -292,9 +298,10 @@ for itr_r in range(len(lanes)):
                 cnt = brc.groupby(by = 'hex_id').agg({'brc_tot':sum}).reset_index()
                 cnt = set(cnt.loc[cnt.brc_tot > density_cut, 'hex_id'].values)
                 brc.loc[brc.hex_id.isin(cnt), 'kept'] = True
-        sub['lane'] = lane
+        sub['#lane'] = lane
         sub['tile'] = tile
         sub = sub.loc[sub.j.isin( brc.loc[brc.kept.eq(True), 'j'] ), output_header]
+        sub.sort_values(by = ['Y','X','gene'], inplace=True)
         n_pixel += sub.shape[0]
         sub.to_csv(flt_f, mode='a', sep='\t', index=False, header=False)
         print(f"Write data for {lane}_{tile}, {sub.shape}. (total {n_pixel} so far)")

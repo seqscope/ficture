@@ -1,4 +1,4 @@
-import sys, os, copy, gc, warnings
+import sys, os, copy, gc, gzip
 import pickle, argparse
 import numpy as np
 import pandas as pd
@@ -100,10 +100,8 @@ L=args.nFactor
 topic_header = ['Topic_'+str(x) for x in range(L)]
 
 ### Read data
-try:
-    df = pd.read_csv(args.input, sep='\t', usecols = ['X','Y','gene',args.key, 'tile'])
-except:
-    df = pd.read_csv(args.input, sep='\t', compression='bz2', usecols = ['X','Y','gene',args.key, 'tile'])
+df = pd.read_csv(gzip.open(args.input, 'rb'), sep='\t', usecols = ['X','Y','gene', args.key, 'tile'])
+
 
 ### If working on a subset of tiles
 if args.subset_tile != '':

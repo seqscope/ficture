@@ -1,4 +1,4 @@
-import sys, os, re
+import sys, os, re, gzip
 import argparse
 import numpy as np
 import pandas as pd
@@ -24,7 +24,7 @@ if args.cmap_name not in plt.colormaps():
 dt = np.uint16 if args.tif else np.uint8
 outf = args.output + ".tif" if args.tif else args.output + ".png"
 
-org_fit = pd.read_csv(args.input, sep='\t',header=0)
+org_fit = pd.read_csv(gzip.open(args.input, 'rb'), sep='\t',header=0)
 
 topic_header = [] 
 for x in org_fit.columns:
