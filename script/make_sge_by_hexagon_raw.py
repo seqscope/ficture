@@ -44,7 +44,7 @@ if not os.path.exists(args.output_path):
     os.system(arg)
 
 ### Menifest
-mani=pd.read_csv(gzip.open(args.meta_data, 'rb'), sep='\t')
+mani=pd.read_csv(args.meta_data, sep='\t')
 mani["lane"] = mani["id"].map(lambda x : x.split('_')[0]).astype(int)
 mani["tile"] = mani["id"].map(lambda x : x.split('_')[1]).astype(int)
 mani = mani[mani.lane.eq(int(lane))]
@@ -150,7 +150,7 @@ feature[['gene_id','gene','dummy']].to_csv(f, sep='\t', index=False, header=Fals
 
 brc_f = args.output_path + "/barcodes.tsv"
 mtx_f = args.output_path + "/matrix.mtx"
-# If exists, delete 
+# If exists, delete
 if os.path.exists(brc_f):
     _ = os.system("rm " + brc_f)
 if os.path.exists(mtx_f):
@@ -191,10 +191,10 @@ while offs_x < n_move:
             offs_y += 1
             continue
         grd_minib = list(range(0, n_hex, b_size))
-        grd_minib[-1] = n_hex 
+        grd_minib[-1] = n_hex
         st_minib = 0
         n_minib = len(grd_minib) - 1
-        
+
         while st_minib < n_minib:
             indx_minib = (sub.cRow >= grd_minib[st_minib]) & (sub.cRow < grd_minib[st_minib+1])
             npixel_minib = sum(indx_minib)
@@ -210,7 +210,7 @@ while offs_x < n_move:
             n_unit += mtx.shape[0]
             mtx = pd.DataFrame({'i':c, 'j':r, 'v':mtx.data})
             mtx['i'] = mtx.i.astype(int)
-            mtx['j'] = mtx.j.astype(int) 
+            mtx['j'] = mtx.j.astype(int)
             mtx.to_csv(mtx_f, mode='a', sep=' ', index=False, header=False)
             st_minib += 1
             print(f"{st_minib}/{n_minib}. Wrote {n_unit} units so far.")
