@@ -26,7 +26,7 @@ outf = args.output + ".tif" if args.tif else args.output + ".png"
 
 org_fit = pd.read_csv(gzip.open(args.input, 'rb'), sep='\t',header=0)
 
-topic_header = [] 
+topic_header = []
 for x in org_fit.columns:
     v = re.match('(^[A-Za-z]+_\d+$)', x)
     if v:
@@ -47,7 +47,7 @@ org_fit['y_indx'] = np.round(np.clip(org_fit.y.values / args.um_per_pixel,0,np.i
 
 if args.top:
     amax = np.array(org_fit[topic_header]).argmax(axis = 1)
-    org_fit[topic_header] = coo_array((np.ones(org_fit.shape[0],dtype=np.int8), (range(org_fit.shape[0]), amax)), shape=(org_fit.shape[0], K)).toarray()
+    org_fit[topic_header] = coo_matrix((np.ones(org_fit.shape[0],dtype=np.int8), (range(org_fit.shape[0]), amax)), shape=(org_fit.shape[0], K)).toarray()
 
 org_fit = org_fit.groupby(by = ['x_indx', 'y_indx']).agg({ x:np.mean for x in topic_header }).reset_index()
 h, w = org_fit[['x_indx','y_indx']].max(axis = 0) + 1
@@ -55,8 +55,8 @@ h, w = org_fit[['x_indx','y_indx']].max(axis = 0) + 1
 rgb_mtx = np.clip(np.around(np.array(org_fit[topic_header]) @ cmtx * 255).astype(dt),0,255)
 img = np.zeros( (h, w, 3), dtype=dt)
 for r in range(3):
-    img[:, :, r] = coo_array((rgb_mtx[:, r], (org_fit.x_indx.values, org_fit.y_indx.values)), shape=(h,w), dtype = dt).toarray()
-# print(dt,K,h,w,rgb_mtx.shape,img.shape,img.dtype) 
+    img[:, :, r] = coo_matrix((rgb_mtx[:, r], (org_fit.x_indx.values, org_fit.y_indx.values)), shape=(h,w), dtype = dt).toarray()
+# print(dt,K,h,w,rgb_mtx.shape,img.shape,img.dtype)
 
 if args.tif:
     img_rgb = Image.fromarray(img, mode="I;16")

@@ -57,7 +57,7 @@ if os.path.exists(flt_f) and not args.redo_filter:
     sys.exit("Output file already exists. Do you want to --redo_filter?")
 
 ### Menifest
-mani=pd.read_csv(gzip.open(args.meta_data, 'rb'), sep='\t')
+mani=pd.read_csv(args.meta_data, sep='\t')
 mani["lane"] = mani["id"].map(lambda x : x.split('_')[0]).astype(int)
 mani["tile"] = mani["id"].map(lambda x : x.split('_')[1]).astype(int)
 mani = mani[mani.lane.eq(int(lane))]
@@ -162,8 +162,7 @@ for itr_r in range(len(lanes)):
                 f=datapath+"/barcodes.tsv.gz"
                 brc = pd.read_csv(gzip.open(f, 'rb'),\
                     sep='\t|,', names=["barcode","j","v2",\
-                    "lane","tile","X","Y","brc_tot_gn","brc_tot_gt",\
-                    "brc_tot_spl","brc_tot_unspl","brc_tot_ambig"],\
+                    "lane","tile","X","Y","gn","gt","spl","unspl","ambig"],\
                     usecols=["j","X","Y"], engine='python')
                 f=datapath+"/matrix.mtx.gz"
                 mtx = pd.read_csv(gzip.open(f, 'rb'),\
@@ -172,8 +171,7 @@ for itr_r in range(len(lanes)):
                 f=datapath+"/features.tsv.gz"
                 feature = pd.read_csv(gzip.open(f, 'rb'),\
                     sep='\t|,', names=["gene_id","gene",\
-                    "i","gene_tot_gn","gene_tot_gt",\
-                    "gene_tot_spl","gene_tot_unspl","gene_tot_ambig"],\
+                    "i","gn","gt","spl","unspl","ambig"],\
                     usecols=["i","gene","gene_id"],  engine='python')
             except:
                 print(f"WARNING: cannot read file for lane {lane} tile {tile}")
@@ -265,8 +263,7 @@ for itr_r in range(len(lanes)):
             f=datapath+"/barcodes.tsv.gz"
             brc = pd.read_csv(gzip.open(f, 'rb'),\
                 sep='\t|,', names=["barcode","j","v2",\
-                "lane","tile","X","Y","brc_tot_gn","brc_tot_gt",\
-                "brc_tot_spl","brc_tot_unspl","brc_tot_ambig"],\
+                "lane","tile","X","Y","gn","gt","spl","unspl","ambig"],\
                 usecols=["j","X","Y"], engine='python')
             f=datapath+"/matrix.mtx.gz"
             mtx = pd.read_csv(gzip.open(f, 'rb'),\
@@ -275,8 +272,7 @@ for itr_r in range(len(lanes)):
             f=datapath+"/features.tsv.gz"
             feature = pd.read_csv(gzip.open(f, 'rb'),\
                 sep='\t|,', names=["gene_id","gene",\
-                "i","gene_tot_gn","gene_tot_gt",\
-                "gene_tot_spl","gene_tot_unspl","gene_tot_ambig"],\
+                "i","gn","gt","spl","unspl","ambig"],\
                 usecols=["i","gene","gene_id"],  engine='python')
             sub = mtx.merge(right = brc, on = 'j', how = 'inner')
             sub = sub.merge(right = feature, on = 'i', how = 'inner' )

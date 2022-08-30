@@ -369,7 +369,7 @@ lda_base_result['y_indx'] = np.round(lda_base_result.y.values / args.plot_um_per
 
 if args.plot_top:
     amax = np.array(lda_base_result[topic_header]).argmax(axis = 1)
-    lda_base_result[topic_header] = coo_array((np.ones(lda_base_result.shape[0],dtype=np.int8), (range(lda_base_result.shape[0]), amax)), shape=(lda_base_result.shape[0], K)).toarray()
+    lda_base_result[topic_header] = coo_matrix((np.ones(lda_base_result.shape[0],dtype=np.int8), (range(lda_base_result.shape[0]), amax)), shape=(lda_base_result.shape[0], K)).toarray()
 
 lda_base_result = lda_base_result.groupby(by = ['x_indx', 'y_indx']).agg({ x:np.mean for x in topic_header }).reset_index()
 h, w = lda_base_result[['x_indx','y_indx']].max(axis = 0) + 1
@@ -377,7 +377,7 @@ h, w = lda_base_result[['x_indx','y_indx']].max(axis = 0) + 1
 rgb_mtx = np.clip(np.around(np.array(lda_base_result[topic_header]) @ cmtx * 255).astype(dt),0,255)
 img = np.zeros( (h, w, 3), dtype=dt)
 for r in range(3):
-    img[:, :, r] = coo_array((rgb_mtx[:, r], (lda_base_result.x_indx.values, lda_base_result.y_indx.values)), shape=(h,w), dtype = dt).toarray()
+    img[:, :, r] = coo_matrix((rgb_mtx[:, r], (lda_base_result.x_indx.values, lda_base_result.y_indx.values)), shape=(h,w), dtype = dt).toarray()
 
 if args.tif:
     img_rgb = Image.fromarray(img, mode="I;16")
@@ -385,5 +385,5 @@ else:
     img_rgb = Image.fromarray(img)
 
 outf = figure_path + "/"+output_id+"_"+str(args.hex_width_fit)
-outf += ".tif" if args.tif else ".png"    
+outf += ".tif" if args.tif else ".png"
 img_rgb.save(outf)

@@ -148,7 +148,7 @@ feature['dummy'] = "Gene Expression"
 f = args.output_path + "/features.tsv.gz"
 feature[['gene_id','gene','dummy']].to_csv(f, sep='\t', index=False, header=False)
 
-brc_f = args.output_path + "/barcode.tsv"
+brc_f = args.output_path + "/barcodes.tsv"
 mtx_f = args.output_path + "/matrix.mtx"
 # If exists, delete 
 if os.path.exists(brc_f):
