@@ -1,240 +1,221 @@
-import sys, io, os, copy, re, gc, time, importlib, warnings, subprocess
-from collections import defaultdict, Counter
-import pickle, argparse
+import sys, os, copy, gc, gzip, pickle, argparse, logging, warnings
 import numpy as np
 import pandas as pd
 from random import shuffle
 
 import matplotlib.pyplot as plt
-from plotnine import *
-import plotnine
-import matplotlib
+from PIL import Image
 
 from scipy.sparse import *
-import scipy.stats
-import sklearn.preprocessing
 import sklearn.neighbors
+import sklearn.preprocessing
 from sklearn.decomposition import LatentDirichletAllocation as LDA
 
 # Add parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import hexagon_fn
 from hexagon_fn import *
+from utilt import plot_colortable
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
 parser.add_argument('--model', type=str, help='')
-parser.add_argument('--output_figure', type=str, help='')
-parser.add_argument('--output_table', type=str, help='')
+parser.add_argument('--output_path', type=str, help='')
+parser.add_argument('--output_id', type=str, help='')
+parser.add_argument('--region_id', type=str, help='lane')
+
+parser.add_argument('--key', default = 'gn', type=str, help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced')
+parser.add_argument('--buffer_step', type=int, default=2000, help='um')
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
-
-parser.add_argument('--key', default = 'gt', type=str, help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced, velo: velo total')
-parser.add_argument('--gene_type_info', type=str, help='A file containing two columns, gene name and gene type. Used only if specific types of genes are kept.', default = '')
-parser.add_argument('--gene_type_keyword', type=str, help='Key words (separated by ,) of gene types to keep, only used is gene_type_info is provided.', default="IG,TR,protein,lnc")
-parser.add_argument('--rm_gene_keyword', type=str, help='Key words (separated by ,) of gene names to remove, only used is gene_type_info is provided.', default="")
-
-parser.add_argument('--hex_width', type=int, default=12, help='')
-parser.add_argument('--hex_radius', type=int, default=-1, help='')
-parser.add_argument('--min_ct_per_unit', type=int, default=20, help='')
-parser.add_argument('--min_count_per_feature', type=int, default=1, help='')
+parser.add_argument('--min_ct_per_unit', type=int, default=50, help='')
 parser.add_argument('--n_move', type=int, default=-1, help='')
-parser.add_argument('--thread', type=int, default=1, help='')
+parser.add_argument('--hex_width', type=int, default=18, help='')
+parser.add_argument('--hex_radius', type=int, default=-1, help='')
 
-parser.add_argument('--figure_width', type=int, default=20, help="Width of the output figure per figure_scale_per_tile um")
-parser.add_argument('--figure_scale_per_tile', type=int, default=3000, help="Final figure will have size scaling with figure_width x n_tiles")
-parser.add_argument('--cmap_name', type=str, default="nipy_spectral", help="Name of Matplotlib colormap to use")
+parser.add_argument('--skip_plot', action='store_true')
+parser.add_argument('--cmap_name', type=str, default="turbo", help="Name of Matplotlib colormap to use")
+parser.add_argument('--plot_um_per_pixel', type=float, default=1, help="Size of the output pixels in um")
+parser.add_argument('--fill_range', type=float, default=-1, help="um")
+# parser.add_argument('--chunk_size', type=int, default=5000, help="um")
+parser.add_argument("--plot_top", default=False, action='store_true', help="")
+parser.add_argument("--tif", default=False, action='store_true', help="Store as 16-bit tif instead of png")
 
 args = parser.parse_args()
+logging.basicConfig(level= getattr(logging, "INFO", None))
 
-try:
-    lda_base = pickle.load( open( args.model, "rb" ) )
-except:
-    sys.exit("Please provide a proper model object")
-L = lda_base.components_.shape[0]
-feature_kept = lda_base.feature_names_in_
-feature_kept_indx = list(range(len(feature_kept)))
 mu_scale = 1./args.mu_scale
+key = args.key
+buffer_step = int(args.buffer_step * args.mu_scale)
 
-radius=args.hex_radius
-diam=args.hex_width
+### Input and output
+if not os.path.exists(args.input) or not os.path.exists(args.model):
+    print(f"ERROR: cannot find input files.")
+    sys.exit()
+
+figure_path = args.output_path + "/analysis/figure/chunk"
+if not os.path.exists(figure_path):
+    arg="mkdir -p "+figure_path
+    os.system(arg)
+
+lda = pickle.load( open( args.model, "rb" ) )
+feature_kept = lda.feature_names_in_
+ft_dict = {x:i for i,x in enumerate( feature_kept ) }
+K, M = lda.exp_dirichlet_component_.shape
+factor_header = ['k_'+str(x) for x in range(K)]
+lda.feature_names_in_ = None
+
+diam = args.hex_width
+radius = args.hex_radius
 if radius < 0:
     radius = diam / np.sqrt(3)
 else:
-    diam = int(radius*np.sqrt(3))
-
-### Input and output
-if not os.path.exists(args.input):
-    print(f"ERROR: cannot find input file \n {args.input}, please run preprocessing script first.")
-    sys.exit()
-
-### If work on subset of genes
-gene_kept_org = set()
-if args.gene_type_info != '' and os.path.exists(args.gene_type_info):
-    gencode = pd.read_csv(args.gene_type_info, sep='\t', names=['Name','Type'])
-    kept_key = args.gene_type_keyword.split(',')
-    kept_type = gencode.loc[gencode.Type.str.contains('|'.join(kept_key)),'Type'].unique()
-    gencode = gencode.loc[ gencode.Type.isin(kept_type) ]
-    if args.rm_gene_keyword != "":
-        rm_list = args.rm_gene_keyword.split(",")
-        for x in rm_list:
-            gencode = gencode.loc[ ~gencode.Name.str.contains(x) ]
-    gene_kept_org = set(list(gencode.Name))
-    feature_kept_indx = [i for i,x in enumerate(feature_kept) if x in gene_kept_org]
-
-### Basic parameterse
-b_size = 256 # minibatch size
-topic_header = ['Topic_'+str(x) for x in range(L)]
-
-### Read data
-try:
-    df = pd.read_csv(args.input, sep='\t', usecols = ['X','Y','gene',args.key])
-except:
-    df = pd.read_csv(args.input, sep='\t', compression='bz2', usecols = ['X','Y','gene',args.key])
-
-df = df[df.gene.isin(feature_kept)]
-if len(gene_kept_org) > 0:
-    df = df[df.gene.isin(gene_kept_org)]
-df.drop_duplicates(subset=['X','Y','gene'], inplace=True)
-feature = df[['gene', args.key]].groupby(by = 'gene', as_index=False).agg({args.key:sum}).rename(columns = {args.key:'gene_tot'})
-feature = feature.loc[feature.gene_tot > args.min_count_per_feature, :]
-gene_kept = set(feature['gene'])
-df = df[df.gene.isin(gene_kept)]
-df['j'] = df.X.astype(str) + '_' + df.Y.astype(str)
-
-feature_kept_indx = [i for i,x in enumerate(feature_kept) if x in gene_kept]
-feature_kept = [feature_kept[i] for i in feature_kept_indx]
-lda_base.components_ = lda_base.components_[:, feature_kept_indx]
-lda_base.exp_dirichlet_component_ = sklearn.preprocessing.normalize(lda_base.exp_dirichlet_component_[:, feature_kept_indx], norm='l1', axis=1)
-lda_base.feature_names_in_ = feature_kept
-lda_base.n_features_in_ = len(feature_kept)
-lda_base.doc_topic_prior_ = 1./L
-lda_base.topic_word_prior_= 1./L
-print(f"Keep {len(feature_kept)} informative genes")
-
-brc = df.groupby(by = ['j','X','Y']).agg({args.key: sum}).reset_index()
-brc.index = range(brc.shape[0])
-pixel_ct = brc[args.key].values
-pts = np.asarray(brc[['X','Y']]) * mu_scale
-balltree = sklearn.neighbors.BallTree(pts)
-print(f"Read data with {brc.shape[0]} pixels and {len(gene_kept)} genes.")
-df.drop(columns = ['X', 'Y'], inplace=True)
-
-# Make DGE
-barcode_kept = list(brc.j.values)
-del brc
-gc.collect()
-bc_dict = {x:i for i,x in enumerate( barcode_kept ) }
-ft_dict = {x:i for i,x in enumerate( feature_kept ) }
-indx_row = [ bc_dict[x] for x in df['j']]
-indx_col = [ ft_dict[x] for x in df['gene']]
-N = len(barcode_kept)
-M = len(feature_kept)
-dge_mtx = coo_matrix((df[args.key].values, (indx_row, indx_col)), shape=(N, M)).tocsr()
-feature_mf = np.asarray(dge_mtx.sum(axis = 0)).reshape(-1)
-feature_mf = feature_mf / feature_mf.sum()
-total_molecule=df[args.key].sum()
-print(f"Made DGE {dge_mtx.shape}")
-del df
-gc.collect()
-
-
+    diam = radius*np.sqrt(3)
 n_move = args.n_move
-if n_move > diam or n_move < 0:
+if n_move >= diam or n_move < 0:
     n_move = diam // 4
+fill_range = max([args.fill_range, radius])
 
-res_f = args.output_table
-wf = open(res_f, 'w')
-out_header = "offs_x,offs_y,hex_x,hex_y".split(',')+['Topic_'+str(x) for x in range(L)]
-out_header = '\t'.join(out_header)
-_ = wf.write(out_header + '\n')
+res_f = args.output_path + "/analysis/"+args.output_id+"_"+str(int(diam))+".fit_result.tsv"
+dtp = {x:int for x in ['offs_x','offs_y','hex_x','hex_y','topK']}
+dtp.update({x:float for x in ['topP','x','y']+factor_header})
 
 # Apply fitted model
 b_size = 512
-offs_x = 0
-offs_y = 0
-while offs_x < n_move:
-    while offs_y < n_move:
-        x,y = pixel_to_hex(pts, radius, offs_x/n_move, offs_y/n_move)
-        hex_crd = list(zip(x,y))
-        hex_list = list(set(hex_crd))
-        hex_dict = {x:i for i,x in enumerate(hex_list)}
-        sub = pd.DataFrame({'cRow':[hex_dict[x] for x in hex_crd], 'cCol':list(range(N))})
-        n_hex = len(hex_dict)
-        n_minib = n_hex // b_size
-        grd_minib = list(range(0, n_hex, b_size))
-        grd_minib[-1] = n_hex - 1
-        st_minib = 0
-        n_minib = len(grd_minib) - 1
-        print(f"{n_minib}, {n_hex}")
-        while st_minib < n_minib:
-            indx_minib = (sub.cRow >= grd_minib[st_minib]) & (sub.cRow < grd_minib[st_minib+1])
-            npixel_minib = sum(indx_minib)
-            nhex_minib = grd_minib[st_minib+1] - grd_minib[st_minib]
-            hex_crd_sub = [hex_list[x+grd_minib[st_minib]] for x in range(nhex_minib)]
-            hex_crd[grd_minib[st_minib]:grd_minib[st_minib+1]]
-
-            mtx = coo_matrix((np.ones(npixel_minib, dtype=bool), (sub.loc[indx_minib, 'cRow'].values-grd_minib[st_minib], sub.loc[indx_minib, 'cCol'].values)), shape=(nhex_minib, N) ).tocsr() @ dge_mtx
-            ct = np.asarray(mtx.sum(axis = 1)).squeeze()
-            indx = ct >= args.min_ct_per_unit
-            logl = lda_base.score(mtx)
-            theta = lda_base.transform(mtx)
-            lines = [ [offs_x, offs_y, hex_crd_sub[i][0],hex_crd_sub[i][1]] + list(np.around(theta[i,], 5)) for i in range(theta.shape[0]) if indx[i] ]
-            lines = ['\t'.join([str(x) for x in y])+'\n' for y in lines]
-            _ = wf.writelines(lines)
-
-            print(f"Minibatch {st_minib} with {sum(indx)} units, log likelihood {logl:.2E}")
-            st_minib += 1
-        print(f"{offs_x}, {offs_y}")
-        offs_y += 1
+df = pd.DataFrame()
+nbatch = 0
+for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=1000000, header=0, usecols=["X","Y","gene",key],dtype={'X':int,'Y':int,'gene':str,key:int}):
+    chunk['j'] = chunk.Y.astype(str).values + "_" + chunk.Y.astype(str).values
+    chunk = chunk[chunk.gene.isin(feature_kept)]
+    if chunk.shape[0] == 0:
+        continue
+    df = pd.concat((df, chunk))
+    st = df.Y.iloc[0]
+    ed = df.Y.iloc[-1]
+    print(st, ed, df.Y.min(), df.Y.max(), chunk.Y.min(), chunk.Y.max())
+    if ed - st < buffer_step or df[key].sum() < b_size*args.min_ct_per_unit:
+        continue
+    brc = df.groupby(by = ['j','X','Y']).agg({key: sum}).reset_index()
+    brc.index = range(brc.shape[0])
+    pts = np.asarray(brc[['X','Y']]) * mu_scale
+    # Make DGE
+    barcode_kept = list(brc.j.values)
+    df = df[df.j.isin(barcode_kept)]
+    bc_dict = {x:i for i,x in enumerate( barcode_kept ) }
+    indx_row = [ bc_dict[x] for x in df['j']]
+    indx_col = [ ft_dict[x] for x in df['gene']]
+    N = len(barcode_kept)
+    dge_mtx = coo_matrix((df[key].values, (indx_row, indx_col)), shape=(N, M)).tocsr()
+    logging.info(f"Made DGE {dge_mtx.shape}")
+    offs_x = 0
     offs_y = 0
-    offs_x += 1
+    while offs_x < n_move:
+        while offs_y < n_move:
+            x,y = pixel_to_hex(pts, radius, offs_x/n_move, offs_y/n_move)
+            hex_crd = list(zip(x,y))
+            hex_list = list(set(hex_crd))
+            hex_dict = {x:i for i,x in enumerate(hex_list)}
+            sub = pd.DataFrame({'cRow':[hex_dict[x] for x in hex_crd], 'cCol':list(range(N))})
+            n_hex = len(hex_dict)
+            mtx = coo_matrix((np.ones(N, dtype=bool), (sub.cRow.values, sub.cCol.values)), shape=(n_hex, N) ).tocsr() @ dge_mtx
+            ct = np.asarray(mtx.sum(axis = 1)).squeeze()
+            indx = np.arange(n_hex)[ct >= args.min_ct_per_unit]
+            nunit = len(indx)
+            if nunit < 2:
+                offs_y += 1
+                continue
+            mtx = mtx[indx, :]
+            logl = lda.score(mtx) / mtx.shape[0]
+            theta = lda.transform(mtx)
+            hex_x = np.array([hex_list[i][0] for i in indx] ).astype(int)
+            hex_y = np.array([hex_list[i][1] for i in indx] ).astype(int)
+            lines = pd.DataFrame({'offs_x':offs_x,'offs_y':offs_y, 'hex_x':hex_x, 'hex_y':hex_y})
+            lines['x'], lines['y'] = hex_to_pixel(hex_x,hex_y, radius, offs_x/n_move, offs_y/n_move)
+            lines = pd.concat((lines, pd.DataFrame(theta, columns = factor_header)), axis = 1)
+            lines['topK'] = np.argmax(theta, axis = 1).astype(int)
+            lines['topP'] = np.max(theta, axis = 1)
+            lines = lines.astype(dtp)
+            if nbatch == 0:
+                lines.to_csv(res_f, sep='\t', mode='w', float_format="%.5f", index=False, header=True)
+            else:
+                lines.to_csv(res_f, sep='\t', mode='a', float_format="%.5f", index=False, header=False)
+            print(f"Batch {nbatch} from {int(st*mu_scale)} to {int(ed*mu_scale)} with {nunit}({n_hex}) units, log likelihood {logl:.3f}")
+            nbatch += 1
+            offs_y += 1
+            # print(f"{offs_x}, {offs_y}")
+        offs_y = 0
+        offs_x += 1
+    df = df[df.Y > ed - 5 * args.mu_scale]
 
-wf.close()
-del mtx
-del dge_mtx
-del lda_base
 gc.collect()
 
-dtp = {x:int for x in ['off_x','offs_y','hex_x','hex_y']}
-dtp.update({"Topic_"+str(x):float for x in range(L)})
-lda_base_result = pd.read_csv(res_f, sep='\t', dtype=dtp)
+if args.skip_plot:
+    sys.exit()
 
-lda_base_result['Top_Topic'] = np.argmax(np.asarray(lda_base_result.loc[:, topic_header ]), axis = 1)
-lda_base_result['Top_Prob'] = lda_base_result.loc[:, topic_header].max(axis = 1)
-lda_base_result['Top_assigned'] = pd.Categorical(lda_base_result.Top_Topic)
-
-# Transform back to pixel location
-x,y = hex_to_pixel(lda_base_result.hex_x.values,\
-                   lda_base_result.hex_y.values, radius, lda_base_result.offs_x.values/n_move, lda_base_result.offs_y.values/n_move)
-
-lda_base_result["Hex_center_x"] = x
-lda_base_result["Hex_center_y"] = y
-
-lda_base_result.round(5).to_csv(res_f,sep='\t',index=False)
-
-# Plot clustering result
+### Make figure
+df = pd.read_csv(res_f,header=0,sep='\t', dtype=dtp)
+dt = np.uint16 if args.tif else np.uint8
 cmap_name = args.cmap_name
 if args.cmap_name not in plt.colormaps():
-    cmap_name = "nipy_spectral"
-cmap = plt.get_cmap(cmap_name, L)
-clist = [matplotlib.colors.rgb2hex(cmap(i)) for i in range(L)]
+    cmap_name = "turbo"
+cmap = plt.get_cmap(cmap_name, K)
+cmtx = np.array([cmap(i) for i in range(K)] )
+indx = np.arange(K)
+shuffle(indx)
+cmtx = cmtx[indx, ]
+print(cmtx)
+cdict = {k:cmtx[k,:3] for k in range(K)}
 
-pt_size = 0.01
-fig_width = int( (pts[:,1].max()-pts[:,1].min())/args.figure_scale_per_tile * args.figure_width )
-plotnine.options.figure_size = (fig_width, fig_width)
-with warnings.catch_warnings(record=True):
-    ps = (
-        ggplot(lda_base_result,
-               aes(x='Hex_center_y', y='Hex_center_x',
-                                    color='Top_assigned',alpha='Top_Prob'))
-        +geom_point(size = pt_size, shape='o')
-        +guides(colour = guide_legend(override_aes = {'size':3,'shape':'o'}))
-        +xlab("")+ylab("")
-        +guides(alpha=None)
-        +coord_fixed(ratio = 1)
-        +scale_color_manual(values = clist)
-        +theme_bw()
-        +theme(legend_position='bottom')
-    )
+# Plot color bar separately
+fig = plot_colortable(cdict, "Factor label", sort_colors=False, ncols=4)
+f = figure_path + "/color_legend."+args.output_id+".png"
+fig.savefig(f)
 
-ggsave(filename=args.output_figure,plot=ps,device='png',limitsize=False)
+df['x_indx'] = np.round(df.x.values / args.plot_um_per_pixel, 0).astype(int)
+df['y_indx'] = np.round(df.y.values / args.plot_um_per_pixel, 0).astype(int)
+df = df.groupby(by = ['x_indx', 'y_indx']).agg({ x:np.mean for x in factor_header }).reset_index()
+df['y_indx'] = df.y_indx - df.y_indx.min()
+
+if args.plot_top:
+    amax = np.array(df[topic_header]).argmax(axis = 1)
+    df[topic_header] = coo_matrix((np.ones(df.shape[0],dtype=np.int8), (range(df.shape[0]), amax)), shape=(df.shape[0], K)).toarray()
+
+h = df.x_indx.max() + 1
+wsize = df.y_indx.max() + 1
+logging.info(f"Size: {h} x {wsize}")
+
+
+df.index = range(df.shape[0])
+rgb_mtx = np.clip(np.around(np.array(df[factor_header]) @ cmtx * 255),0,255).astype(dt)
+pts = np.array(df[['x_indx', 'y_indx']], dtype=int)
+ref = sklearn.neighbors.BallTree(pts)
+st = df.y_indx.min()
+bsize = 1000
+while st < wsize:
+    ed = min([st + bsize, wsize])
+    if ((df.y_indx > st) & (df.y_indx < ed)).sum() < 10:
+        st = ed
+        continue
+    mesh = np.meshgrid(np.arange(h), np.arange(st, ed))
+    nodes = np.array(list(zip(*(dim.flat for dim in mesh))), dtype=int)
+    dv, iv = ref.query(nodes, k = 1, dualtree=True)
+    indx = (dv[:, 0] < fill_range) & (dv[:, 0] > 0)
+    pts = np.vstack((pts, nodes[indx, :]) )
+    rgb_mtx = np.vstack((rgb_mtx,\
+        np.clip(np.around(np.array(df.loc[iv[indx, 0], factor_header]) @ cmtx * 255),0,255).astype(dt)) )
+    print(st, ed, sum(indx), pts.shape[0])
+    st = ed
+
+pts[:,0] = h - np.clip(pts[:, 0], 1, h)
+pts[:,1] = np.clip(pts[:, 1], 1, wsize)
+
+img = np.zeros( (h, wsize, 3), dtype=dt)
+for r in range(3):
+    img[:, :, r] = coo_array((rgb_mtx[:, r], (pts[:,0], pts[:,1])),\
+        shape=(h, wsize), dtype = dt).toarray()
+if args.tif:
+    img = Image.fromarray(img, mode="I;16")
+else:
+    img = Image.fromarray(img)
+
+outf = figure_path + "/" + args.output_id
+outf += ".tif" if args.tif else ".png"
+img.save(outf)

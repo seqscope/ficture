@@ -16,6 +16,7 @@ from sklearn.decomposition import LatentDirichletAllocation as LDA
 # Add parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from hexagon_fn import *
+from utilt import plot_colortable
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
@@ -45,15 +46,17 @@ parser.add_argument('--thread', type=int, default=1, help='')
 
 parser.add_argument('--figure_width', type=int, default=20, help="Width of the output figure per figure_scale_per_tile um")
 parser.add_argument('--cmap_name', type=str, default="nipy_spectral", help="Name of Matplotlib colormap to use")
-parser.add_argument('--plot_um_per_pixel', type=float, default=4, help="Size of the output pixels in um")
+parser.add_argument('--plot_um_per_pixel', type=float, default=1, help="Size of the output pixels in um")
+parser.add_argument('--fill_range', type=float, default=10, help="um")
+parser.add_argument('--chunk_size', type=int, default=5000, help="um")
 parser.add_argument("--plot_top", default=False, action='store_true', help="")
-parser.add_argument("--plot_fit", default=False, action='store_true', help="")
 parser.add_argument("--tif", default=False, action='store_true', help="Store as 16-bit tif instead of png")
 
 parser.add_argument('--use_specific_model', type=str, default="", help="(Temporary) A file containing pre-trained LDA model object")
 parser.add_argument('--model_only', action='store_true')
 parser.add_argument('--use_stored_model', action='store_true')
 parser.add_argument('--skip_analysis', action='store_true')
+parser.add_argument('--skip_plot', action='store_true')
 
 args = parser.parse_args()
 
@@ -76,7 +79,7 @@ if not os.path.exists(args.input):
 
 output_id = args.identifier + "." + args.experiment_id + "." + output_suffix
 print(f"Output id: {output_id}")
-figure_path = outbase + "/analysis/figure"
+figure_path = outbase + "/analysis/figure/chunk"
 if not os.path.exists(figure_path):
     arg="mkdir -p "+figure_path
     os.system(arg)
@@ -157,9 +160,8 @@ print(f"Output file {model_f}")
 if args.use_specific_model !="" and os.path.exists(args.use_specific_model):
     lda_base = pickle.load( open( args.use_specific_model, "rb" ) )
 elif args.use_stored_model and os.path.exists(model_f):
-    if args.model_only:
-        sys.exit()
-    lda_base = pickle.load( open( model_f, "rb" ) )
+    if not args.model_only:
+        lda_base = pickle.load( open( model_f, "rb" ) )
 else:
     lda_base = LDA(n_components=L, learning_method='online', batch_size=b_size, n_jobs = args.thread, verbose = 0)
     epoch = 0
@@ -230,38 +232,38 @@ else:
                pd.DataFrame(sklearn.preprocessing.normalize(lda_base.components_, axis = 1, norm='l1').T,\
                columns = ["Factor_"+str(k) for k in range(L)], dtype='float64')],\
                axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.4e')
-    if args.model_only:
-        sys.exit()
+if args.model_only:
+    sys.exit()
 
-### DE gene based on learned factor profiles
-if not args.skip_analysis:
-    mtx = sklearn.preprocessing.normalize(lda_base.components_, axis = 0, norm='l1') # L x M
-    mtx = mtx * np.array(feature.gene_tot.values).reshape((1, -1))
-    gene_sum = mtx.sum(axis = 0)
-    fact_sum = mtx.sum(axis = 1)
-    tt = mtx.sum()
-    res=[]
-    tab=np.zeros((2,2))
-    for i, name in enumerate(lda_base.feature_names_in_):
-        for l in range(L):
-            if mtx[l,i] == 0 or fact_sum[l] == 0:
-                continue
-            tab[0,0]=mtx[l,i]
-            tab[0,1]=gene_sum[i]-tab[0,0]
-            tab[1,0]=fact_sum[l]-tab[0,0]
-            tab[1,1]=tt-fact_sum[l]-gene_sum[i]+tab[0,0]
-            fd=tab[0,0]/fact_sum[l]/tab[0,1]*(tt-fact_sum[l])
-            chi2, p, dof, ex = scipy.stats.chi2_contingency(tab, correction=False)
-            res.append([name,l,chi2,p,fd])
+# ### DE gene based on learned factor profiles
+# if not args.skip_analysis:
+#     mtx = sklearn.preprocessing.normalize(lda_base.components_, axis = 0, norm='l1') # L x M
+#     mtx = mtx * np.array(feature.gene_tot.values).reshape((1, -1))
+#     gene_sum = mtx.sum(axis = 0)
+#     fact_sum = mtx.sum(axis = 1)
+#     tt = mtx.sum()
+#     res=[]
+#     tab=np.zeros((2,2))
+#     for i, name in enumerate(lda_base.feature_names_in_):
+#         for l in range(L):
+#             if mtx[l,i] == 0 or fact_sum[l] == 0:
+#                 continue
+#             tab[0,0]=mtx[l,i]
+#             tab[0,1]=gene_sum[i]-tab[0,0]
+#             tab[1,0]=fact_sum[l]-tab[0,0]
+#             tab[1,1]=tt-fact_sum[l]-gene_sum[i]+tab[0,0]
+#             fd=tab[0,0]/fact_sum[l]/tab[0,1]*(tt-fact_sum[l])
+#             chi2, p, dof, ex = scipy.stats.chi2_contingency(tab, correction=False)
+#             res.append([name,l,chi2,p,fd])
 
-    chidf=pd.DataFrame(res,columns=['gene','factor','Chi2','pval','FoldChange'])
-    res=chidf.loc[(chidf.pval<1e-3)*(chidf.FoldChange>1)].sort_values(by='FoldChange',ascending=False)
-    res = res.merge(right = feature, on = 'gene', how = 'inner')
-    res.sort_values(by=['factor','FoldChange'],ascending=[True,False],inplace=True)
-    res['pval'] = res.pval.map('{:,.3e}'.format)
+#     chidf=pd.DataFrame(res,columns=['gene','factor','Chi2','pval','FoldChange'])
+#     res=chidf.loc[(chidf.pval<1e-3)*(chidf.FoldChange>1)].sort_values(by='FoldChange',ascending=False)
+#     res = res.merge(right = feature, on = 'gene', how = 'inner')
+#     res.sort_values(by=['factor','FoldChange'],ascending=[True,False],inplace=True)
+#     res['pval'] = res.pval.map('{:,.3e}'.format)
 
-    f = outbase + "/analysis/"+output_id+".DEgene.tsv.gz"
-    res.round(5).to_csv(f,sep='\t',index=False)
+#     f = outbase + "/analysis/"+output_id+".DEgene.tsv.gz"
+#     res.round(5).to_csv(f,sep='\t',index=False)
 
 diam = args.hex_width_fit
 radius = args.hex_radius_fit
@@ -340,30 +342,32 @@ lda_base_result['Top_assigned'] = pd.Categorical(lda_base_result.Top_Topic)
 x,y = hex_to_pixel(lda_base_result.hex_x.values,\
                    lda_base_result.hex_y.values, radius, lda_base_result.offs_x.values/n_move, lda_base_result.offs_y.values/n_move)
 
-lda_base_result["Hex_center_x"] = x
-lda_base_result["Hex_center_y"] = y
+lda_base_result["x"] = x
+lda_base_result["y"] = y
 
 # Output estimates
 lda_base_result.round(5).to_csv(res_f,sep='\t',index=False)
 
+if args.skip_plot:
+    sys.exit()
 
-
-# Plot clustering result
-cmap_name = args.cmap_name
-if args.cmap_name not in plt.colormaps():
-    cmap_name = "turbo"
+### Plot clustering result
 
 dt = np.uint16 if args.tif else np.uint8
 K = args.nFactor
+cmap_name = args.cmap_name
+if args.cmap_name not in plt.colormaps():
+    cmap_name = "turbo"
+cmap = plt.get_cmap(cmap_name, K)
+cmtx = np.array([cmap(i) for i in range(K)] )
+shuffle(cmtx)
+cdict = {k:cmtx[k,:3] for k in range(K)}
 
-cmap = plt.get_cmap('turbo', K)
-cmtx = np.array([cmap(i) for i in range(K)] )[:, :3]
-np.random.shuffle(cmtx)
+# Plot color bar separately
+fig = plot_colortable(cdict, "Factor label", sort_colors=False, ncols=4)
+f = figure_path + "/color_legend."+output_id+".png"
+fig.savefig(f)
 
-lda_base_result.rename(columns = {'Hex_center_x':'x', 'Hex_center_y':'y'}, inplace=True)
-if args.plot_fit:
-    lda_base_result.x -= lda_base_result.x.min()
-    lda_base_result.y -= lda_base_result.y.min()
 lda_base_result['x_indx'] = np.round(lda_base_result.x.values / args.plot_um_per_pixel, 0).astype(int)
 lda_base_result['y_indx'] = np.round(lda_base_result.y.values / args.plot_um_per_pixel, 0).astype(int)
 
@@ -374,16 +378,52 @@ if args.plot_top:
 lda_base_result = lda_base_result.groupby(by = ['x_indx', 'y_indx']).agg({ x:np.mean for x in topic_header }).reset_index()
 h, w = lda_base_result[['x_indx','y_indx']].max(axis = 0) + 1
 
-rgb_mtx = np.clip(np.around(np.array(lda_base_result[topic_header]) @ cmtx * 255).astype(dt),0,255)
-img = np.zeros( (h, w, 3), dtype=dt)
-for r in range(3):
-    img[:, :, r] = coo_matrix((rgb_mtx[:, r], (lda_base_result.x_indx.values, lda_base_result.y_indx.values)), shape=(h,w), dtype = dt).toarray()
 
-if args.tif:
-    img_rgb = Image.fromarray(img, mode="I;16")
-else:
-    img_rgb = Image.fromarray(img)
+# plot by chunk?
+wsize = args.chunk_size
+bsize = 1000
+w_bins = np.arange(0,w,wsize).astype(int)
+w_labs = np.arange(len(w_bins)-1)
+lda_base_result["plot_window"] = pd.cut(lda_base_result.y_indx, bins=w_bins,labels=w_labs)
 
-outf = figure_path + "/"+output_id+"_"+str(args.hex_width_fit)
-outf += ".tif" if args.tif else ".png"
-img_rgb.save(outf)
+for bk in lda_base_result.plot_window.unique():
+    org_fit = copy.copy(lda_base_result[lda_base_result.plot_window.eq(bk)])
+    if org_fit.shape[0] < 100:
+        continue
+    org_fit.index = range(org_fit.shape[0])
+    org_fit["y_indx"] = org_fit["y_indx"] - w_bins[bk]
+    print(org_fit.y_indx.min(), org_fit.y_indx.max(), org_fit.shape[0])
+    rgb_mtx = np.clip(np.around(np.array(org_fit[topic_header]) @ cmtx * 255),0,255).astype(dt)
+
+    ref = sklearn.neighbors.BallTree(np.array(org_fit[['x_indx', 'y_indx']]))
+    fill_mtx = np.zeros((0, 4), dtype=dt)
+    fill_pts = np.zeros((0, 2), dtype=int)
+
+    st = 0
+    while st < wsize:
+        ed = min([st + bsize, wsize+1])
+        if ((org_fit.y_indx > st) & (org_fit.y_indx < ed)).sum() < 10:
+            st = ed
+            continue
+        mesh = np.meshgrid(np.arange(h+1), np.arange(st, ed))
+        nodes = np.array(list(zip(*(dim.flat for dim in mesh))), dtype=int)
+        dv, iv = ref.query(nodes, k = 1)
+        indx = (dv[:, 0] < args.fill_range) & (dv[:, 0] > 0)
+        fill_pts = np.vstack((fill_pts, nodes[indx, :]) )
+        fill_mtx = np.vstack((fill_mtx, np.clip(np.around(np.array(org_fit.loc[iv[indx, 0], topic_header]) @ cmtx * 255),0,255).astype(dt)) )
+        print(st, ed, sum(indx), fill_pts.shape[0])
+        st = ed
+
+    img = np.zeros( (h+2, wsize+2, 3), dtype=dt)
+    for r in range(3):
+        img[:, :, r] = coo_array((rgb_mtx[:, r], (org_fit.x_indx.values+1, org_fit.y_indx.values+1)), shape=(h+2,wsize+2), dtype = dt).toarray() +\
+                       coo_array((fill_mtx[:, r], (fill_pts[:, 0]+1, fill_pts[:, 1]+1)), shape=(h+2,wsize+2), dtype = dt).toarray()
+
+    if args.tif:
+        img_rgb = Image.fromarray(img, mode="I;16")
+    else:
+        img_rgb = Image.fromarray(img)
+
+    outf = figure_path + "/"+output_id+"_"+str(args.hex_width_fit)+".X"+str(int(bk*wsize))
+    outf += ".tif" if args.tif else ".png"
+    img_rgb.save(outf)
