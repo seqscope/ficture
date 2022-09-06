@@ -12,8 +12,8 @@ from hexagon_fn import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
+parser.add_argument('--feature', type=str, help='')
 parser.add_argument('--output_path', type=str, help='')
-parser.add_argument('--index_code', type=str, help='')
 
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
 parser.add_argument('--key', default = 'gn', type=str, help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced')
@@ -45,19 +45,15 @@ if not os.path.exists(args.output_path):
     arg="mkdir -p " + args.output_path
     os.system(arg)
 
-with open(args.index_code, 'r') as rf:
-    tile_list = [x.strip() for x in rf.readlines()]
-
-
 with gzip.open(args.input, 'rt') as rf:
     input_header=rf.readline().strip().split('\t')
 
-f=args.input.replace("matrix_merged","feature")
-feature=pd.read_csv(f,sep='\t',header=0,usecols=['gene', 'gene_id', args.key])
+feature=pd.read_csv(args.feature,sep='\t',header=0,usecols=['gene', 'gene_id', args.key])
 feature['dummy'] = "Gene Expression"
 f = args.output_path + "/features.tsv.gz"
 feature[['gene_id','gene','dummy']].to_csv(f, sep='\t', index=False, header=False)
 
+feature.drop_duplicates(subset='gene', inplace=True)
 feature_kept = list(feature.gene.values)
 ft_dict = {x:i for i,x in enumerate( feature_kept ) }
 M = len(feature_kept)
@@ -72,21 +68,28 @@ if os.path.exists(mtx_f):
 
 n_unit = 0
 T = 0
-for tile in tile_list:
-    cmd = "tabix "+args.input+" " + tile
-    df = pd.read_csv(StringIO(sp.check_output(cmd, stderr=sp.STDOUT, shell=True).decode('utf-8')), sep='\t', names=input_header, usecols = ['X','Y','gene','gene_id',args.key])
+
+adt = {x:int for x in ['tile','X','Y', args.key]}
+adt.update({x:str for x in ['gene', 'gene_id']})
+df = pd.DataFrame()
+for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, header=0, usecols=['tile','X','Y','gene','gene_id',args.key], dtype=adt):
+
+    ed = chunk.Y.iloc[-1]
+    left = copy.copy(chunk[~chunk.Y > ed - 5 * args.mu_scale])
+    df = pd.concat([df, chunk])
+    if chunk.shape[0] == 0:
+        break
     df['j'] = df.X.astype(str) + '_' + df.Y.astype(str)
-    if df.shape[0] == 0:
-        continue
-    brc = df.groupby(by = ['j','X','Y']).agg({args.key: sum}).reset_index()
-    brc.index = range(brc.shape[0])
-    pixel_ct = brc[args.key].values
-    pts = np.asarray(brc[['X','Y']]) * mu_scale
-    print(f"Read data with {brc.shape[0]} pixels and {feature.shape[0]} genes.")
+    print(df.shape[0], ed)
+    brc_full = df.groupby(by = ['j','tile','X','Y']).agg({args.key: sum}).reset_index()
+    brc_full.index = range(brc_full.shape[0])
+    pixel_ct = brc_full[args.key].values
+    pts = np.asarray(brc_full[['X','Y']]) * mu_scale
+    print(f"Read data with {brc_full.shape[0]} pixels and {feature.shape[0]} genes.")
     df.drop(columns = ['X', 'Y'], inplace=True)
 
     # Make DGE
-    barcode_kept = list(brc.j.values)
+    barcode_kept = list(brc_full.j.values)
     bc_dict = {x:i for i,x in enumerate( barcode_kept ) }
     indx_row = [ bc_dict[x] for x in df['j']]
     indx_col = [ ft_dict[x] for x in df['gene']]
@@ -110,7 +113,7 @@ for tile in tile_list:
                 continue
             hex_list = list(ct)
             hex_dict = {x:i for i,x in enumerate(hex_list)}
-            sub = pd.DataFrame({'crd':hex_crd,'cCol':range(N), 'X':pts[:, 0], 'Y':pts[:, 1], 'tile':tile})
+            sub = pd.DataFrame({'crd':hex_crd,'cCol':range(N), 'X':pts[:, 0], 'Y':pts[:, 1], 'tile':brc_full.tile.values})
             sub = sub[sub.crd.isin(ct)]
             sub['cRow'] = sub.crd.map(hex_dict).astype(int)
             brc = sub[['cRow', 'tile', 'X', 'Y']].groupby(by = 'cRow').agg({'X':np.mean, 'Y':np.mean, 'tile':np.max}).reset_index()
@@ -151,6 +154,7 @@ for tile in tile_list:
             offs_y += 1
         offs_y = 0
         offs_x += 1
+    df = copy.copy(left)
 
 _ = os.system("gzip -f " + brc_f)
 

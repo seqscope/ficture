@@ -13,6 +13,8 @@ from scipy.sparse import *
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
 parser.add_argument('--output', type=str, help='')
+parser.add_argument('--unit_id', default='', type=str, help='')
+parser.add_argument('--white_list', default='', type=str, help='')
 
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
 parser.add_argument('--key', default = 'gn', type=str, help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced')
@@ -28,38 +30,52 @@ mu_scale = 1./args.mu_scale
 key=args.key
 max_n = args.max_n
 
-f = args.input.replace(".tsv.gz", ".tsv.unit_id")
-with open(f, 'r') as rf:
-    unit_id = [x.strip() for x in rf.readlines()]
-unit_id=np.array(unit_id).astype(int)
+with gzip.open(args.input,'rt') as rf:
+    header=rf.readline()
+
+if os.path.exists(args.unit_id):
+    with open(args.unit_id, 'r') as rf:
+        unit_id = [x.strip() for x in rf.readlines()]
+    print(f"Read {len(unit_id)} hexagon ID from {args.unit_id}")
+else:
+    indx=str(header.strip().split('\t').index("random_index") + 1)
+    cmd="zcat "+args.input+" | grep -vP '^#' | cut -f "+indx+" | uniq "
+    print(cmd)
+    unit_id=sp.check_output(cmd, shell = True).decode("utf-8").split('\n')
+    print(f"Read {len(unit_id)} hexagon ID from {args.input}")
+unit_id=np.array(unit_id).astype(str)
 np.random.shuffle(unit_id)
 if len(unit_id) > max_n:
     unit_id = unit_id[:max_n]
 unit_id = set(unit_id)
 
-with gzip.open(args.input,'rt') as rf:
-    header=rf.readline()
-
-print(header)
-
 df = pd.DataFrame()
 feature_ct = defaultdict(int)
-for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=1000000, header=0, usecols=["random_index","gene",key]):
+dty = {'random_index':str, 'gene':str, key:int}
+for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=1000000, header=0, usecols=["random_index","gene",key], dtype=dty):
     df = pd.concat((df, chunk[chunk.random_index.isin(unit_id)]))
     feature = chunk.groupby(by = 'gene').agg({key:sum}).reset_index()
     for i,v in feature.iterrows():
         feature_ct[v['gene']] += v[key]
+    print(f"Streaming ... {df.shape[0]}")
 
 df.rename(columns = {'random_index':'j'},inplace=True)
-print(df.shape)
+print(f"Randomly keep {len(unit_id)}. Read data {df.shape}")
 
 feature = pd.DataFrame([[k,v] for k,v in feature_ct.items()],columns=['gene',key])
 feature = feature[feature[key] > args.min_ct_per_feature]
+if os.path.exists(args.white_list):
+    feature_wl = []
+    with open(args.white_list, 'r') as rf:
+        for line in rf:
+            feature_wl.append(line.strip().split('\t')[0])
+    feature=feature[feature.gene.isin(feature_wl)]
+
 feature.index=range(feature.shape[0])
 df = df[df.gene.isin(feature.gene.values)]
 
 n_top = min([args.n_top_genes, feature.shape[0]])
-print(n_top, feature.shape[0])
+print(f"Will keep {n_top} top variable genes out of {feature.shape[0]}")
 
 brc = df.groupby(by = ['j']).agg({key:sum}).reset_index()
 brc = brc[brc[key] > args.min_ct_per_unit]
@@ -94,12 +110,3 @@ res['Label'] = 0
 res.loc[res.gene.isin(gene_list), 'Label'] = 1
 
 res.to_csv(args.output, sep='\t', index=False, header=True, float_format="%.5f")
-
-
-
-
-# f = args.input.replace(".tsv.gz",".high_var_"+str(args.n_top_genes)+".tsv.gz")
-# with gzip.open(f,'wt') as wf:
-#     _=wf.write(header)
-# for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',header=0,chunksize=1000000,):
-#     chunk[chunk.gene.isin(gene_list)].to_csv(f,mode='a',sep='\t',index=False,header=False)
