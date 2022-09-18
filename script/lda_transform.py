@@ -52,7 +52,6 @@ else:
 
 mu_scale = 1./args.mu_scale
 key = args.key
-buffer_step = int(args.buffer_step * args.mu_scale)
 
 ### Input and output
 if not os.path.exists(args.input) or not os.path.exists(args.model):
@@ -81,6 +80,7 @@ n_move = args.n_move
 if n_move >= diam or n_move < 0:
     n_move = diam // 4
 fill_range = max([args.fill_range, radius])
+ovlp_buffer = diam * 2
 
 res_f = args.output_path + "/analysis/"+args.output_id+"_"+str(int(diam))+".fit_result.tsv"
 dtp = {x:int for x in ['offs_x','offs_y','hex_x','hex_y','topK']}
@@ -106,14 +106,15 @@ if do_transform:
         if chunk.shape[0] == 0:
             continue
         df = pd.concat((df, chunk))
-        st = df.Y.iloc[0]
-        ed = df.Y.iloc[-1]
+        st = df.Y.min() * mu_scale
+        ed = df.Y.max() * mu_scale
         print(st, ed, df.Y.min(), df.Y.max(), chunk.Y.min(), chunk.Y.max())
-        if ed - st < buffer_step:
+        if ed - st < args.buffer_step:
             continue
         brc = df.groupby(by = ['j','X','Y']).agg({key: sum}).reset_index()
         brc.index = range(brc.shape[0])
-        pts = np.asarray(brc[['X','Y']]) * mu_scale
+        brc['X'] = brc.X.values * mu_scale
+        brc['Y'] = brc.Y.values * mu_scale
         # Make DGE
         barcode_kept = list(brc.j.values)
         df = df[df.j.isin(barcode_kept)]
@@ -127,26 +128,28 @@ if do_transform:
         offs_y = 0
         while offs_x < n_move:
             while offs_y < n_move:
-                x,y = pixel_to_hex(pts, radius, offs_x/n_move, offs_y/n_move)
-                hex_crd = list(zip(x,y))
-                hex_list = list(set(hex_crd))
-                hex_dict = {x:i for i,x in enumerate(hex_list)}
-                sub = pd.DataFrame({'cRow':[hex_dict[x] for x in hex_crd], 'cCol':list(range(N))})
-                n_hex = len(hex_dict)
-                mtx = coo_matrix((np.ones(N, dtype=bool), (sub.cRow.values, sub.cCol.values)), shape=(n_hex, N) ).tocsr() @ dge_mtx
-                ct = np.asarray(mtx.sum(axis = 1)).squeeze()
-                indx = np.arange(n_hex)[ct >= args.min_ct_per_unit]
-                nunit = len(indx)
-                if nunit < 2:
+                x,y = pixel_to_hex(np.array(brc[['X','Y']]), radius, offs_x/n_move, offs_y/n_move)
+                hex_pt  = pd.DataFrame({'hex_x':x,'hex_y':y,'ct':brc[key].values}).groupby(by=['hex_x','hex_y']).agg({'ct':np.sum}).reset_index()
+                hex_pt['x'], hex_pt['y'] = hex_to_pixel(hex_pt.hex_x.values, hex_pt.hex_y.values, radius, offs_x/n_move, offs_y/n_move)
+                hex_pt = hex_pt[ (hex_pt.y > st + diam/2) & (hex_pt.y < ed - diam/2) & (hex_pt.ct >= args.min_ct_per_unit) ]
+                if hex_pt.shape[0] < 2:
                     offs_y += 1
                     continue
-                mtx = mtx[indx, :]
+                hex_list = list(zip(hex_pt.hex_x.values, hex_pt.hex_y.values))
+                hex_crd = list(zip(x,y))
+                hex_dict = {x:i for i,x in enumerate(hex_list)}
+                indx = [i for i,x in enumerate(hex_crd) if x in hex_dict]
+                hex_crd = [hex_crd[i] for i in indx]
+                sub = pd.DataFrame({'cRow':[hex_dict[x] for x in hex_crd], 'cCol':indx, 'hexID':hex_crd})
+                nunit = len(hex_dict)
+                n_pixel = sub.shape[0]
+                mtx = coo_matrix((np.ones(n_pixel, dtype=bool),\
+                        (sub.cRow.values, sub.cCol.values)),\
+                        shape=(nunit,N) ).tocsr() @ dge_mtx
                 logl = lda.score(mtx) / mtx.shape[0]
                 theta = lda.transform(mtx)
-                hex_x = np.array([hex_list[i][0] for i in indx] ).astype(int)
-                hex_y = np.array([hex_list[i][1] for i in indx] ).astype(int)
-                lines = pd.DataFrame({'offs_x':offs_x,'offs_y':offs_y, 'hex_x':hex_x, 'hex_y':hex_y})
-                lines['x'], lines['y'] = hex_to_pixel(hex_x,hex_y, radius, offs_x/n_move, offs_y/n_move)
+                lines = pd.DataFrame({'offs_x':offs_x,'offs_y':offs_y, 'hex_x':hex_pt.hex_x.values, 'hex_y':hex_pt.hex_y.values})
+                lines['x'], lines['y'] = hex_to_pixel(hex_pt.hex_x.values,hex_pt.hex_y.values, radius, offs_x/n_move, offs_y/n_move)
                 lines = pd.concat((lines, pd.DataFrame(theta, columns = factor_header)), axis = 1)
                 lines['topK'] = np.argmax(theta, axis = 1).astype(int)
                 lines['topP'] = np.max(theta, axis = 1)
@@ -155,13 +158,13 @@ if do_transform:
                     lines.to_csv(res_f, sep='\t', mode='w', float_format="%.5f", index=False, header=True)
                 else:
                     lines.to_csv(res_f, sep='\t', mode='a', float_format="%.5f", index=False, header=False)
-                logging.info(f"Batch {nbatch} from {int(st*mu_scale)} to {int(ed*mu_scale)} with {nunit}({n_hex}) units, log likelihood {logl:.3f}")
+                logging.info(f"Batch {nbatch} from {int(st)} to {int(ed)} with {nunit} units, log likelihood {logl:.3f}")
                 nbatch += 1
+                print(nbatch, offs_x, offs_y)
                 offs_y += 1
-                # logging.info(f"{offs_x}, {offs_y}")
             offs_y = 0
             offs_x += 1
-        df = df[df.Y > ed - 5 * args.mu_scale]
+        df = df[df.Y > ed - ovlp_buffer]
 
     gc.collect()
 
@@ -186,7 +189,7 @@ cdict = {k:cmtx[k,:] for k in range(K)}
 
 # Plot color bar separately
 fig = plot_colortable(cdict, "Factor label", sort_colors=False, ncols=4)
-f = figure_path + "/color_legend."+args.output_id+"_"+str(int(diam))+".png"
+f = figure_path + "/"+args.output_id+"_"+str(int(diam))+".cbar.png"
 fig.savefig(f)
 
 df['x_indx'] = np.round(df.x.values / args.plot_um_per_pixel, 0).astype(int)

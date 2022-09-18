@@ -58,10 +58,14 @@ feature.sort_values(by=args.key,ascending=False,inplace=True)
 feature.drop_duplicates(subset='gene',keep='first',inplace=True)
 if os.path.exists(args.hvg):
     hvg = pd.read_csv(args.hvg, sep='\t', header=0, usecols=['gene',args.key],dtype={'gene':str,args.key:int})
+    hvg.sort_values(by=args.key,ascending=False,inplace=True)
+    hvg.drop_duplicates(subset='gene',keep='first',inplace=True)
     nhvg = hvg.shape[0]
     logging.info(f"Read {nhvg} highly variable genes from " + args.hvg)
     if args.nFeature > nhvg:
-        feature = pd.concat( (hvg, feature[~feature.gene.isin(hvg.gene.values)].sort_values(by = args.key, ascending=False).iloc[:(args.nFactor-hvg.shape[0])] ) )
+        feature = feature[~feature.gene.isin(hvg.gene.values)]
+        feature.sort_values(by = args.key, ascending=False, inplace=True)
+        feature = pd.concat( (hvg, feature.iloc[:(args.nFactor-hvg.shape[0])] ) )
 
 feature_kept = list(feature.gene.values)
 ft_dict = {x:i for i,x in enumerate( feature_kept ) }
@@ -80,6 +84,7 @@ if not args.overwrite and os.path.exists(model_f):
     logging.warning(f"Model already exits, use --overwrite to allow the existing model files to be overwritten\n{model_f}")
     lda = pickle.load( open( model_f, "rb" ) )
     feature_kept = lda.feature_names_in_
+    lda.feature_names_in_ = None
     ft_dict = {x:i for i,x in enumerate( feature_kept ) }
     M = len(feature_kept)
 
@@ -214,3 +219,5 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=100000, 
         brc.to_csv(res_f, sep='\t', mode='a', float_format="%.5f", index=False, header=False)
     nbatch += 1
     df = copy.copy(left)
+
+logging.info(f"Finished ({nbatch})")

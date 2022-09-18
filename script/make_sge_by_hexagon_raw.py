@@ -22,7 +22,7 @@ parser.add_argument('--precision', type=int, default=1, help='Number of digits t
 parser.add_argument('--hex_width', type=int, default=24, help='')
 parser.add_argument('--hex_radius', type=int, default=-1, help='')
 parser.add_argument('--n_move', type=int, default=1, help='')
-parser.add_argument('--min_ct_per_unit', type=int, default=1, help='')
+parser.add_argument('--min_ct_per_unit', type=int, default=20, help='')
 parser.add_argument('--min_count_per_feature', type=int, default=1, help='')
 
 args = parser.parse_args()
@@ -87,15 +87,19 @@ ct_header = ["gn","gt", "spl","unspl","ambig"]
 
 f = path + "features.tsv.gz"
 feature = pd.read_csv(gzip.open(f, 'rb'), sep='\t|,', names=["gene_id","gene", "i","gn","gt", "spl","unspl","ambig"], usecols=["i","gene_id","gene",args.key],  engine='python')
-
-feature_kept = list(feature.loc[feature[args.key] > args.min_count_per_feature, "gene"].values)
-M = len(feature_kept)
-ft_dict = {x:i for i,x in enumerate( feature_kept ) }
-
-feature = feature[feature.gene.isin(feature_kept)]
+feature = feature[feature[args.key] > args.min_count_per_feature]
+feature.sort_values(by=args.key, ascending=False, inplace=True)
+feature.drop_duplicates(subset='gene', inplace=True)
 feature['dummy'] = "Gene Expression"
 f = args.output_path + "/features.tsv.gz"
 feature[['gene_id','gene','dummy']].to_csv(f, sep='\t', index=False, header=False)
+
+feature_kept = list(feature.gene.values)
+M = len(feature_kept)
+ft_dict = {x:i for i,x in enumerate( feature_kept ) }
+
+
+
 
 brc_f = args.output_path + "/barcodes.tsv"
 mtx_f = args.output_path + "/matrix.mtx"
@@ -155,12 +159,12 @@ for itr_r in range(len(lanes)):
                 x,y = pixel_to_hex(pts, radius, offs_x/n_move, offs_y/n_move)
                 hex_crd = list(zip(x,y))
                 ct = pd.DataFrame({'hex_id':hex_crd, 'tot':pixel_ct}).groupby(by = 'hex_id').agg({'tot': sum}).reset_index()
-                mid_ct = np.median(ct.loc[ct.tot >= args.min_ct_per_unit, 'tot'].values)
-                ct = set(ct.loc[ct.tot >= args.min_ct_per_unit, 'hex_id'].values)
-                if len(ct) < 2:
+                ct = ct[ct.tot >= args.min_ct_per_unit]
+                if ct.shape[0] < 2:
                     offs_y += 1
                     continue
-
+                mid_ct = np.median(ct.tot.values)
+                ct = set(ct.hex_id.values)
                 hex_list = list(ct)
                 hex_dict = {x:i for i,x in enumerate(hex_list)}
                 sub = pd.DataFrame({'crd':hex_crd,'cCol':range(N), 'X':pts[:, 0], 'Y':pts[:, 1]})
@@ -177,7 +181,6 @@ for itr_r in range(len(lanes)):
                 brc.sort_values(by = 'cRow', inplace=True)
                 with open(brc_f, 'a') as wf:
                     _ = wf.write('\n'.join((brc.cRow+n_unit+1).astype(str).values + '_' + lane + '_' + tile + '_' + brc.X.values + '_' + brc.Y.values)+'\n')
-
                 grd_minib = list(range(0, n_hex, b_size))
                 grd_minib[-1] = n_hex
                 st_minib = 0
@@ -192,18 +195,18 @@ for itr_r in range(len(lanes)):
 
                     mtx.eliminate_zeros()
                     r, c = mtx.nonzero()
-                    r = np.array(r,dtype=int) + n_unit + 1
+                    r = np.array(r,dtype=int) + offset + n_unit + 1
                     c = np.array(c,dtype=int) + 1
-                    n_unit += mtx.shape[0]
                     T += mtx.sum()
                     mtx = pd.DataFrame({'i':c, 'j':r, 'v':mtx.data})
                     mtx['i'] = mtx.i.astype(int)
                     mtx['j'] = mtx.j.astype(int)
                     mtx.to_csv(mtx_f, mode='a', sep=' ', index=False, header=False)
                     st_minib += 1
-                    print(f"{st_minib}/{n_minib}. Wrote {n_unit} units so far.")
+                    print(f"{st_minib}/{n_minib}. Wrote {nhex_minib} units")
 
-                print(f"Sliding offset {offs_x}, {offs_y}. Fit data with {n_unit} units.")
+                n_unit += brc.shape[0]
+                print(f"Sliding offset {offs_x}, {offs_y}. Write {n_unit} units so far.")
                 offs_y += 1
             offs_y = 0
             offs_x += 1

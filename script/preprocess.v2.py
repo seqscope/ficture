@@ -30,6 +30,7 @@ parser.add_argument('--log', default = '', type=str, help='files to write log to
 
 parser.add_argument('--gene_type_info', type=str, help='A file containing two columns, gene name and gene type. Used only if specific types of genes are kept.', default = '')
 parser.add_argument('--gene_type_keyword', type=str, help='Key words (separated by ,) of gene types to keep, only used is gene_type_info is provided.', default="IG,TR,protein,lnc")
+parser.add_argument('--rm_gene_type_keyword', type=str, help='Key words (separated by ,) of gene types to remove, only used is gene_type_info is provided.', default="pseudogene")
 parser.add_argument('--rm_gene_keyword', type=str, help='Key words (separated by ,) of gene names to remove, only used is gene_type_info is provided.', default="")
 
 parser.add_argument('--min_count_per_feature', type=int, default=20, help='')
@@ -187,13 +188,15 @@ if args.tile == '':
 gene_kept = []
 if args.gene_type_info != '' and os.path.exists(args.gene_type_info):
     gencode = pd.read_csv(args.gene_type_info, sep='\t', names=['Name','Type'])
-    kept_key = args.gene_type_keyword.split(',')
-    kept_type = gencode.loc[gencode.Type.str.contains('|'.join(kept_key)),'Type'].unique()
-    gencode = gencode.loc[ gencode.Type.isin(kept_type) ]
-    if args.rm_gene_keyword != "":
-        rm_list = args.rm_gene_keyword.split(",")
-        for x in rm_list:
-            gencode = gencode.loc[ ~gencode.Name.str.contains(x) ]
+    kept_key = [x for x in args.gene_type_keyword.split(',') if x != '']
+    rm_key = [x for x in args.rm_gene_type_keyword.split(',') if x != '']
+    rm_name = [x for x in args.rm_gene_keyword.split(",") if x != '']
+    if len(kept_key) > 0:
+        gencode = gencode.loc[gencode.Type.str.contains('|'.join(kept_key)), :]
+    if len(rm_key) > 0:
+        gencode = gencode.loc[~gencode.Type.str.contains('|'.join(rm_key)), :]
+    if len(rm_name) > 0:
+        gencode = gencode.loc[~gencode.Name.str.contains('|'.join(rm_name)), :]
     gene_kept = list(gencode.Name)
 
 ### Decide which genes to keep

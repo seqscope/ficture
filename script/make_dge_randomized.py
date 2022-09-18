@@ -36,7 +36,7 @@ diam=args.hex_width
 n_move = args.n_move
 if n_move > diam // 2:
     n_move = diam // 4
-ovlp_buffer = diam / 2
+ovlp_buffer = diam * 2
 
 if radius < 0:
     radius = diam / np.sqrt(3)
@@ -63,20 +63,23 @@ dty = {x:int for x in ['tile','X','Y', args.key]}
 dty.update({x:str for x in ['gene', 'gene_id']})
 
 df = pd.DataFrame()
-for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, header=0, dtype=dty):
+for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=2000000, header=0, dtype=dty):
     chunk = chunk[chunk[args.key] > 0]
     if chunk.shape[0] == 0:
         continue
     ed = chunk.Y.iloc[-1]
-    left = copy.copy(chunk[~chunk.Y > ed - ovlp_buffer * args.mu_scale])
+    left = copy.copy(chunk[chunk.Y > ed - ovlp_buffer * args.mu_scale])
     df = pd.concat([df, chunk])
+    if df.Y.iloc[-1] - df.Y.iloc[0] < ovlp_buffer * 3 * args.mu_scale:
+        # This chunk is too narrow, leave to process together with neighbors
+        continue
     df['j'] = df.X.astype(str) + '_' + df.Y.astype(str)
     brc = df.groupby(by = ['j','tile','X','Y']).agg(adt).reset_index()
-    if brc.shape[0] < args.min_ct_per_unit:
-        continue
     brc.index = range(brc.shape[0])
     brc['X'] = brc.X.astype(float).values * mu_scale
     brc['Y'] = brc.Y.astype(float).values * mu_scale
+    st = brc.Y.min()
+    ed = brc.Y.max()
     pts = np.asarray(brc[['X','Y']])
     logging.info(f"Read {brc.shape[0]} pixels.")
     df.drop(columns = ['X', 'Y'], inplace=True)
@@ -88,14 +91,15 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, 
         while offs_y < n_move:
             x,y = pixel_to_hex(pts, radius, offs_x/n_move, offs_y/n_move)
             hex_crd = list(zip(x,y))
-            ct = pd.DataFrame({'hex_id':hex_crd, 'tot':brc[args.key].values}).groupby(by = 'hex_id').agg({'tot': sum}).reset_index()
+            ct = pd.DataFrame({'hex_id':hex_crd, 'tot':brc[args.key].values, 'y':pts[:,1]}).groupby(by = 'hex_id').agg({'tot': sum, 'y':np.min}).reset_index()
             mid_ct = np.median(ct.loc[ct.tot >= args.min_ct_per_unit, 'tot'].values)
-            ct = set(ct.loc[ct.tot >= args.min_ct_per_unit, 'hex_id'].values)
+            ct = set(ct.loc[(ct.tot >= args.min_ct_per_unit) & (ct.y > st + diam/2) & (ct.y < ed - diam/2), 'hex_id'].values)
             if len(ct) < 2:
                 offs_y += 1
                 continue
             hex_list = list(ct)
-            hex_dict = {x:str(rng.randint(1, sys.maxsize)) for i,x in enumerate(hex_list)}
+            suff = [str(x[0])[-1]+str(x[1])[-1] for x in hex_list]
+            hex_dict = {x:str(rng.randint(1, sys.maxsize//100))+suff[i] for i,x in enumerate(hex_list)}
             brc["hex_id"] = hex_crd
             brc["random_index"] = brc.hex_id.map(hex_dict)
             sub = copy.copy(brc[brc.hex_id.isin(ct)] )

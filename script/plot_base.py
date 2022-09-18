@@ -18,7 +18,7 @@ from utilt import plot_colortable
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
 parser.add_argument('--output', type=str, help='Output prefix')
-parser.add_argument('--fill_range', type=float, default=12, help="um")
+parser.add_argument('--fill_range', type=float, default=5, help="um")
 parser.add_argument('--cmap_name', type=str, default="turbo", help="Name of Matplotlib colormap to use")
 parser.add_argument('--plot_um_per_pixel', type=float, default=1, help="Size of the output pixels in um")
 parser.add_argument("--plot_individual_factor", action='store_true', help="")
@@ -39,6 +39,9 @@ for x in df.columns:
         factor_header.append(y.group(0))
 
 K = len(factor_header)
+# Temporary
+df.rename(columns = {'Hex_center_x':'x', 'Hex_center_y':'y'}, inplace=True)
+#
 print(f"Read X coordinates {df.x.min(), df.x.max()}, Y coordinates {df.y.min(), df.y.max()}, {K} factors.")
 print(factor_header)
 

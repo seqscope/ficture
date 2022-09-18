@@ -49,11 +49,12 @@ with gzip.open(args.input, 'rt') as rf:
     input_header=rf.readline().strip().split('\t')
 
 feature=pd.read_csv(args.feature,sep='\t',header=0,usecols=['gene', 'gene_id', args.key])
+feature.sort_values(by=args.key, ascending=False, inplace=True)
+feature.drop_duplicates(subset='gene', inplace=True)
 feature['dummy'] = "Gene Expression"
 f = args.output_path + "/features.tsv.gz"
 feature[['gene_id','gene','dummy']].to_csv(f, sep='\t', index=False, header=False)
 
-feature.drop_duplicates(subset='gene', inplace=True)
 feature_kept = list(feature.gene.values)
 ft_dict = {x:i for i,x in enumerate( feature_kept ) }
 M = len(feature_kept)
@@ -75,7 +76,7 @@ df = pd.DataFrame()
 for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, header=0, usecols=['tile','X','Y','gene','gene_id',args.key], dtype=adt):
 
     ed = chunk.Y.iloc[-1]
-    left = copy.copy(chunk[~chunk.Y > ed - 5 * args.mu_scale])
+    left = copy.copy(chunk[chunk.Y > ed - 5 * args.mu_scale])
     df = pd.concat([df, chunk])
     if chunk.shape[0] == 0:
         break
@@ -139,18 +140,17 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, 
 
                 mtx.eliminate_zeros()
                 r, c = mtx.nonzero()
-                r = np.array(r,dtype=int) + n_unit + 1
+                r = np.array(r,dtype=int) + offset + n_unit + 1
                 c = np.array(c,dtype=int) + 1
-                n_unit += mtx.shape[0]
                 T += mtx.sum()
                 mtx = pd.DataFrame({'i':c, 'j':r, 'v':mtx.data})
                 mtx['i'] = mtx.i.astype(int)
                 mtx['j'] = mtx.j.astype(int)
                 mtx.to_csv(mtx_f, mode='a', sep=' ', index=False, header=False)
                 st_minib += 1
-                print(f"{st_minib}/{n_minib}. Wrote {n_unit} units so far.")
-
-            print(f"Sliding offset {offs_x}, {offs_y}. Fit data with {n_unit} units.")
+                print(f"{st_minib}/{n_minib}. Wrote {nhex_minib} units.")
+            n_unit += brc.shape[0]
+            print(f"Sliding offset {offs_x}, {offs_y}. Wrote {n_unit} units so far.")
             offs_y += 1
         offs_y = 0
         offs_x += 1
