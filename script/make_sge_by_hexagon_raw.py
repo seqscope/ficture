@@ -23,7 +23,7 @@ parser.add_argument('--hex_width', type=int, default=24, help='')
 parser.add_argument('--hex_radius', type=int, default=-1, help='')
 parser.add_argument('--overlap', type=float, default=-1, help='')
 parser.add_argument('--n_move', type=int, default=-1, help='')
-parser.add_argument('--min_ct_per_unit', type=int, default=20, help='')
+parser.add_argument('--min_ct_density', type=float, default=0.1, help='Minimum density of output hexagons, in nUMI/um^2')
 parser.add_argument('--min_count_per_feature', type=int, default=1, help='')
 
 args = parser.parse_args()
@@ -44,6 +44,9 @@ else:
     n_move = args.n_move
     if n_move < 0:
         n_move = 1
+
+hex_area = diam*radius*3/2
+min_ct_per_unit = args.min_ct_density * hex_area
 
 ### Output
 if not os.path.exists(args.output_path):
@@ -163,7 +166,7 @@ for itr_r in range(len(lanes)):
                 x,y = pixel_to_hex(pts, radius, offs_x/n_move, offs_y/n_move)
                 hex_crd = list(zip(x,y))
                 ct = pd.DataFrame({'hex_id':hex_crd, 'tot':pixel_ct}).groupby(by = 'hex_id').agg({'tot': sum}).reset_index()
-                ct = ct[ct.tot >= args.min_ct_per_unit]
+                ct = ct[ct.tot >= min_ct_per_unit]
                 if ct.shape[0] < 2:
                     offs_y += 1
                     continue
