@@ -27,6 +27,7 @@ parser.add_argument('--minibatch_size', type=int, default=256, help='')
 parser.add_argument('--min_count_per_feature', type=int, default=1, help='')
 parser.add_argument('--min_ct_per_unit', type=int, default=20, help='')
 parser.add_argument('--thread', type=int, default=1, help='')
+parser.add_argument('--epoch', type=int, default=1, help='How many times to loop through the full data')
 parser.add_argument('--overwrite', action='store_true')
 
 args = parser.parse_args()
@@ -39,7 +40,6 @@ else:
     logging.basicConfig(level= getattr(logging, "INFO", None))
 
 
-outbase=args.output_path
 mu_scale = 1./args.mu_scale
 key = args.key
 
@@ -54,6 +54,7 @@ if not os.path.exists(args.input) or not os.path.exists(args.feature):
 
 ### Use only the provided list of features
 feature = pd.read_csv(args.feature, sep='\t', header=0, usecols=['gene',args.key],dtype={'gene':str,args.key:int})
+feature = feature[feature[args.key] >= args.min_count_per_feature]
 feature.sort_values(by=args.key,ascending=False,inplace=True)
 feature.drop_duplicates(subset='gene',keep='first',inplace=True)
 if os.path.exists(args.hvg):
@@ -70,8 +71,6 @@ if os.path.exists(args.hvg):
 feature_kept = list(feature.gene.values)
 ft_dict = {x:i for i,x in enumerate( feature_kept ) }
 M = len(feature_kept)
-feature_mf = np.array(feature[args.key].values).astype(float)
-feature_mf/= feature_mf.sum()
 logging.info(f"{M} genes will be used")
 
 
@@ -87,59 +86,63 @@ if not args.overwrite and os.path.exists(model_f):
     lda.feature_names_in_ = None
     ft_dict = {x:i for i,x in enumerate( feature_kept ) }
     M = len(feature_kept)
-
 else:
     lda = LDA(n_components=K, learning_method='online', batch_size=b_size, n_jobs = args.thread, verbose = 0)
-    df = pd.DataFrame()
-    for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, header=0, usecols=["random_index","X","Y","gene",key], dtype=adt):
-        chunk = chunk[chunk.gene.isin(feature_kept)]
-        if chunk.shape[0] == 0:
-            continue
-        chunk['j'] = chunk.random_index.values + '_' + chunk.X.values + '_' + chunk.Y.values
-        chunk.drop(columns = ['random_index','X','Y'], inplace=True)
-        last_indx = chunk.j.iloc[-1]
-        df = pd.concat([df, chunk[~chunk.j.eq(last_indx)]])
-        if len(df.j.unique()) < b_size * 1.5: # Left to next chunk
-            df = pd.concat((df, chunk[chunk.j.eq(last_indx)]))
-            continue
-        # Total mulecule count per unit
-        brc = df.groupby(by = ['j']).agg({args.key: sum}).reset_index()
-        brc = brc[brc[args.key] > args.min_ct_per_unit]
-        brc.index = range(brc.shape[0])
-        df = df[df.j.isin(brc.j.values)]
-        # Make DGE
-        barcode_kept = list(brc.j.values)
-        bc_dict = {x:i for i,x in enumerate( barcode_kept ) }
-        indx_row = [ bc_dict[x] for x in df['j']]
-        indx_col = [ ft_dict[x] for x in df['gene']]
-        N = len(barcode_kept)
-        mtx = coo_matrix((df[args.key].values, (indx_row, indx_col)), shape=(N, M)).tocsr()
-        x1 = np.median(brc[key].values)
-        x2 = np.mean(brc[key].values)
-        logging.info(f"Made DGE {mtx.shape}, median/mean count: {x1:.1f}/{x2:.1f}")
-        _ = lda.partial_fit(mtx)
+    feature_mf = np.array(feature[args.key].values).astype(float)
+    feature_mf/= feature_mf.sum()
+    epoch = 0
+    while epoch < args.epoch:
+        df = pd.DataFrame()
+        for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, header=0, usecols=["random_index","X","Y","gene",key], dtype=adt):
+            chunk = chunk[chunk.gene.isin(feature_kept)]
+            if chunk.shape[0] == 0:
+                continue
+            chunk['j'] = chunk.random_index.values + '_' + chunk.X.values + '_' + chunk.Y.values
+            chunk.drop(columns = ['random_index','X','Y'], inplace=True)
+            last_indx = chunk.j.iloc[-1]
+            df = pd.concat([df, chunk[~chunk.j.eq(last_indx)]])
+            if len(df.j.unique()) < b_size * 1.5: # Left to next chunk
+                df = pd.concat((df, chunk[chunk.j.eq(last_indx)]))
+                continue
+            # Total mulecule count per unit
+            brc = df.groupby(by = ['j']).agg({args.key: sum}).reset_index()
+            brc = brc[brc[args.key] > args.min_ct_per_unit]
+            brc.index = range(brc.shape[0])
+            df = df[df.j.isin(brc.j.values)]
+            # Make DGE
+            barcode_kept = list(brc.j.values)
+            bc_dict = {x:i for i,x in enumerate( barcode_kept ) }
+            indx_row = [ bc_dict[x] for x in df['j']]
+            indx_col = [ ft_dict[x] for x in df['gene']]
+            N = len(barcode_kept)
+            mtx = coo_matrix((df[args.key].values, (indx_row, indx_col)), shape=(N, M)).tocsr()
+            x1 = np.median(brc[key].values)
+            x2 = np.mean(brc[key].values)
+            logging.info(f"Made DGE {mtx.shape}, median/mean count: {x1:.1f}/{x2:.1f}")
+            _ = lda.partial_fit(mtx)
 
-        # Evaluation Training Performance
-        logl = lda.score(mtx) / mtx.shape[0]
-        # Compute topic coherence
-        topic_pmi = []
-        top_gene_n = np.min([50, mtx.shape[1]])
-        pseudo_ct = 100
-        for k in range(K):
-            b = lda.exp_dirichlet_component_[k,:]
-            b = np.clip(b, 1e-6, 1.-1e-6)
-            indx = np.argsort(-b)[:top_gene_n]
-            w = 1. - np.power(1.-feature_mf[indx], pseudo_ct)
-            w = w.reshape((-1, 1)) @ w.reshape((1, -1))
-            p0 = 1.-np.power(1-b[indx], pseudo_ct)
-            p0 = p0.reshape((-1, 1)) @ p0.reshape((1, -1))
-            pmi = np.log(p0) - np.log(w)
-            np.fill_diagonal(pmi, 0)
-            pmi = np.round(pmi.mean(), 3)
-            topic_pmi.append(pmi)
-        df = copy.copy(chunk[chunk.j.eq(last_indx)] )
-        logging.info(f"logl: {logl:.4f}")
-        logging.info("Coherence: "+", ".join([str(x) for x in topic_pmi]))
+            # Evaluation Training Performance
+            logl = lda.score(mtx) / mtx.shape[0]
+            # Compute topic coherence
+            topic_pmi = []
+            top_gene_n = np.min([50, mtx.shape[1]])
+            pseudo_ct = 100
+            for k in range(K):
+                b = lda.exp_dirichlet_component_[k,:]
+                b = np.clip(b, 1e-6, 1.-1e-6)
+                indx = np.argsort(-b)[:top_gene_n]
+                w = 1. - np.power(1.-feature_mf[indx], pseudo_ct)
+                w = w.reshape((-1, 1)) @ w.reshape((1, -1))
+                p0 = 1.-np.power(1-b[indx], pseudo_ct)
+                p0 = p0.reshape((-1, 1)) @ p0.reshape((1, -1))
+                pmi = np.log(p0) - np.log(w)
+                np.fill_diagonal(pmi, 0)
+                pmi = np.round(pmi.mean(), 3)
+                topic_pmi.append(pmi)
+            df = copy.copy(chunk[chunk.j.eq(last_indx)] )
+            logging.info(f"logl: {logl:.4f}")
+            logging.info("Coherence: "+", ".join([str(x) for x in topic_pmi]))
+        epoch += 1
 
     if len(df.j.unique()) > b_size:
         brc = df.groupby(by = ['j']).agg({args.key: sum}).reset_index()

@@ -12,16 +12,22 @@ def safe_log(X):
 class ARTM:
     '''
     '''
-    def __init__(self, K, tau = None, ker_thres=-1,\
-                 nB=1, nS=None, B=None, S=None):
-        self.K = K
-        self.nS = nS
-        self.nB = nB
-        self.T = set(range(self.K))
-        self.tau = {'smooth_phi':0, 'sparse_phi':0, 'smooth_theta':0, 'sparse_theta':0, 'decorr_phi':0}
+    def __init__(self, K, tau = None, nB=1, nS=None, B=None, S=None):
+
+        self.verbose = False
+        self.verbose_inner = False
+        self.init_model = False
+        self.init_data = False
+
+        self.tau = {'smooth_phi':0, 'sparse_phi':0, 'smooth_theta':0,\
+                    'sparse_theta':0, 'decorr_phi':0} # Hyper-parameters - relative weights of regularizers
         if tau is not None:
             self.tau.update(tau)
-        self.kernel_thres = ker_thres
+
+        self.K = K   # Number of total topics
+        self.nS = nS # Number of sparse topics
+        self.nB = nB # Number of smooth topics
+        self.T = set(range(self.K)) # Index set of all topics
         if S is None and nS is not None and nS > 0:
             self.S = set(range(nS))
         elif S is not None:
@@ -41,16 +47,13 @@ class ARTM:
         self.topic_class = {'S':self.S, 'B':self.B, 'Other':self.T-self.S-self.B}
         self.mask_s = np.array([1 if t in self.topic_class['S'] else 0 for t in range(self.K)]).reshape((-1, 1))
         self.mask_b = np.array([1 if t in self.topic_class['B'] else 0 for t in range(self.K)]).reshape((-1, 1))
-        self.verbose = False
-        self.verbose_inner = False
-        self.init_model = False
-        self.init_data = False
 
     def initialize_model(self, M = None, vocab = None, vocab_freq = None,\
                          phi = None, tol_theta_max = 1e-4, tol_perp_rel = 1e-4,\
                          kappa = 0.7, rho_offset = 10,\
                          max_iter = 20, min_iter = 5,\
                          kernel_thres = 0.25, verbose = False):
+
         assert M is not None or vocab is not None, "Please input vocabulary list or its size"
         self.M = M
         if phi is not None:

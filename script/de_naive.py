@@ -161,7 +161,11 @@ for g0 in test_pw.groups:
     for g1 in test_pw.groups:
         if g1 == g0:
             continue
-        tab = copy.copy(test_pw.summary_pairs(g0, g1))
+        try:
+            tab = copy.copy(test_pw.summary_pairs(g0, g1))
+        except:
+            print(f"Group pair ({g0},{g1}) not in pairwise test result")
+            continue
         tab = tab[(tab.qval < qcut) & (tab.log2fc > np.log2(fcut))]
         if tab.shape[0] == 0:
             continue

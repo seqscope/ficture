@@ -22,6 +22,8 @@ parser.add_argument("--layout", type=str, help="Layout file of tiles to draw [la
 parser.add_argument('--lane', type=str, help='')
 parser.add_argument('--tile', type=str, help='',default='')
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
+parser.add_argument('--species', type=str, default='', help='')
+parser.add_argument('--feature_prefix', type=str, default='', help='e.g. mouse:mm10___,human:GRCh38_ (only for multi-species scenario)')
 parser.add_argument('--filter_by_box_nrow', type=int, default=1, help='')
 parser.add_argument('--filter_by_box_ncol', type=int, default=1, help='')
 parser.add_argument('--filter_based_on', type=str, default='gn', help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced')
@@ -34,7 +36,7 @@ parser.add_argument('--rm_gene_type_keyword', type=str, help='Key words (separat
 parser.add_argument('--rm_gene_keyword', type=str, help='Key words (separated by ,) of gene names to remove, only used is gene_type_info is provided.', default="")
 
 parser.add_argument('--min_count_per_feature', type=int, default=20, help='')
-parser.add_argument('--min_abs_mol_density_squm', type=float, default=0.05, help='A safe lowerbound to remove very sparse technical noise')
+parser.add_argument('--min_abs_mol_density_squm', type=float, default=0.02, help='A safe lowerbound to remove very sparse technical noise')
 parser.add_argument('--hard_threshold', type=float, default=-1, help='If provided, filter by hard threshold (number of molecules per squared um)')
 parser.add_argument('--hex_diam', type=int, default=12, help='')
 parser.add_argument('--hex_n_move', type=int, default=6, help='')
@@ -61,6 +63,13 @@ hex_area = diam*radius*3/2
 key = args.filter_based_on
 ct_header = ['gn', 'gt', 'spl', 'unspl', 'ambig']
 
+### Extract list of tiles to process
+if args.tile == '':
+    cmd="find "+path+"/"+lane+" -type d "
+    tab = sp.check_output(cmd, stderr=sp.STDOUT, shell=True).decode('utf-8')
+    tab = tab.split('\n')
+    kept_list = sorted([x.split('/')[-1] for x in tab])
+
 ### Output
 outpath = '/'.join([outbase,lane])
 if not os.path.exists(outpath):
@@ -86,23 +95,71 @@ tile_ll = tiles[-1][0]
 tile_ur = tiles[0][-1]
 logging.info(f"Read layout info. lane {lane}, tile {tile_ll}-{tile_ur}")
 
+
+### If work on subset of genes
+gene_kept = []
+if args.gene_type_info != '' and os.path.exists(args.gene_type_info):
+    gencode = pd.read_csv(args.gene_type_info, sep='\t', names=['Name','Type','species'])
+    if args.species in gencode.species.values:
+        gencode = gencode[gencode.species.eq(args.species)]
+    if args.feature_prefix != '':
+        gene_prefix = [x.split(":") for x in args.feature_prefix.split(",")]
+        for i,v in enumerate(gene_prefix):
+            if len(v) != 2:
+                continue
+            indx = gencode.species.eq(v[0])
+            if sum(indx) == 0:
+                continue
+            gencode.loc[indx, "Name"] = v[1] + gencode.loc[indx, "Name"].values
+    kept_key = [x for x in args.gene_type_keyword.split(',') if x != '']
+    rm_key = [x for x in args.rm_gene_type_keyword.split(',') if x != '']
+    rm_name = [x for x in args.rm_gene_keyword.split(",") if x != '']
+    if len(kept_key) > 0:
+        gencode = gencode.loc[gencode.Type.str.contains('|'.join(kept_key)), :]
+    if len(rm_key) > 0:
+        gencode = gencode.loc[~gencode.Type.str.contains('|'.join(rm_key)), :]
+    if len(rm_name) > 0:
+        gencode = gencode.loc[~gencode.Name.str.contains('|'.join(rm_name)), :]
+    gene_kept = list(gencode.Name)
+    print(f"Read {len(gene_kept)} genes from gene_type_info")
+
+### Decide which genes to keep
+f = path + "/" + str(lane) + "/features.tsv.gz"
+feature_tot = pd.read_csv(gzip.open(f, 'rb'), sep='\t|,',\
+        names=["gene_id","gene","i"]+ct_header, engine='python')
+feature_kept = list(feature_tot.loc[feature_tot[key] > args.min_count_per_feature,'gene'].values)
+if len(gene_kept) > 0:
+    gene_kept = [x for x in gene_kept if x in feature_kept]
+else:
+    gene_kept = feature_kept
+logging.info(f"Kept {len(gene_kept)} genes")
+print(f"Kept {len(gene_kept)} genes")
+
+
 if os.path.exists(args.ref_pts) and not args.redo_filter:
     pt = pd.read_csv(args.ref_pts,sep='\t',names=['x','y'],dtype=int)
     logging.info(f"Read existing anchor positions:\n{args.ref_pts}, {pt.shape}. (Use --redo_filter to avoid using existing files)")
 else:
     ### Read barcode
-    f=path+"/"+str(lane)+"/barcodes.sorted.tsv.gz"
+    # f=path+"/"+str(lane)+"/barcodes.sorted.tsv.gz"
     df=pd.DataFrame()
-    bsize_row = nrows // args.filter_by_box_nrow
-    bsize_col = ncols // args.filter_by_box_ncol
+    bsize_row = np.max([1, nrows // args.filter_by_box_nrow])
+    bsize_col = np.max([1, ncols // args.filter_by_box_ncol])
     for itr_r in range(nrows):
         for itr_c in range(ncols):
             lane, tile = lanes[itr_r][itr_c], tiles[itr_r][itr_c]
-            cmd = "tabix " + f + " " + tile
-            sub = pd.read_csv(StringIO(sp.check_output(cmd, stderr=sp.STDOUT,\
-                    shell=True).decode('utf-8')), sep='\t|,', dtype=int,\
-                    names=["v1","lane","tile","Y","X"]+ct_header,\
-                    usecols=["Y","X",key], engine='python')
+            f="/".join([path,lane,tile])+"/barcodes.tsv.gz"
+            if not os.path.exists(f):
+                continue
+            sub = pd.read_csv(gzip.open(f, 'rb'),\
+                sep='\t|,', names=["barcode","j","v2",\
+                    "lane","tile","X","Y"]+ct_header,\
+                usecols=["Y","X",key], engine='python')
+            # cmd = "tabix " + f + " " + tile
+            # sub = pd.read_csv(StringIO(sp.check_output(cmd, stderr=sp.STDOUT,\
+            #         shell=True).decode('utf-8')), sep='\t|,', dtype=int,\
+            #         names=["v1","lane","tile","Y","X"]+ct_header,\
+            #         usecols=["Y","X",key], engine='python')
             sub = sub[sub[key] > 0]
             sub['X'] = (nrows - itr_r - 1) * xr + sub.X.values - xbin_min
             sub['Y'] = itr_c * yr + sub.Y.values - ybin_min
@@ -177,42 +234,9 @@ else:
 ref = sklearn.neighbors.BallTree(np.array(pt[['x','y']]))
 logging.info(f"Built balltree for reference points")
 
-### Extract list of tiles to process
-if args.tile == '':
-    cmd="find "+path+"/"+lane+" -type d "
-    tab = sp.check_output(cmd, stderr=sp.STDOUT, shell=True).decode('utf-8')
-    tab = tab.split('\n')
-    kept_list = sorted([x.split('/')[-1] for x in tab])
-
-### If work on subset of genes
-gene_kept = []
-if args.gene_type_info != '' and os.path.exists(args.gene_type_info):
-    gencode = pd.read_csv(args.gene_type_info, sep='\t', names=['Name','Type'])
-    kept_key = [x for x in args.gene_type_keyword.split(',') if x != '']
-    rm_key = [x for x in args.rm_gene_type_keyword.split(',') if x != '']
-    rm_name = [x for x in args.rm_gene_keyword.split(",") if x != '']
-    if len(kept_key) > 0:
-        gencode = gencode.loc[gencode.Type.str.contains('|'.join(kept_key)), :]
-    if len(rm_key) > 0:
-        gencode = gencode.loc[~gencode.Type.str.contains('|'.join(rm_key)), :]
-    if len(rm_name) > 0:
-        gencode = gencode.loc[~gencode.Name.str.contains('|'.join(rm_name)), :]
-    gene_kept = list(gencode.Name)
-
-### Decide which genes to keep
-f = path + "/" + str(lane) + "/features.tsv.gz"
-feature_tot = pd.read_csv(gzip.open(f, 'rb'), sep='\t|,',\
-        names=["gene_id","gene","i"]+ct_header, engine='python')
-feature_kept = list(feature_tot.loc[feature_tot[key] > args.min_count_per_feature,'gene'].values)
-if len(gene_kept) > 0:
-    gene_kept = [x for x in gene_kept if x in feature_kept]
-else:
-    gene_kept = feature_kept
-logging.info(f"Kept {len(gene_kept)} genes")
-
-feature_tot_ct = pd.DataFrame()
 
 ### Read pixels and keep only those close to the kept grid points
+feature_tot_ct = pd.DataFrame()
 output_header = ['#lane','tile','Y','X','gene','gene_id']+ct_header
 header=pd.DataFrame([], columns = output_header)
 header.to_csv(flt_f, sep='\t', index=False)

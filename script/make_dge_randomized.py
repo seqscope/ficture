@@ -15,6 +15,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
 parser.add_argument('--output', type=str, help='')
 
+parser.add_argument('--region', type=str, default="", help='lane:Y_start-Y_end (Y axis in barcode coordinate unit)')
+parser.add_argument('--region_um', type=str, default="", help='lane:Y_start-Y_end (Y axis in um)')
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
 parser.add_argument('--key', default = 'gn', type=str, help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced')
 parser.add_argument('--precision', type=int, default=1, help='Number of digits to store spatial location (in um), 0 for integer.')
@@ -62,8 +64,26 @@ n_unit = 0
 dty = {x:int for x in ['tile','X','Y', args.key]}
 dty.update({x:str for x in ['gene', 'gene_id']})
 
+reg = args.region
+if args.region_um != "":
+    st, ed = args.region_um.split(':')[1].split('-')
+    st = str(int(float(st) * mu_scale) )
+    ed = str(int(float(ed) * mu_scale) )
+    reg = args.region_um.split(':')[0] + ":" + st + "-" + ed
+if reg == "":
+    with gzip.open(args.input, 'rt') as rf:
+        for line in rf:
+            if line[0] == "#":
+                continue
+            line = line.strip().split('\t')
+            reg = line[0]
+            break
+
+cmd = "tabix " + args.input + " " + reg
+
 df = pd.DataFrame()
-for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=2000000, header=0, dtype=dty):
+for chunk in pd.read_csv(StringIO(sp.check_output(cmd, stderr=sp.STDOUT,\
+    shell=True).decode('utf-8')),sep='\t',chunksize=2000000, names=input_header, dtype=dty):
     chunk = chunk[chunk[args.key] > 0]
     if chunk.shape[0] == 0:
         continue

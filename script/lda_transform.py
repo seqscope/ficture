@@ -131,7 +131,7 @@ if do_transform:
                 x,y = pixel_to_hex(np.array(brc[['X','Y']]), radius, offs_x/n_move, offs_y/n_move)
                 hex_pt  = pd.DataFrame({'hex_x':x,'hex_y':y,'ct':brc[key].values}).groupby(by=['hex_x','hex_y']).agg({'ct':np.sum}).reset_index()
                 hex_pt['x'], hex_pt['y'] = hex_to_pixel(hex_pt.hex_x.values, hex_pt.hex_y.values, radius, offs_x/n_move, offs_y/n_move)
-                hex_pt = hex_pt[ (hex_pt.y > st + diam/2) & (hex_pt.y < ed - diam/2) & (hex_pt.ct >= args.min_ct_per_unit) ]
+                hex_pt = hex_pt.loc[ (hex_pt.y > st + diam/2) & (hex_pt.y < ed - diam/2) & (hex_pt.ct >= args.min_ct_per_unit), :]
                 if hex_pt.shape[0] < 2:
                     offs_y += 1
                     continue

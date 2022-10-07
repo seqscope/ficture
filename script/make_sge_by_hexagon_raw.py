@@ -21,7 +21,8 @@ parser.add_argument('--key', default = 'gn', type=str, help='gt: genetotal, gn: 
 parser.add_argument('--precision', type=int, default=1, help='Number of digits to store spatial location (in um), 0 for integer.')
 parser.add_argument('--hex_width', type=int, default=24, help='')
 parser.add_argument('--hex_radius', type=int, default=-1, help='')
-parser.add_argument('--n_move', type=int, default=1, help='')
+parser.add_argument('--overlap', type=float, default=-1, help='')
+parser.add_argument('--n_move', type=int, default=-1, help='')
 parser.add_argument('--min_ct_per_unit', type=int, default=20, help='')
 parser.add_argument('--min_count_per_feature', type=int, default=1, help='')
 
@@ -29,6 +30,7 @@ args = parser.parse_args()
 
 lane=args.lane
 mu_scale = 1./args.mu_scale
+b_size = 512
 
 diam=args.hex_width
 radius=args.hex_radius
@@ -36,9 +38,12 @@ if radius < 0:
     radius = diam / np.sqrt(3)
 else:
     diam = int(radius*np.sqrt(3))
-n_move = args.n_move
-if n_move > diam:
-    n_move = diam // 4
+if args.overlap >= 0 and args.overlap < 1:
+    n_move = int(1. / (1. - args.overlap) )
+else:
+    n_move = args.n_move
+    if n_move < 0:
+        n_move = 1
 
 ### Output
 if not os.path.exists(args.output_path):
@@ -109,7 +114,6 @@ if os.path.exists(brc_f):
 if os.path.exists(mtx_f):
     _ = os.system("rm " + mtx_f)
 
-b_size = 512
 T = 0
 n_unit = 0
 for itr_r in range(len(lanes)):
