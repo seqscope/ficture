@@ -58,7 +58,8 @@ with open(args.output,'w') as wf:
     _=wf.write('\t'.join(output_header)+'\n')
 
 adt = {x:np.sum for x in ct_header}
-bdt = {'X':np.mean,'Y':np.mean}
+# bdt = {'X':np.mean,'Y':np.mean}
+bdt={}
 bdt['tile'] = lambda x : int(np.median(x))
 n_unit = 0
 dty = {x:int for x in ['tile','X','Y', args.key]}
@@ -123,8 +124,13 @@ for chunk in pd.read_csv(StringIO(sp.check_output(cmd, stderr=sp.STDOUT,\
             brc["hex_id"] = hex_crd
             brc["random_index"] = brc.hex_id.map(hex_dict)
             sub = copy.copy(brc[brc.hex_id.isin(ct)] )
-            cnt = sub.groupby(by = ['random_index']).agg(bdt).reset_index()
-            sub = sub.loc[:,['j','X','Y','random_index']].merge(right = df, on='j', how = 'inner')
+
+            cnt = sub.groupby(by = ['hex_id', 'random_index']).agg(bdt).reset_index()
+            hx = cnt.hex_id.map(lambda x : x[0])
+            hy = cnt.hex_id.map(lambda x : x[1])
+            cnt['X'], cnt['Y'] = hex_to_pixel(hx, hy, radius, offs_x/n_move, offs_y/n_move)
+
+            sub = sub.loc[:,['j','random_index']].merge(right = df, on='j', how = 'inner')
             sub = sub.groupby(by = ['#lane','random_index','gene','gene_id']).agg(adt).reset_index()
             sub = sub.merge(right = cnt, on = 'random_index', how = 'inner')
             sub['X'] = [f"{x:.{args.precision}f}" for x in sub.X.values]

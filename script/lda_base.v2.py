@@ -22,6 +22,12 @@ parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to
 parser.add_argument('--key', default = 'gn', type=str, help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced')
 parser.add_argument('--log', default = '', type=str, help='files to write log to')
 
+parser.add_argument('--tiles', type=str, default="", help="List of tiles to work on with, separated by comma (use all if not provided)")
+parser.add_argument('--x_range_um', type=float, nargs=2, default=[-1, np.inf], help="Lower and upper bound of the x-axis, in um")
+parser.add_argument('--y_range_um', type=float, nargs=2, default=[-1, np.inf], help="Lower and upper bound of the y-axis, in um")
+parser.add_argument('--x_range', type=float, nargs=2, default=[-1, np.inf], help="Lower and upper bound of the x-axis, in original barcode coordinates")
+parser.add_argument('--y_range', type=float, nargs=2, default=[-1, np.inf], help="Lower and upper bound of the y-axis, in original barcode coordinates")
+
 parser.add_argument('--nFactor', type=int, default=10, help='')
 parser.add_argument('--minibatch_size', type=int, default=256, help='')
 parser.add_argument('--min_count_per_feature', type=int, default=1, help='')
@@ -48,9 +54,27 @@ b_size = args.minibatch_size
 K = args.nFactor
 factor_header = ['Topic_'+str(x) for x in range(K)]
 
-### Input and output
+### Input
 if not os.path.exists(args.input) or not os.path.exists(args.feature):
     sys.exit("ERROR: cannot find input file.")
+# If using only subset of input data
+tile_list = []
+if args.tiles != "":
+    tile_list = args.tiles.split(',')
+xmin, xmax = args.x_range_um
+ymin, ymax = args.y_range_um
+
+print(xmin, xmax, args.x_range_um, args.x_range)
+print(ymin, ymax, args.y_range_um, args.y_range)
+
+if args.x_range_um[0] < 0 and args.x_range[0] >= 0:
+    xmin = args.x_range[0] * mu_scale
+if args.x_range_um[1] == np.inf and args.x_range[1] != np.inf:
+    xmax = args.x_range[1] * mu_scale
+if args.y_range_um[0] < 0 and args.y_range[0] >= 0:
+    ymin = args.y_range[0] * mu_scale
+if args.y_range_um[1] == np.inf and args.y_range[1] != np.inf:
+    ymax = args.y_range[1] * mu_scale
 
 ### Use only the provided list of features
 feature = pd.read_csv(args.feature, sep='\t', header=0, usecols=['gene',args.key],dtype={'gene':str,args.key:int})
@@ -77,8 +101,9 @@ logging.info(f"{M} genes will be used")
 
 ### Stochastic model fitting
 model_f = args.output_path + "/analysis/"+args.identifier+".model.p"
-logging.info(f"Output file {model_f}")
-adt = {'random_index':str, 'X': str, 'Y':str, 'gene':str, key:int}
+logging.info(f"Model file {model_f}")
+adt = {'random_index':str, 'tile':str, 'X': str, 'Y':str, 'gene':str, key:int}
+adthat = {'X':float, 'Y':float}
 if not args.overwrite and os.path.exists(model_f):
     logging.warning(f"Model already exits, use --overwrite to allow the existing model files to be overwritten\n{model_f}")
     lda = pickle.load( open( model_f, "rb" ) )
@@ -93,11 +118,16 @@ else:
     epoch = 0
     while epoch < args.epoch:
         df = pd.DataFrame()
-        for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, header=0, usecols=["random_index","X","Y","gene",key], dtype=adt):
+        for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, header=0, usecols=["random_index","tile","X","Y","gene",key], dtype=adt):
             chunk = chunk[chunk.gene.isin(feature_kept)]
-            if chunk.shape[0] == 0:
-                continue
             chunk['j'] = chunk.random_index.values + '_' + chunk.X.values + '_' + chunk.Y.values
+            chunk = chunk.astype(adthat)
+            indx = (chunk.X >= xmin) & (chunk.X <= xmax) & (chunk.Y >= ymin) & (chunk.Y <= ymax)
+            if args.tiles != "":
+                indx = indx & chunk.tile.isin(tile_list)
+            if sum(indx) == 0:
+                continue
+            chunk = chunk[indx]
             chunk.drop(columns = ['random_index','X','Y'], inplace=True)
             last_indx = chunk.j.iloc[-1]
             df = pd.concat([df, chunk[~chunk.j.eq(last_indx)]])
@@ -178,13 +208,19 @@ dtp = {'topK':int,args.key:int,'j':str, 'x':str, 'y':str}
 dtp.update({x:float for x in ['topP']+factor_header})
 res_f = args.output_path+"/analysis/"+args.identifier+".fit_result.tsv.gz"
 nbatch = 0
+logging.info(f"Result file {res_f}")
 
 df = pd.DataFrame()
 for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=100000, header=0, usecols=["random_index","X","Y","gene",key], dtype=adt):
     chunk = chunk[chunk.gene.isin(feature_kept)]
-    if chunk.shape[0] == 0:
-        continue
     chunk['j'] = chunk.random_index.values + '_' + chunk.X.values + '_' + chunk.Y.values
+    chunk = chunk.astype(adthat)
+    indx = (chunk.X >= xmin) & (chunk.X <= xmax) & (chunk.Y >= ymin) & (chunk.Y <= ymax)
+    if args.tiles != "":
+        indx = indx & chunk.tile.isin(tile_list)
+    if sum(indx) == 0:
+        continue
+    chunk = chunk[indx]
     chunk.drop(columns = ['random_index','X','Y'], inplace=True)
     last_indx = chunk.j.iloc[-1]
     left = copy.copy(chunk[chunk.j.eq(last_indx)])
@@ -216,11 +252,44 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=100000, 
     brc['topK'] = np.argmax(theta, axis = 1).astype(int)
     brc['topP'] = np.max(theta, axis = 1)
     brc = brc.astype(dtp)
+    print(brc.shape)
     if nbatch == 0:
         brc.to_csv(res_f, sep='\t', mode='w', float_format="%.5f", index=False, header=True)
     else:
         brc.to_csv(res_f, sep='\t', mode='a', float_format="%.5f", index=False, header=False)
     nbatch += 1
     df = copy.copy(left)
+
+# Total mulecule count per unit
+brc = df.groupby(by = ['j']).agg({args.key: sum}).reset_index()
+brc = brc[brc[args.key] > args.min_ct_per_unit]
+brc.index = range(brc.shape[0])
+print(brc.shape)
+if brc.shape[0] > 0:
+    df = df[df.j.isin(brc.j.values)]
+    # Make DGE
+    barcode_kept = list(brc.j.values)
+    bc_dict = {x:i for i,x in enumerate( barcode_kept ) }
+    indx_row = [ bc_dict[x] for x in df['j']]
+    indx_col = [ ft_dict[x] for x in df['gene']]
+    N = len(barcode_kept)
+    mtx = coo_matrix((df[args.key].values, (indx_row, indx_col)), shape=(N, M)).tocsr()
+    x1 = np.median(brc[key].values)
+    x2 = np.mean(brc[key].values)
+    logging.info(f"Made DGE {mtx.shape}, median/mean count: {x1:.1f}/{x2:.1f}")
+
+    theta = lda.transform(mtx)
+    brc['x'] = brc.j.map(lambda x : x.split('_')[1])
+    brc['y'] = brc.j.map(lambda x : x.split('_')[2])
+    brc['j'] = brc.j.map(lambda x : x.split('_')[0])
+    brc = pd.concat((brc, pd.DataFrame(theta, columns = factor_header)), axis = 1)
+    brc['topK'] = np.argmax(theta, axis = 1).astype(int)
+    brc['topP'] = np.max(theta, axis = 1)
+    brc = brc.astype(dtp)
+    print(brc.shape)
+    if nbatch == 0:
+        brc.to_csv(res_f, sep='\t', mode='w', float_format="%.5f", index=False, header=True)
+    else:
+        brc.to_csv(res_f, sep='\t', mode='a', float_format="%.5f", index=False, header=False)
 
 logging.info(f"Finished ({nbatch})")
