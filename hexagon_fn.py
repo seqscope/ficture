@@ -1,9 +1,4 @@
-import sys, io, os, gzip, glob, copy, re, time, importlib
 import numpy as np
-import pandas as pd
-import scipy.sparse
-from scipy.sparse import *
-
 
 def pixel_to_hex(pts, size, offset_x = 0, offset_y = 0):
     n,d = pts.shape

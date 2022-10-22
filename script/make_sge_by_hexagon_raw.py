@@ -147,7 +147,8 @@ for itr_r in range(len(lanes)):
         pts = np.asarray(brc[['X','Y']]) * mu_scale
         df.drop(columns = ['X', 'Y'], inplace=True)
         print(f"Read data in {lane}-{tile} with {brc.shape[0]} pixels.")
-        if brc.shape[0] < 100: # Ignore the whole tile
+        if brc.shape[0] < min_ct_per_unit*2: # Ignore the whole tile
+            print(f"WARNING: ignore lane {lane} tile {tile} with {brc.shape[0]} pixels")
             continue
 
         # Make DGE
@@ -157,7 +158,7 @@ for itr_r in range(len(lanes)):
         indx_col = [ ft_dict[x] for x in df['gene']]
         N = len(barcode_kept)
         dge_mtx = coo_matrix((df[args.key].values, (indx_row, indx_col)), shape=(N, M)).tocsr()
-        print(f"Made DGE {dge_mtx.shape}")
+        print(f"...Made DGE {dge_mtx.shape}")
 
         offs_x = 0
         offs_y = 0
@@ -178,7 +179,7 @@ for itr_r in range(len(lanes)):
                 sub = sub[sub.crd.isin(ct)]
                 sub['cRow'] = sub.crd.map(hex_dict).astype(int)
                 n_hex = len(hex_dict)
-                print(f"{n_hex} ({sub.cRow.max()}, {sub.shape[0]}), median count per unit {mid_ct}")
+                print(f"...{n_hex} units, median count per unit {mid_ct}")
 
                 # Output unit barcode with identifier:
                 # GlobalIndexUnit_lane_tile_globalX_globalY
@@ -188,18 +189,14 @@ for itr_r in range(len(lanes)):
                 brc.sort_values(by = 'cRow', inplace=True)
                 with open(brc_f, 'a') as wf:
                     _ = wf.write('\n'.join((brc.cRow+n_unit+1).astype(str).values + '_' + lane + '_' + tile + '_' + brc.X.values + '_' + brc.Y.values)+'\n')
-                grd_minib = list(range(0, n_hex, b_size))
-                grd_minib[-1] = n_hex
                 st_minib = 0
-                n_minib = len(grd_minib) - 1
-                while st_minib < n_minib:
-                    indx_minib = (sub.cRow >= grd_minib[st_minib]) & (sub.cRow < grd_minib[st_minib+1])
+                offset= 0
+                while st_minib < n_hex:
+                    ed_minib = np.min([st_minib + b_size, n_hex])
+                    nhex_minib = ed_minib - st_minib
+                    indx_minib = (sub.cRow >= st_minib) & (sub.cRow < ed_minib)
                     npixel_minib = sum(indx_minib)
-                    offset = sub.loc[indx_minib, 'cRow'].min()
-                    nhex_minib = sub.loc[indx_minib, 'cRow'].max() - offset + 1
-
                     mtx = coo_matrix((np.ones(npixel_minib, dtype=bool), (sub.loc[indx_minib, 'cRow'].values-offset, sub.loc[indx_minib, 'cCol'].values)), shape=(nhex_minib, N) ).tocsr() @ dge_mtx
-
                     mtx.eliminate_zeros()
                     r, c = mtx.nonzero()
                     r = np.array(r,dtype=int) + offset + n_unit + 1
@@ -209,11 +206,12 @@ for itr_r in range(len(lanes)):
                     mtx['i'] = mtx.i.astype(int)
                     mtx['j'] = mtx.j.astype(int)
                     mtx.to_csv(mtx_f, mode='a', sep=' ', index=False, header=False)
-                    st_minib += 1
-                    print(f"{st_minib}/{n_minib}. Wrote {nhex_minib} units")
+                    st_minib = ed_minib
+                    offset += nhex_minib
+                    print(f"...{offset}/{n_hex}. Add {nhex_minib} units")
 
                 n_unit += brc.shape[0]
-                print(f"Sliding offset {offs_x}, {offs_y}. Write {n_unit} units so far.")
+                print(f"...Sliding offset {offs_x}, {offs_y}. Write {n_unit} units so far.")
                 offs_y += 1
             offs_y = 0
             offs_x += 1
