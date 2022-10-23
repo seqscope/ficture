@@ -1,4 +1,4 @@
-import sys, os, copy, gc, gzip, pickle, argparse, logging, warnings
+import sys, os, copy, gc, re, gzip, pickle, argparse, logging, warnings
 import numpy as np
 import pandas as pd
 from random import shuffle

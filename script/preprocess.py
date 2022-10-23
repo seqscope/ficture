@@ -1,3 +1,4 @@
+from collections import defaultdict
 import sys, os, gzip, gc, argparse, warnings, logging
 import subprocess as sp
 from io import StringIO
@@ -19,8 +20,10 @@ parser.add_argument('--ref_pts', type=str, help='')
 parser.add_argument('--identifier', type=str, help='Identifier for the processed data e.g. 1stID-2ndZ-Species-L')
 parser.add_argument("--meta_data", type=str, help="Per tile meta data menifest.tsv")
 parser.add_argument("--layout", type=str, help="Layout file of tiles to draw [lane] [tile] [row] [col] format in each line")
-parser.add_argument('--lane', type=str, help='')
-parser.add_argument('--tile', type=str, help='',default='')
+
+parser.add_argument('--lanes', nargs='*', type=str, help='One or multiple lanes to work on', default=[])
+parser.add_argument('--region', nargs='*', type=str, help="In the form of \"lane1:st1-ed1 lane2:st2-ed2 ... \"", default=[])
+
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
 parser.add_argument('--species', type=str, default='', help='')
 parser.add_argument('--feature_prefix', type=str, default='', help='e.g. mouse:mm10___,human:GRCh38_ (only for multi-species scenario)')
@@ -35,7 +38,6 @@ parser.add_argument('--gene_type_keyword', type=str, help='Key words (separated 
 parser.add_argument('--rm_gene_type_keyword', type=str, help='Key words (separated by ,) of gene types to remove, only used is gene_type_info is provided.', default="pseudogene")
 parser.add_argument('--rm_gene_keyword', type=str, help='Key words (separated by ,) of gene names to remove, only used is gene_type_info is provided.', default="")
 
-parser.add_argument('--min_count_per_feature', type=int, default=20, help='')
 parser.add_argument('--min_abs_mol_density_squm', type=float, default=0.02, help='A safe lowerbound to remove very sparse technical noise')
 parser.add_argument('--hard_threshold', type=float, default=-1, help='If provided, filter by hard threshold (number of molecules per squared um)')
 parser.add_argument('--hex_diam', type=int, default=12, help='')
@@ -43,6 +45,10 @@ parser.add_argument('--hex_n_move', type=int, default=6, help='')
 parser.add_argument('--redo_filter', action='store_true')
 
 args = parser.parse_args()
+
+if len(args.lanes) == 0 and len(args.region) == 0:
+    sys.exit("At least one of --lanes and --region is required")
+
 if args.log != '':
     try:
         logging.basicConfig(filename=args.log, filemode='a', encoding='utf-8', level=logging.INFO)
@@ -51,10 +57,22 @@ if args.log != '':
 else:
     logging.basicConfig(level= getattr(logging, "INFO", None))
 
-path=args.input_path
-outbase=args.output_path
-lane=args.lane
-kept_list=args.tile.split(',')
+path = args.input_path
+outpath = args.output_path
+
+### Parse input region
+kept_list = defaultdict(list)
+for v in args.region:
+    w = v.split(':')
+    if len(w) != 2:
+        sys.exit("Invalid regions in --tiles")
+    u = [x for x in w[1].split('-') if x != '']
+    if len(u) == 0 or len(u) > 2:
+        sys.exit("Invalid regions in --tiles")
+    if len(u) == 2:
+        u = [str(x) for x in range(int(u[0]), int(u[1])+1)]
+    kept_list[w[0]] += u
+
 mu_scale = 1./args.mu_scale
 diam = args.hex_diam
 n_move = args.hex_n_move
@@ -64,14 +82,17 @@ key = args.filter_based_on
 ct_header = ['gn', 'gt', 'spl', 'unspl', 'ambig']
 
 ### Extract list of tiles to process
-if args.tile == '':
-    cmd="find "+path+"/"+lane+" -type d "
-    tab = sp.check_output(cmd, stderr=sp.STDOUT, shell=True).decode('utf-8')
-    tab = tab.split('\n')
-    kept_list = sorted([x.split('/')[-1] for x in tab])
+if len(args.region) == 0:
+    for lane in args.lanes:
+        cmd="find "+path+"/"+lane+" -type d "
+        tab = sp.check_output(cmd, stderr=sp.STDOUT, shell=True).decode('utf-8')
+        tab = tab.split('\n')
+        kept_list[lane] = sorted([x.split('/')[-1] for x in tab])
+
+print(kept_list)
 
 ### Output
-outpath = '/'.join([outbase,lane])
+# outpath = '/'.join([outbase,lane])
 if not os.path.exists(outpath):
     arg="mkdir -p "+outpath
     os.system(arg)
@@ -82,7 +103,7 @@ if os.path.exists(flt_f) and not args.redo_filter:
     warnings.warn("Output file already exists but will be overwritten without --redo_filter")
 
 ### Layout
-layout, lanes, tiles = layout_map(args.meta_data, args.layout, lane)
+layout, lanes, tiles = layout_map(args.meta_data, args.layout)
 xbin_min, ybin_min = layout.xmin.min(), layout.ymin.min()
 xbin_max, ybin_max = layout.xmax.max(), layout.ymax.max()
 xr = xbin_max-xbin_min+1
@@ -93,7 +114,7 @@ ncols = int(layout.col.max() + 1)
 # Code the output as the tile numbers of the lower-left and upper-right corners
 tile_ll = tiles[-1][0]
 tile_ur = tiles[0][-1]
-logging.info(f"Read layout info. lane {lane}, tile {tile_ll}-{tile_ur}")
+logging.info(f"Read layout info.")
 
 
 ### If work on subset of genes
@@ -123,31 +144,21 @@ if args.gene_type_info != '' and os.path.exists(args.gene_type_info):
     gene_kept = list(gencode.Name)
     print(f"Read {len(gene_kept)} genes from gene_type_info")
 
-### Decide which genes to keep
-f = path + "/" + str(lane) + "/features.tsv.gz"
-feature_tot = pd.read_csv(gzip.open(f, 'rb'), sep='\t|,',\
-        names=["gene_id","gene","i"]+ct_header, engine='python')
-feature_kept = list(feature_tot.loc[feature_tot[key] > args.min_count_per_feature,'gene'].values)
-if len(gene_kept) > 0:
-    gene_kept = [x for x in gene_kept if x in feature_kept]
-else:
-    gene_kept = feature_kept
-logging.info(f"Kept {len(gene_kept)} genes")
-print(f"Kept {len(gene_kept)} genes")
-
-
 if os.path.exists(args.ref_pts) and not args.redo_filter:
-    pt = pd.read_csv(args.ref_pts,sep='\t',names=['x','y'],dtype=int)
+    pt = pd.read_csv(args.ref_pts,sep='\t',header=0)
     logging.info(f"Read existing anchor positions:\n{args.ref_pts}, {pt.shape}. (Use --redo_filter to avoid using existing files)")
 else:
     ### Read barcode
-    # f=path+"/"+str(lane)+"/barcodes.sorted.tsv.gz"
     df=pd.DataFrame()
     bsize_row = np.max([1, nrows // args.filter_by_box_nrow])
     bsize_col = np.max([1, ncols // args.filter_by_box_ncol])
     for itr_r in range(nrows):
         for itr_c in range(ncols):
             lane, tile = lanes[itr_r][itr_c], tiles[itr_r][itr_c]
+            if lane not in kept_list:
+                continue
+            if tile not in kept_list[lane]:
+                continue
             f="/".join([path,lane,tile])+"/barcodes.tsv.gz"
             if not os.path.exists(f):
                 continue
@@ -155,20 +166,15 @@ else:
                 sep='\t|,', names=["barcode","j","v2",\
                     "lane","tile","X","Y"]+ct_header,\
                 usecols=["Y","X",key], engine='python')
-            # cmd = "tabix " + f + " " + tile
-            # sub = pd.read_csv(StringIO(sp.check_output(cmd, stderr=sp.STDOUT,\
-            #         shell=True).decode('utf-8')), sep='\t|,', dtype=int,\
-            #         names=["v1","lane","tile","Y","X"]+ct_header,\
-            #         usecols=["Y","X",key], engine='python')
             sub = sub[sub[key] > 0]
             sub['X'] = (nrows - itr_r - 1) * xr + sub.X.values - xbin_min
             sub['Y'] = itr_c * yr + sub.Y.values - ybin_min
             sub['X'] = sub.X.values * mu_scale
             sub['Y'] = sub.Y.values * mu_scale
             if args.precision_um > 0:
-                sub['X'] = (np.around(sub.X.values/args.precision_um,0)*args.precision_um).astype(int)
-                sub['Y'] = (np.around(sub.Y.values/args.precision_um,0)*args.precision_um).astype(int)
-            sub['win'] = str(itr_r//bsize_row) + '_' + str(itr_c//bsize_col)
+                sub['X'] = np.around(sub.X.values/args.precision_um,0).astype(int)*args.precision_um
+                sub['Y'] = np.around(sub.Y.values/args.precision_um,0).astype(int)*args.precision_um
+            sub['win'] = lane + '_' + str(itr_r//bsize_row) + '_' + str(itr_c//bsize_col)
             df = pd.concat((df, sub))
             logging.info(f"{lane}-{tile}, {sub.shape[0]}, {df.shape[0]}")
     logging.info(f"Read barcodes, collapsed into {df.shape[0]} pts")
@@ -176,7 +182,10 @@ else:
     df['hex_y'] = 0
     ### Detect grid points falling inside dense tissue region
     anchor = np.zeros((0,2))
+    pt = pd.DataFrame()
+    lane_list = []
     for w in df.win.unique():
+        lane = w.split('_')[0]
         indx = df.win.eq(w)
         m0v=[]
         m1v=[]
@@ -217,23 +226,28 @@ else:
                 m0v.append(m0)
                 m1v.append(m1)
                 anchor_x, anchor_y = hex_to_pixel(cnt.loc[cnt.det.eq(True), 'hex_x'].values, cnt.loc[cnt.det.eq(True), 'hex_y'].values, radius,i/n_move,j/n_move)
-                anchor = np.vstack( (anchor, np.concatenate([anchor_x.reshape(-1,1), anchor_y.reshape(-1,1)], axis = 1) ) )
+                pt = pd.concat([pt,\
+                     pd.DataFrame({'x':anchor_x, 'y':anchor_y, 'lane':lane})])
                 logging.info(f"{m0:.3f} v.s. {m1:.3f}")
         m0 = np.mean(m0v)
         m1 = np.mean(m1v)
-        logging.info(f"{str(w)}:\t{m0:.3f} v.s. {m1:.3f}")
+        logging.info(f"Window {str(w)}:\t{m0:.3f} v.s. {m1:.3f}")
 
-    pt = np.around(np.clip(anchor,0,np.inf),0).astype(int)
-    pt = pd.DataFrame({'x':pt[:,0], 'y':pt[:,1]})
+    pt.x = np.around(np.clip(pt.x.values,0,np.inf)/args.precision_um,0).astype(int)
+    pt.y = np.around(np.clip(pt.y.values,0,np.inf)/args.precision_um,0).astype(int)
     pt.drop_duplicates(inplace=True)
-    pt.to_csv(args.ref_pts, sep='\t', index=False, header=False)
+    pt.x = pt.x * args.precision_um
+    pt.y = pt.y * args.precision_um
+    pt.to_csv(args.ref_pts, sep='\t', index=False, header=True)
     del df
     gc.collect()
 
 
-ref = sklearn.neighbors.BallTree(np.array(pt[['x','y']]))
+pt = pt.astype({'x':float, 'y':float, 'lane':str})
+ref = {}
+for lane in pt.lane.unique():
+    ref[lane] = sklearn.neighbors.BallTree(np.array(pt.loc[pt.lane.eq(lane), ['x','y']]))
 logging.info(f"Built balltree for reference points")
-
 
 ### Read pixels and keep only those close to the kept grid points
 feature_tot_ct = pd.DataFrame()
@@ -244,7 +258,7 @@ n_pixel = 0
 for itr_r in range(len(lanes)):
     for itr_c in range(len(lanes[0])):
         lane, tile = lanes[itr_r][itr_c], tiles[itr_r][itr_c]
-        if tile not in kept_list:
+        if tile not in kept_list[lane]:
             continue
         try:
             datapath = "/".join([path,lane,tile])
@@ -268,8 +282,9 @@ for itr_r in range(len(lanes)):
         sub.drop(columns = ['i', 'j'], inplace=True)
         sub['X'] = (nrows - itr_r - 1) * xr + sub.X.values - xbin_min
         sub['Y'] = itr_c * yr + sub.Y.values - ybin_min
-        sub['j'] = lane + '_' + tile + '_' + sub.X.astype(str) + '_' + sub.Y.astype(str)
-        sub = sub.loc[sub.gene.isin(gene_kept), :]
+        sub['j'] = sub.X.astype(str) + '_' + sub.Y.astype(str)
+        if len(gene_kept) > 0:
+            sub = sub.loc[sub.gene.isin(gene_kept), :]
         if sub.shape[0] < 10:
             continue
         brc = sub[['j','X','Y']].drop_duplicates(subset=['j'])
@@ -277,7 +292,7 @@ for itr_r in range(len(lanes)):
         brc['y'] = brc.Y.values * mu_scale
         brc = brc[['j','x','y']]
         brc["kept"] = False
-        dv, iv = ref.query(X=brc[['x','y']], k=1, return_distance=True, sort_results=False)
+        dv, iv = ref[lane].query(X=brc[['x','y']], k=1, return_distance=True, sort_results=False)
         dv = dv.squeeze()
         brc.loc[dv < radius, 'kept'] = True
         sub['#lane'] = lane

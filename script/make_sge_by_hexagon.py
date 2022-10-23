@@ -80,90 +80,93 @@ n_unit = 0
 T = 0
 
 adt = {x:int for x in ['tile','X','Y', args.key]}
-adt.update({x:str for x in ['gene', 'gene_id']})
-df = pd.DataFrame()
-for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, header=0, usecols=['tile','X','Y','gene','gene_id',args.key], dtype=adt):
-
-    ed = chunk.Y.iloc[-1]
-    left = copy.copy(chunk[chunk.Y > ed - 5 * args.mu_scale])
-    df = pd.concat([df, chunk])
+adt.update({x:str for x in ['#lane', 'gene', 'gene_id']})
+df_buff = pd.DataFrame()
+for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, header=0, usecols=['#lane','tile','X','Y','gene','gene_id',args.key], dtype=adt):
     if chunk.shape[0] == 0:
         break
-    df['j'] = df.X.astype(str) + '_' + df.Y.astype(str)
-    print(df.shape[0], ed)
-    brc_full = df.groupby(by = ['j','tile','X','Y']).agg({args.key: sum}).reset_index()
-    brc_full.index = range(brc_full.shape[0])
-    pixel_ct = brc_full[args.key].values
-    pts = np.asarray(brc_full[['X','Y']]) * mu_scale
-    print(f"Read data with {brc_full.shape[0]} pixels and {feature.shape[0]} genes.")
-    df.drop(columns = ['X', 'Y'], inplace=True)
+    chunk.rename(columns = {'#lane':'lane'}, inplace=True)
+    ed = chunk.Y.iloc[-1]
+    ed_s = chunk.lane.iloc[-1]
+    left = copy.copy(chunk[chunk.lane.eq(ed_s) & (chunk.Y > ed - 5 * args.mu_scale)])
+    df_buff = pd.concat([df_buff, chunk])
+    df_buff['j'] = df_buff.X.astype(str) + '_' + df_buff.Y.astype(str)
+    for l in df_buff.lane.unique():
+        df = df_buff[df_buff.lane.eq(l)]
+        print(l, df.shape[0], ed)
 
-    # Make DGE
-    barcode_kept = list(brc_full.j.values)
-    bc_dict = {x:i for i,x in enumerate( barcode_kept ) }
-    indx_row = [ bc_dict[x] for x in df['j']]
-    indx_col = [ ft_dict[x] for x in df['gene']]
-    N = len(barcode_kept)
+        brc_full = df.groupby(by = ['j','tile','X','Y']).agg({args.key: sum}).reset_index()
+        brc_full.index = range(brc_full.shape[0])
+        pixel_ct = brc_full[args.key].values
+        pts = np.asarray(brc_full[['X','Y']]) * mu_scale
+        print(f"Read data with {brc_full.shape[0]} pixels and {feature.shape[0]} genes.")
 
-    dge_mtx = coo_matrix((df[args.key].values, (indx_row, indx_col)), shape=(N, M)).tocsr()
-    total_molecule=df[args.key].sum()
-    print(f"Made DGE {dge_mtx.shape}")
+        # Make DGE
+        barcode_kept = list(brc_full.j.values)
+        bc_dict = {x:i for i,x in enumerate( barcode_kept ) }
+        indx_row = [ bc_dict[x] for x in df['j']]
+        indx_col = [ ft_dict[x] for x in df['gene']]
+        N = len(barcode_kept)
 
-    offs_x = 0
-    offs_y = 0
-    while offs_x < n_move:
-        while offs_y < n_move:
-            x,y = pixel_to_hex(pts, radius, offs_x/n_move, offs_y/n_move)
-            hex_crd = list(zip(x,y))
-            ct = pd.DataFrame({'hex_id':hex_crd, 'tot':pixel_ct}).groupby(by = 'hex_id').agg({'tot': sum}).reset_index()
-            mid_ct = np.median(ct.loc[ct.tot >= min_ct_per_unit, 'tot'].values)
-            ct = set(ct.loc[ct.tot >= min_ct_per_unit, 'hex_id'].values)
-            if len(ct) < 2:
-                offs_y += 1
-                continue
-            hex_list = list(ct)
-            hex_dict = {x:i for i,x in enumerate(hex_list)}
-            sub = pd.DataFrame({'crd':hex_crd,'cCol':range(N), 'X':pts[:, 0], 'Y':pts[:, 1], 'tile':brc_full.tile.values})
-            sub = sub[sub.crd.isin(ct)]
-            sub['cRow'] = sub.crd.map(hex_dict).astype(int)
-            brc = sub[['cRow', 'tile', 'X', 'Y']].groupby(by = 'cRow').agg({'X':np.mean, 'Y':np.mean, 'tile':np.max}).reset_index()
-            brc['X'] = [f"{x:.{args.precision}f}" for x in brc.X.values]
-            brc['Y'] = [f"{x:.{args.precision}f}" for x in brc.Y.values]
-            brc.sort_values(by = 'cRow', inplace=True)
-            with open(brc_f, 'a') as wf:
-                _ = wf.write('\n'.join((brc.cRow+n_unit+1).astype(str).values + '_' + brc.tile.astype(str) + '_' + brc.X.values + '_' + brc.Y.values)+'\n')
-            n_hex = len(hex_dict)
-            n_minib = n_hex // b_size
-            print(f"{n_minib}, {n_hex} ({sub.cRow.max()}, {sub.shape[0]}), median count per unit {mid_ct}")
-            grd_minib = list(range(0, n_hex, b_size))
-            grd_minib[-1] = n_hex
-            st_minib = 0
-            n_minib = len(grd_minib) - 1
-            while st_minib < n_minib:
-                indx_minib = (sub.cRow >= grd_minib[st_minib]) & (sub.cRow < grd_minib[st_minib+1])
-                npixel_minib = sum(indx_minib)
-                offset = sub.loc[indx_minib, 'cRow'].min()
-                nhex_minib = sub.loc[indx_minib, 'cRow'].max() - offset + 1
+        dge_mtx = coo_matrix((df[args.key].values, (indx_row, indx_col)), shape=(N, M)).tocsr()
+        total_molecule=df[args.key].sum()
+        print(f"Made DGE {dge_mtx.shape}")
 
-                mtx = coo_matrix((np.ones(npixel_minib, dtype=bool), (sub.loc[indx_minib, 'cRow'].values-offset, sub.loc[indx_minib, 'cCol'].values)), shape=(nhex_minib, N) ).tocsr() @ dge_mtx
-
-                mtx.eliminate_zeros()
-                r, c = mtx.nonzero()
-                r = np.array(r,dtype=int) + offset + n_unit + 1
-                c = np.array(c,dtype=int) + 1
-                T += mtx.sum()
-                mtx = pd.DataFrame({'i':c, 'j':r, 'v':mtx.data})
-                mtx['i'] = mtx.i.astype(int)
-                mtx['j'] = mtx.j.astype(int)
-                mtx.to_csv(mtx_f, mode='a', sep=' ', index=False, header=False)
-                st_minib += 1
-                print(f"{st_minib}/{n_minib}. Wrote {nhex_minib} units.")
-            n_unit += brc.shape[0]
-            print(f"Sliding offset {offs_x}, {offs_y}. Wrote {n_unit} units so far.")
-            offs_y += 1
+        offs_x = 0
         offs_y = 0
-        offs_x += 1
-    df = copy.copy(left)
+        while offs_x < n_move:
+            while offs_y < n_move:
+                x,y = pixel_to_hex(pts, radius, offs_x/n_move, offs_y/n_move)
+                hex_crd = list(zip(x,y))
+                ct = pd.DataFrame({'hex_id':hex_crd, 'tot':pixel_ct}).groupby(by = 'hex_id').agg({'tot': sum}).reset_index()
+                mid_ct = np.median(ct.loc[ct.tot >= min_ct_per_unit, 'tot'].values)
+                ct = set(ct.loc[ct.tot >= min_ct_per_unit, 'hex_id'].values)
+                if len(ct) < 2:
+                    offs_y += 1
+                    continue
+                hex_list = list(ct)
+                hex_dict = {x:i for i,x in enumerate(hex_list)}
+                sub = pd.DataFrame({'crd':hex_crd,'cCol':range(N), 'X':pts[:, 0], 'Y':pts[:, 1], 'tile':brc_full.tile.values})
+                sub = sub[sub.crd.isin(ct)]
+                sub['cRow'] = sub.crd.map(hex_dict).astype(int)
+                brc = sub[['cRow', 'tile', 'X', 'Y']].groupby(by = 'cRow').agg({'X':np.mean, 'Y':np.mean, 'tile':np.max}).reset_index()
+                brc['X'] = [f"{x:.{args.precision}f}" for x in brc.X.values]
+                brc['Y'] = [f"{x:.{args.precision}f}" for x in brc.Y.values]
+                brc.sort_values(by = 'cRow', inplace=True)
+                with open(brc_f, 'a') as wf:
+                    _ = wf.write('\n'.join((brc.cRow+n_unit+1).astype(str).values + '_' + l + '_' + brc.tile.astype(str) + '_' + brc.X.values + '_' + brc.Y.values)+'\n')
+                n_hex = len(hex_dict)
+                n_minib = n_hex // b_size
+                print(f"{n_minib}, {n_hex} ({sub.cRow.max()}, {sub.shape[0]}), median count per unit {mid_ct}")
+                grd_minib = list(range(0, n_hex, b_size))
+                grd_minib[-1] = n_hex
+                st_minib = 0
+                n_minib = len(grd_minib) - 1
+                while st_minib < n_minib:
+                    indx_minib = (sub.cRow >= grd_minib[st_minib]) & (sub.cRow < grd_minib[st_minib+1])
+                    npixel_minib = sum(indx_minib)
+                    offset = sub.loc[indx_minib, 'cRow'].min()
+                    nhex_minib = sub.loc[indx_minib, 'cRow'].max() - offset + 1
+
+                    mtx = coo_matrix((np.ones(npixel_minib, dtype=bool), (sub.loc[indx_minib, 'cRow'].values-offset, sub.loc[indx_minib, 'cCol'].values)), shape=(nhex_minib, N) ).tocsr() @ dge_mtx
+
+                    mtx.eliminate_zeros()
+                    r, c = mtx.nonzero()
+                    r = np.array(r,dtype=int) + offset + n_unit + 1
+                    c = np.array(c,dtype=int) + 1
+                    T += mtx.sum()
+                    mtx = pd.DataFrame({'i':c, 'j':r, 'v':mtx.data})
+                    mtx['i'] = mtx.i.astype(int)
+                    mtx['j'] = mtx.j.astype(int)
+                    mtx.to_csv(mtx_f, mode='a', sep=' ', index=False, header=False)
+                    st_minib += 1
+                    print(f"{st_minib}/{n_minib}. Wrote {nhex_minib} units.")
+                n_unit += brc.shape[0]
+                print(f"Sliding offset {offs_x}, {offs_y}. Wrote {n_unit} units so far.")
+                offs_y += 1
+            offs_y = 0
+            offs_x += 1
+    df_buff = copy.copy(left)
 
 _ = os.system("gzip -f " + brc_f)
 

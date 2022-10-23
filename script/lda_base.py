@@ -22,11 +22,11 @@ parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to
 parser.add_argument('--key', default = 'gn', type=str, help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced')
 parser.add_argument('--log', default = '', type=str, help='files to write log to')
 
-parser.add_argument('--tiles', type=str, default="", help="List of tiles to work on with, separated by comma (use all if not provided)")
-parser.add_argument('--x_range_um', type=float, nargs=2, default=[-1, np.inf], help="Lower and upper bound of the x-axis, in um")
-parser.add_argument('--y_range_um', type=float, nargs=2, default=[-1, np.inf], help="Lower and upper bound of the y-axis, in um")
-parser.add_argument('--x_range', type=float, nargs=2, default=[-1, np.inf], help="Lower and upper bound of the x-axis, in original barcode coordinates")
-parser.add_argument('--y_range', type=float, nargs=2, default=[-1, np.inf], help="Lower and upper bound of the y-axis, in original barcode coordinates")
+parser.add_argument('--tiles', type=str, default="", help="List of lane:tile to work on with, separated by comma (use all in the input files if not provided)")
+parser.add_argument('--x_range_um', type=float, nargs='*', default=[], help="Lower and upper bound of the x-axis, in um")
+parser.add_argument('--y_range_um', type=float, nargs='*', default=[], help="Lower and upper bound of the y-axis, in um")
+parser.add_argument('--x_range', type=float, nargs='*', default=[], help="Lower and upper bound of the x-axis, in original barcode coordinates")
+parser.add_argument('--y_range', type=float, nargs='*', default=[], help="Lower and upper bound of the y-axis, in original barcode coordinates")
 
 parser.add_argument('--nFactor', type=int, default=10, help='')
 parser.add_argument('--minibatch_size', type=int, default=256, help='')
@@ -61,20 +61,31 @@ if not os.path.exists(args.input) or not os.path.exists(args.feature):
 tile_list = []
 if args.tiles != "":
     tile_list = args.tiles.split(',')
-xmin, xmax = args.x_range_um
-ymin, ymax = args.y_range_um
+
+
+if len(args.x_range_um) > 0:
+    xmin = np.array([x for i,x in enumerate(args.x_range_um) if i % 2 == 0])
+    xmax = np.array([x for i,x in enumerate(args.x_range_um) if i % 2 == 1])
+    ymin = np.array([x for i,x in enumerate(args.y_range_um) if i % 2 == 0])
+    ymax = np.array([x for i,x in enumerate(args.y_range_um) if i % 2 == 1])
+elif len(args.x_range) > 0:
+    xmin = np.array([x * mu_scale for i,x in enumerate(args.x_range) if i % 2 == 0])
+    xmax = np.array([x * mu_scale for i,x in enumerate(args.x_range) if i % 2 == 1])
+    ymin = np.array([x * mu_scale for i,x in enumerate(args.y_range) if i % 2 == 0])
+    ymax = np.array([x * mu_scale for i,x in enumerate(args.y_range) if i % 2 == 1])
+else:
+    xmin = np.array([-1])
+    xmax = np.array([np.inf])
+    ymin = np.array([-1])
+    ymax = np.array([np.inf])
+
+n_region = np.min([len(xmin), len(xmax), len(ymin), len(ymax)])
+if n_region < 1:
+    sys.exit("Invalid range parameters")
 
 print(xmin, xmax, args.x_range_um, args.x_range)
 print(ymin, ymax, args.y_range_um, args.y_range)
 
-if args.x_range_um[0] < 0 and args.x_range[0] >= 0:
-    xmin = args.x_range[0] * mu_scale
-if args.x_range_um[1] == np.inf and args.x_range[1] != np.inf:
-    xmax = args.x_range[1] * mu_scale
-if args.y_range_um[0] < 0 and args.y_range[0] >= 0:
-    ymin = args.y_range[0] * mu_scale
-if args.y_range_um[1] == np.inf and args.y_range[1] != np.inf:
-    ymax = args.y_range[1] * mu_scale
 
 ### Use only the provided list of features
 feature = pd.read_csv(args.feature, sep='\t', header=0, usecols=['gene',args.key],dtype={'gene':str,args.key:int})
@@ -102,7 +113,7 @@ logging.info(f"{M} genes will be used")
 ### Stochastic model fitting
 model_f = args.output_path + "/analysis/"+args.identifier+".model.p"
 logging.info(f"Model file {model_f}")
-adt = {'random_index':str, 'tile':str, 'X': str, 'Y':str, 'gene':str, key:int}
+adt = {'random_index':str, '#lane':str, 'tile':str, 'X': str, 'Y':str, 'gene':str, key:int}
 adthat = {'X':float, 'Y':float}
 if not args.overwrite and os.path.exists(model_f):
     logging.warning(f"Model already exits, use --overwrite to allow the existing model files to be overwritten\n{model_f}")
@@ -118,11 +129,16 @@ else:
     epoch = 0
     while epoch < args.epoch:
         df = pd.DataFrame()
-        for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, header=0, usecols=["random_index","tile","X","Y","gene",key], dtype=adt):
+        for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, header=0, usecols=["random_index","#lane","tile","X","Y","gene",key], dtype=adt):
             chunk = chunk[chunk.gene.isin(feature_kept)]
             chunk['j'] = chunk.random_index.values + '_' + chunk.X.values + '_' + chunk.Y.values
+            chunk['tile'] = chunk["#lane"].values + ':' + chunk.tile.values
             chunk = chunk.astype(adthat)
-            indx = (chunk.X >= xmin) & (chunk.X <= xmax) & (chunk.Y >= ymin) & (chunk.Y <= ymax)
+            i = 0
+            indx = (chunk.X >= xmin[i]) & (chunk.X <= xmax[i]) & (chunk.Y >= ymin[i]) & (chunk.Y <= ymax[i])
+            while i < len(xmin):
+                indx = indx | ((chunk.X >= xmin[i]) & (chunk.X <= xmax[i]) & (chunk.Y >= ymin[i]) & (chunk.Y <= ymax[i]))
+                i += 1
             if args.tiles != "":
                 indx = indx & chunk.tile.isin(tile_list)
             if sum(indx) == 0:
@@ -211,11 +227,16 @@ nbatch = 0
 logging.info(f"Result file {res_f}")
 
 df = pd.DataFrame()
-for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=100000, header=0, usecols=["random_index","X","Y","gene",key], dtype=adt):
+for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=100000, header=0, usecols=["random_index","#lane","tile","X","Y","gene",key], dtype=adt):
     chunk = chunk[chunk.gene.isin(feature_kept)]
     chunk['j'] = chunk.random_index.values + '_' + chunk.X.values + '_' + chunk.Y.values
+    chunk['tile'] = chunk["#lane"].values + ':' + chunk.tile.values
     chunk = chunk.astype(adthat)
-    indx = (chunk.X >= xmin) & (chunk.X <= xmax) & (chunk.Y >= ymin) & (chunk.Y <= ymax)
+    i = 0
+    indx = (chunk.X >= xmin[i]) & (chunk.X <= xmax[i]) & (chunk.Y >= ymin[i]) & (chunk.Y <= ymax[i])
+    while i < len(xmin):
+        indx = indx | ((chunk.X >= xmin[i]) & (chunk.X <= xmax[i]) & (chunk.Y >= ymin[i]) & (chunk.Y <= ymax[i]))
+        i += 1
     if args.tiles != "":
         indx = indx & chunk.tile.isin(tile_list)
     if sum(indx) == 0:

@@ -14,7 +14,6 @@ parser.add_argument('--output_path', type=str, help='')
 parser.add_argument("--meta_data", type=str, help="Per tile meta data menifest.tsv")
 parser.add_argument("--layout", type=str, help="Layout file of tiles to draw [lane] [tile] [row] [col] format in each line")
 parser.add_argument('--lane', type=str, help='')
-parser.add_argument('--tile', type=str, help='',default='')
 
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
 parser.add_argument('--key', default = 'gn', type=str, help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced')
