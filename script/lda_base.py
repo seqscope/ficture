@@ -22,7 +22,7 @@ parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to
 parser.add_argument('--key', default = 'gn', type=str, help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced')
 parser.add_argument('--log', default = '', type=str, help='files to write log to')
 
-parser.add_argument('--tiles', type=str, default="", help="List of lane:tile to work on with, separated by comma (use all in the input files if not provided)")
+parser.add_argument('--region', type=str, nargs='*', default=[], help="List of lane:tile1-tile2 or lane:tile to work on")
 parser.add_argument('--x_range_um', type=float, nargs='*', default=[], help="Lower and upper bound of the x-axis, in um")
 parser.add_argument('--y_range_um', type=float, nargs='*', default=[], help="Lower and upper bound of the y-axis, in um")
 parser.add_argument('--x_range', type=float, nargs='*', default=[], help="Lower and upper bound of the x-axis, in original barcode coordinates")
@@ -34,6 +34,7 @@ parser.add_argument('--min_count_per_feature', type=int, default=1, help='')
 parser.add_argument('--min_ct_per_unit', type=int, default=20, help='')
 parser.add_argument('--thread', type=int, default=1, help='')
 parser.add_argument('--epoch', type=int, default=1, help='How many times to loop through the full data')
+parser.add_argument('--use_model', type=str, default='', help="Use provided model to transform input data")
 parser.add_argument('--overwrite', action='store_true')
 
 args = parser.parse_args()
@@ -45,6 +46,8 @@ if args.log != '':
 else:
     logging.basicConfig(level= getattr(logging, "INFO", None))
 
+if args.use_model != '' and not os.path.exists(args.use_model):
+    sys.exit("Invalid model file")
 
 mu_scale = 1./args.mu_scale
 key = args.key
@@ -57,11 +60,20 @@ factor_header = ['Topic_'+str(x) for x in range(K)]
 ### Input
 if not os.path.exists(args.input) or not os.path.exists(args.feature):
     sys.exit("ERROR: cannot find input file.")
+
 # If using only subset of input data
 tile_list = []
-if args.tiles != "":
-    tile_list = args.tiles.split(',')
-
+for v in args.region:
+    w = v.split(':')
+    if len(w) != 2:
+        sys.exit("Invalid regions in --region")
+    u = [x for x in w[1].split('-') if x != '']
+    if len(u) == 0 or len(u) > 2:
+        sys.exit("Invalid regions in --region")
+    if len(u) == 2:
+        u = [str(x) for x in range(int(u[0]), int(u[1])+1)]
+    tile_list += [w[0]+":"+x for x in u]
+print(tile_list)
 
 if len(args.x_range_um) > 0:
     xmin = np.array([x for i,x in enumerate(args.x_range_um) if i % 2 == 0])
@@ -112,17 +124,19 @@ logging.info(f"{M} genes will be used")
 
 ### Stochastic model fitting
 model_f = args.output_path + "/analysis/"+args.identifier+".model.p"
-logging.info(f"Model file {model_f}")
 adt = {'random_index':str, '#lane':str, 'tile':str, 'X': str, 'Y':str, 'gene':str, key:int}
 adthat = {'X':float, 'Y':float}
+if os.path.exists(args.use_model):
+    model_f = args.use_model
 if not args.overwrite and os.path.exists(model_f):
-    logging.warning(f"Model already exits, use --overwrite to allow the existing model files to be overwritten\n{model_f}")
     lda = pickle.load( open( model_f, "rb" ) )
+    logging.warning(f"Read existing model from\n{model_f}\n use --overwrite to allow the model files to be overwritten")
     feature_kept = lda.feature_names_in_
     lda.feature_names_in_ = None
     ft_dict = {x:i for i,x in enumerate( feature_kept ) }
     M = len(feature_kept)
 else:
+    logging.info(f"Start fitting model ... model will be stored in\n{model_f}")
     lda = LDA(n_components=K, learning_method='online', batch_size=b_size, n_jobs = args.thread, verbose = 0)
     feature_mf = np.array(feature[args.key].values).astype(float)
     feature_mf/= feature_mf.sum()
@@ -139,7 +153,7 @@ else:
             while i < len(xmin):
                 indx = indx | ((chunk.X >= xmin[i]) & (chunk.X <= xmax[i]) & (chunk.Y >= ymin[i]) & (chunk.Y <= ymax[i]))
                 i += 1
-            if args.tiles != "":
+            if len(tile_list) > 0:
                 indx = indx & chunk.tile.isin(tile_list)
             if sum(indx) == 0:
                 continue
@@ -237,7 +251,7 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=100000, 
     while i < len(xmin):
         indx = indx | ((chunk.X >= xmin[i]) & (chunk.X <= xmax[i]) & (chunk.Y >= ymin[i]) & (chunk.Y <= ymax[i]))
         i += 1
-    if args.tiles != "":
+    if len(tile_list) > 0:
         indx = indx & chunk.tile.isin(tile_list)
     if sum(indx) == 0:
         continue

@@ -1,7 +1,6 @@
 from collections import defaultdict
 import sys, os, gzip, gc, argparse, warnings, logging
 import subprocess as sp
-from io import StringIO
 import numpy as np
 import pandas as pd
 import sklearn.neighbors
@@ -43,6 +42,7 @@ parser.add_argument('--hard_threshold', type=float, default=-1, help='If provide
 parser.add_argument('--hex_diam', type=int, default=12, help='')
 parser.add_argument('--hex_n_move', type=int, default=6, help='')
 parser.add_argument('--redo_filter', action='store_true')
+parser.add_argument('--merge_raw_data', action='store_true')
 
 args = parser.parse_args()
 
@@ -61,17 +61,39 @@ path = args.input_path
 outpath = args.output_path
 
 ### Parse input region
+lane_list = args.lanes
 kept_list = defaultdict(list)
 for v in args.region:
     w = v.split(':')
+    if len(w) == 1:
+        lane_list.append(w[0])
+        continue
     if len(w) != 2:
-        sys.exit("Invalid regions in --tiles")
+        sys.exit("Invalid regions in --region")
     u = [x for x in w[1].split('-') if x != '']
     if len(u) == 0 or len(u) > 2:
-        sys.exit("Invalid regions in --tiles")
+        sys.exit("Invalid regions in --region")
     if len(u) == 2:
         u = [str(x) for x in range(int(u[0]), int(u[1])+1)]
     kept_list[w[0]] += u
+
+lane_list = list(set(lane_list))
+
+### Extract list of tiles to process
+if len(lane_list) > 0:
+    for lane in args.lanes:
+        if not os.path.exists(path+"/"+lane):
+            continue
+        cmd="find "+path+"/"+lane+" -type d "
+        tab = sp.check_output(cmd, stderr=sp.STDOUT, shell=True).decode('utf-8')
+        tab = tab.split('\n')
+        kept_list[lane] += [x.split('/')[-1] for x in tab]
+
+for k,v in kept_list.items():
+    kept_list[k] = sorted(list(set(kept_list[k])))
+
+
+print(kept_list)
 
 mu_scale = 1./args.mu_scale
 diam = args.hex_diam
@@ -81,15 +103,6 @@ hex_area = diam*radius*3/2
 key = args.filter_based_on
 ct_header = ['gn', 'gt', 'spl', 'unspl', 'ambig']
 
-### Extract list of tiles to process
-if len(args.region) == 0:
-    for lane in args.lanes:
-        cmd="find "+path+"/"+lane+" -type d "
-        tab = sp.check_output(cmd, stderr=sp.STDOUT, shell=True).decode('utf-8')
-        tab = tab.split('\n')
-        kept_list[lane] = sorted([x.split('/')[-1] for x in tab])
-
-print(kept_list)
 
 ### Output
 # outpath = '/'.join([outbase,lane])
@@ -97,6 +110,7 @@ if not os.path.exists(outpath):
     arg="mkdir -p "+outpath
     os.system(arg)
 flt_f = outpath+"/matrix_merged."+args.identifier+".tsv"
+raw_f = outpath+"/matrix_merged.raw."+args.identifier+".tsv"
 logging.info(f"Output file:\n{flt_f}")
 
 if os.path.exists(flt_f) and not args.redo_filter:
@@ -254,6 +268,9 @@ feature_tot_ct = pd.DataFrame()
 output_header = ['#lane','tile','Y','X','gene','gene_id']+ct_header
 header=pd.DataFrame([], columns = output_header)
 header.to_csv(flt_f, sep='\t', index=False)
+if args.merge_raw_data:
+    header.to_csv(raw_f, sep='\t', index=False)
+
 n_pixel = 0
 for itr_r in range(len(lanes)):
     for itr_c in range(len(lanes[0])):
@@ -291,12 +308,15 @@ for itr_r in range(len(lanes)):
         brc['x'] = brc.X.values * mu_scale
         brc['y'] = brc.Y.values * mu_scale
         brc = brc[['j','x','y']]
+        sub['#lane'] = lane
+        sub['tile'] = tile
+        if args.merge_raw_data:
+            sub.sort_values(by = ['Y','X','gene'], inplace=True)
+            sub.loc[:, output_header].to_csv(raw_f, mode='a', sep='\t', index=False, header=False)
         brc["kept"] = False
         dv, iv = ref[lane].query(X=brc[['x','y']], k=1, return_distance=True, sort_results=False)
         dv = dv.squeeze()
         brc.loc[dv < radius, 'kept'] = True
-        sub['#lane'] = lane
-        sub['tile'] = tile
         sub = sub.loc[sub.j.isin( brc.loc[brc.kept.eq(True), 'j'] ), output_header]
         feature_sub = sub.groupby(by = ['gene', 'gene_id']).agg({x:sum for x in ct_header}).reset_index()
         feature_tot_ct = pd.concat((feature_tot_ct, feature_sub))
