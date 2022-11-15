@@ -77,9 +77,9 @@ elif len(args.region_um) > 0:
             continue
         l = v.split(':')[0]
         st, ed = v.split(':')[1].split('-')
-        st = str(int(float(st) * mu_scale) )
-        ed = str(int(float(ed) * mu_scale) )
-        reg_list.append(l+':'+'-'.join([st,ed]))
+        st = str(int(float(st) * args.mu_scale) )
+        ed = str(int(float(ed) * args.mu_scale) )
+        reg_list.append(l+':'+'-'.join([st,ed]) )
     cmd = ["tabix", args.input] + reg_list
 if len(cmd) == 0:
     p0 = sp.Popen(["zcat", args.input], stdout=sp.PIPE)
@@ -94,7 +94,7 @@ for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
                 names=input_header, dtype=dty):
     chunk = chunk[chunk[args.key] > 0]
     if chunk.shape[0] == 0:
-        logging.info(f"Empty? Left over size {df.shape[0]}.")
+        logging.info(f"Empty? Left over size {df_full.shape[0]}.")
         continue
     ed = chunk.Y.iloc[-1]
     df_full = pd.concat([df_full, chunk])
