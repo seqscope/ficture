@@ -13,13 +13,14 @@ from matplotlib.patches import Rectangle
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 
-def dirichlet_expectation(alpha):
+def dirichlet_expectation(alpha, tol=1e-4):
     """
     For a vector theta ~ Dir(alpha), computes E[log(theta)] given alpha.
     """
+    assert alpha.min() >= 0, "Expecting positive Dirichlet parameters"
     if (len(alpha.shape) == 1):
-        return(psi(alpha) - psi(np.sum(alpha)))
-    return(psi(alpha+1e-3) - psi(np.sum(alpha+1e-3, 1))[:, np.newaxis])
+        return(psi(alpha+tol) - psi(np.sum(alpha+tol)))
+    return(psi(alpha+tol) - psi(np.sum(alpha+tol, axis=1)).reshape((-1, 1)))
 
 def pg_mean(b,c=0):
     if np.isscalar(c) and c == 0:
@@ -72,8 +73,8 @@ def match_factors(mtx1, mtx2, c1, n, cmap, mode='beta'):
     # Try to match two sets of factors
     Q = np.zeros((k1, k2))
     if mode == 'beta':
-        beta1 = mtx1 / mtx1.sum(axis = 1)[:, np.newaxis]
-        beta2 = mtx2 / mtx2.sum(axis = 1)[:, np.newaxis]
+        beta1 = mtx1 / mtx1.sum(axis = 1).reshape((-1, 1))
+        beta2 = mtx2 / mtx2.sum(axis = 1).reshape((-1, 1))
         for k in range(k1):
             q,r = scipy.optimize.nnls(beta2.transpose(), beta1[k, :].transpose())
             Q[k, ] = q
@@ -85,8 +86,8 @@ def match_factors(mtx1, mtx2, c1, n, cmap, mode='beta'):
             Q[k, ] = q
             indx2 = [(-Q[:,k]).argsort() for k in range(k2)]
             indx1 = [(-Q[k,:]).argsort() for k in range(k1)]
-            Q = Q * mtx2.sum(axis = 1)[np.newaxis, :]
-            Q = Q / (Q.sum(axis = 1)[:, np.newaxis])
+            Q = Q * mtx2.sum(axis = 1).reshape((1, -1))
+            Q = Q / (Q.sum(axis = 1).reshape((-1, 1)))
 
     model = sklearn.cluster.SpectralBiclustering(n_clusters=(k1,k1), method="bistochastic").fit(Q+1e-5)
     prio = (-Q.sum(axis = 0)).argsort() # sorted from most consistent to less consistent

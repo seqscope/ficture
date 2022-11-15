@@ -26,6 +26,7 @@ parser.add_argument('--min_ct_per_unit', default=50, type=int, help='')
 parser.add_argument('--min_ct_per_gene', default=50, type=int, help='')
 parser.add_argument('--max_qval_pairwise_output', default=1e-3, type=float, help='')
 parser.add_argument('--min_fold_pairwise_output', default=2, type=float, help='')
+parser.add_argument('--bulk_only', action='store_true')
 
 
 args = parser.parse_args()
@@ -91,6 +92,8 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=200000, 
             info.loc[i, str(k)] += v['Count']
     chunk = chunk.loc[chunk.j.isin(kept_unit), :]
     df = pd.concat([df, chunk])
+    print(df.shape[0])
+print(f"Read data ({df.shape[0]}")
 
 v = info.loc[:, [str(k) for k in range(K)]].sum(axis = 1).values
 gene_scale = np.zeros(info.shape[0])
@@ -103,7 +106,7 @@ for k in range(K):
     info.loc[indx, str(k)] = info.loc[indx, args.key]
     total_k[k] = info[str(k)].sum()
 
-print(f"Read data ({df.shape[0]}, {len(df.j.unique())} x {info.shape[0]})")
+print(f"{len(df.j.unique())} x {info.shape[0]})")
 print(total_k)
 
 ### Bulk
@@ -127,6 +130,8 @@ chidf=chidf.loc[(chidf.pval<1e-3)&(chidf.FoldChange>1), :].sort_values(by=['fact
 outf = args.outpref + ".bulk_chisq.tsv"
 chidf.to_csv(outf,sep='\t',float_format="%.2e",index=False)
 
+if args.bulk_only:
+    sys.exit()
 
 ### pseudo-sc
 ### Test based on real data
