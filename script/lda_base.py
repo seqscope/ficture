@@ -18,7 +18,7 @@ parser.add_argument('--output_path', type=str, help='')
 parser.add_argument('--identifier', type=str, help='')
 parser.add_argument('--hvg', type=str, default='', help='')
 parser.add_argument('--nFeature', type=int, default=-1, help='If boath nFeature and hvg are provided and nFeature is larger than the number of genes in hvg, top-expressed genes will be added.')
-parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
+parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate, only used if --x_range and --y_range are used')
 parser.add_argument('--key', default = 'gn', type=str, help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced')
 parser.add_argument('--log', default = '', type=str, help='files to write log to')
 
@@ -75,21 +75,23 @@ for v in args.region:
     tile_list += [w[0]+":"+x for x in u]
 print(tile_list)
 
+xmin = np.array([-1])
+xmax = np.array([np.inf])
+ymin = np.array([-1])
+ymax = np.array([np.inf])
 if len(args.x_range_um) > 0:
     xmin = np.array([x for i,x in enumerate(args.x_range_um) if i % 2 == 0])
     xmax = np.array([x for i,x in enumerate(args.x_range_um) if i % 2 == 1])
-    ymin = np.array([x for i,x in enumerate(args.y_range_um) if i % 2 == 0])
-    ymax = np.array([x for i,x in enumerate(args.y_range_um) if i % 2 == 1])
 elif len(args.x_range) > 0:
     xmin = np.array([x * mu_scale for i,x in enumerate(args.x_range) if i % 2 == 0])
     xmax = np.array([x * mu_scale for i,x in enumerate(args.x_range) if i % 2 == 1])
+if len(args.y_range_um) > 0:
+    ymin = np.array([x for i,x in enumerate(args.y_range_um) if i % 2 == 0])
+    ymax = np.array([x for i,x in enumerate(args.y_range_um) if i % 2 == 1])
+elif len(args.y_range) > 0:
     ymin = np.array([x * mu_scale for i,x in enumerate(args.y_range) if i % 2 == 0])
     ymax = np.array([x * mu_scale for i,x in enumerate(args.y_range) if i % 2 == 1])
-else:
-    xmin = np.array([-1])
-    xmax = np.array([np.inf])
-    ymin = np.array([-1])
-    ymax = np.array([np.inf])
+
 
 n_region = np.min([len(xmin), len(xmax), len(ymin), len(ymax)])
 if n_region < 1:
@@ -295,7 +297,7 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=100000, 
     nbatch += 1
     df = copy.copy(left)
 
-# Total mulecule count per unit
+# Total molecule count per unit
 brc = df.groupby(by = ['j']).agg({args.key: sum}).reset_index()
 brc = brc[brc[args.key] > args.min_ct_per_unit]
 brc.index = range(brc.shape[0])

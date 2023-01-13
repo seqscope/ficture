@@ -16,18 +16,22 @@ parser.add_argument('--input_path', type=str, help='')
 parser.add_argument('--output_path', type=str, help='')
 parser.add_argument('--ref_pts', type=str, help='')
 parser.add_argument('--identifier', type=str, help='Identifier for the processed data e.g. 1stID-2ndZ-Species-L')
-parser.add_argument("--meta_data", type=str, help="Per tile meta data menifest.tsv")
-parser.add_argument("--layout", type=str, help="Layout file of tiles to draw [lane] [tile] [row] [col] format in each line")
+parser.add_argument('--count_key', nargs='*', type=str, help='One or multiple column names for read counts', default=["Count"])
+parser.add_argument('--filter_based_on', type=str, default="Count", help='')
 
-parser.add_argument('--lanes', nargs='*', type=str, help='One or multiple lanes to work on', default=[])
-parser.add_argument('--region', nargs='*', type=str, help="In the form of \"lane1:st1-ed1 lane2:st2-ed2 ... \"", default=[])
+parser.add_argument('--pseudo_lane', type=str, default="1", help="")
+parser.add_argument('--pseudo_tile', type=str, default="1", help="")
+
+# parser.add_argument("--meta_data", type=str, help="Per tile meta data menifest.tsv")
+# parser.add_argument("--layout", type=str, help="Layout file of tiles to draw [lane] [tile] [row] [col] format in each line")
+# parser.add_argument('--lanes', nargs='*', type=str, help='One or multiple lanes to work on', default=[])
+# parser.add_argument('--region', nargs='*', type=str, help="In the form of \"lane1:st1-ed1 lane2:st2-ed2 ... \"", default=[])
 
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
 parser.add_argument('--species', type=str, default='', help='')
 parser.add_argument('--feature_prefix', type=str, default='', help='e.g. mouse:mm10___,human:GRCh38_ (only for multi-species scenario)')
 parser.add_argument('--filter_by_box_nrow', type=int, default=1, help='')
 parser.add_argument('--filter_by_box_ncol', type=int, default=1, help='')
-parser.add_argument('--filter_based_on', type=str, default='gn', help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced')
 parser.add_argument('--precision_um', type=int, default=1, help='')
 parser.add_argument('--log', default = '', type=str, help='files to write log to')
 
@@ -42,11 +46,9 @@ parser.add_argument('--hex_diam', type=int, default=12, help='')
 parser.add_argument('--hex_n_move', type=int, default=6, help='')
 parser.add_argument('--redo_filter', action='store_true')
 parser.add_argument('--merge_raw_data', action='store_true')
+parser.add_argument('--debug', action='store_true')
 
 args = parser.parse_args()
-
-if len(args.lanes) == 0 and len(args.region) == 0:
-    sys.exit("At least one of --lanes and --region is required")
 
 if args.log != '':
     try:
@@ -59,49 +61,16 @@ else:
 path = args.input_path
 outpath = args.output_path
 
-### Parse input region
-lane_list = args.lanes
-kept_list = defaultdict(list)
-for v in args.region:
-    w = v.split(':')
-    if len(w) == 1:
-        lane_list.append(w[0])
-        continue
-    if len(w) != 2:
-        sys.exit("Invalid regions in --region")
-    u = [x for x in w[1].split('-') if x != '']
-    if len(u) == 0 or len(u) > 2:
-        sys.exit("Invalid regions in --region")
-    if len(u) == 2:
-        u = [str(x) for x in range(int(u[0]), int(u[1])+1)]
-    kept_list[w[0]] += u
-
-lane_list = list(set(lane_list))
-
-### Extract list of tiles to process
-if len(lane_list) > 0:
-    for lane in args.lanes:
-        if not os.path.exists(path+"/"+lane):
-            continue
-        cmd="find "+path+"/"+lane+" -type d "
-        tab = sp.check_output(cmd, stderr=sp.STDOUT, shell=True).decode('utf-8')
-        tab = tab.split('\n')
-        kept_list[lane] += [x.split('/')[-1] for x in tab]
-
-for k,v in kept_list.items():
-    kept_list[k] = sorted(list(set(kept_list[k])))
-
-
-print(kept_list)
-
 mu_scale = 1./args.mu_scale
 diam = args.hex_diam
 n_move = args.hex_n_move
 radius = diam / np.sqrt(3)
 hex_area = diam*radius*3/2
-key = args.filter_based_on
-ct_header = ['gn', 'gt', 'spl', 'unspl', 'ambig']
 
+ct_header = args.count_key
+key = args.filter_based_on
+lane= args.pseudo_lane
+tile= args.pseudo_tile
 
 ### Output
 if not os.path.exists(outpath):
@@ -113,18 +82,6 @@ logging.info(f"Output file:\n{flt_f}")
 
 if os.path.exists(flt_f):
     warnings.warn("Output file already exists and will be overwritten")
-
-### Layout
-layout, lanes, tiles = layout_map(args.meta_data, args.layout)
-xr = layout.xbin.max()
-yr = layout.ybin.max()
-logging.info(f"Read meta data. {xr}, {yr}")
-nrows = int(layout.row.max() + 1)
-ncols = int(layout.col.max() + 1)
-# Code the output as the tile numbers of the lower-left and upper-right corners
-tile_ll = tiles[-1][0]
-tile_ur = tiles[0][-1]
-logging.info(f"Read layout info.")
 
 
 ### If work on subset of genes
@@ -154,50 +111,46 @@ if args.gene_type_info != '' and os.path.exists(args.gene_type_info):
     gene_kept = list(gencode.Name)
     print(f"Read {len(gene_kept)} genes from gene_type_info")
 
+
 if os.path.exists(args.ref_pts) and not args.redo_filter:
     pt = pd.read_csv(args.ref_pts,sep='\t',header=0)
     logging.info(f"Read existing anchor positions:\n{args.ref_pts}, {pt.shape}. (Use --redo_filter to avoid using existing files)")
 else:
     ### Read barcode
+    f=os.path.join(path, "barcodes.tsv.gz")
+    if not os.path.exists(f):
+        sys.exit("Input directory does not contain barcodes.tsv.gz")
+
     df=pd.DataFrame()
-    bsize_row = np.max([1, nrows // args.filter_by_box_nrow])
-    bsize_col = np.max([1, ncols // args.filter_by_box_ncol])
-    for itr_r in range(nrows):
-        for itr_c in range(ncols):
-            lane, tile = lanes[itr_r][itr_c], tiles[itr_r][itr_c]
-            xmin = layout.loc[(lane, tile), 'xmin']
-            ymin = layout.loc[(lane, tile), 'ymin']
-            if lane not in kept_list:
-                continue
-            if tile not in kept_list[lane]:
-                continue
-            f="/".join([path,lane,tile])+"/barcodes.tsv.gz"
-            if not os.path.exists(f):
-                continue
-            sub = pd.read_csv(gzip.open(f, 'rb'),\
-                sep='\t|,', names=["barcode","j","v2",\
-                    "lane","tile","X","Y"]+ct_header,\
-                usecols=["Y","X",key], engine='python')
-            sub = sub[sub[key] > 0]
-            sub['X'] = (nrows - itr_r - 1) * xr + sub.X.values - xmin
-            sub['Y'] = itr_c * yr + sub.Y.values - ymin
-            sub['X'] = sub.X.values * mu_scale
-            sub['Y'] = sub.Y.values * mu_scale
-            if args.precision_um > 0:
-                sub['X'] = np.around(sub.X.values/args.precision_um,0).astype(int)*args.precision_um
-                sub['Y'] = np.around(sub.Y.values/args.precision_um,0).astype(int)*args.precision_um
-            sub['win'] = lane + '_' + str(itr_r//bsize_row) + '_' + str(itr_c//bsize_col)
-            df = pd.concat((df, sub))
-            logging.info(f"{lane}-{tile}, {sub.shape[0]}, {df.shape[0]}")
+    for chunk in pd.read_csv(gzip.open(f, 'rb'), sep='\t|,',\
+            names=["barcode","j","v2","lane","tile","X","Y"]+ct_header,\
+            usecols=["Y","X",key], engine='python', chunksize=500000):
+        chunk = chunk[chunk[key] > 0]
+        chunk['X'] = chunk.X.values * mu_scale
+        chunk['Y'] = chunk.Y.values * mu_scale
+        npixel = chunk.shape[0]
+        if args.precision_um > 0:
+            chunk['X'] = np.around(chunk.X.values/args.precision_um,0).astype(int)*args.precision_um
+            chunk['Y'] = np.around(chunk.Y.values/args.precision_um,0).astype(int)*args.precision_um
+        chunk = chunk.groupby(by = ["X", "Y"]).agg({key:sum}).reset_index()
+        df = pd.concat([df, chunk])
+        logging.info(f"Read {npixel} pixels, collapsed into {chunk.shape[0]} pts ({df.shape[0]} so far)")
+
+    xmax,xmin = df.X.max(), df.X.min()
+    ymax,ymin = df.Y.max(), df.Y.min()
+    bsize_row = np.max([1, (ymax-ymin)//args.filter_by_box_nrow])
+    bsize_col = np.max([1, (xmax-xmin)//args.filter_by_box_ncol])
+    df['win'] = ((df.Y-ymin)/bsize_row).astype(int).astype(str) + '_' +\
+                ((df.X-xmin)/bsize_col).astype(int).astype(str)
+
     logging.info(f"Read barcodes, collapsed into {df.shape[0]} pts")
     df['hex_x'] = 0
     df['hex_y'] = 0
+
     ### Detect grid points falling inside dense tissue region
     anchor = np.zeros((0,2))
     pt = pd.DataFrame()
-    lane_list = []
     for w in df.win.unique():
-        lane = w.split('_')[0]
         indx = df.win.eq(w)
         m0v=[]
         m1v=[]
@@ -266,65 +219,58 @@ feature_tot_ct = pd.DataFrame()
 output_header = ['#lane','tile','Y','X','gene','gene_id']+ct_header
 header=pd.DataFrame([], columns = output_header)
 header.to_csv(flt_f, sep='\t', index=False)
-if args.merge_raw_data:
-    header.to_csv(raw_f, sep='\t', index=False)
+
+
+
+f=os.path.join(path, "matrix.mtx.gz")
+mtx = pd.read_csv(gzip.open(f, 'rb'), sep=' ', \
+    skiprows=3, names=["i","j"]+ct_header)
 
 n_pixel = 0
-for itr_r in range(len(lanes)):
-    for itr_c in range(len(lanes[0])):
-        lane, tile = lanes[itr_r][itr_c], tiles[itr_r][itr_c]
-        xmin = layout.loc[(lane, tile), 'xmin']
-        ymin = layout.loc[(lane, tile), 'ymin']
-        if tile not in kept_list[lane]:
-            continue
-        try:
-            datapath = "/".join([path,lane,tile])
-            f=datapath+"/barcodes.tsv.gz"
-            brc = pd.read_csv(gzip.open(f, 'rb'),\
-                sep='\t|,', names=["barcode","j","v2",\
-                "lane","tile","X","Y"]+ct_header,\
-                usecols=["j","X","Y"], engine='python')
-            f=datapath+"/matrix.mtx.gz"
-            mtx = pd.read_csv(gzip.open(f, 'rb'),\
-                sep=' ', skiprows=3, names=["i","j"]+ct_header)
-            f=datapath+"/features.tsv.gz"
-            feature = pd.read_csv(gzip.open(f, 'rb'),\
-                sep='\t', names=["gene_id","gene","i","ct"],\
-                usecols=["i","gene","gene_id"],  engine='python')
-        except:
-            warnings.warm(f"Unable to read data for tile {tile}")
-            continue
-        sub = mtx.merge(right = brc, on = 'j', how = 'inner')
-        sub = sub.merge(right = feature, on = 'i', how = 'inner')
-        sub.drop(columns = ['i', 'j'], inplace=True)
-        sub['X'] = (nrows - itr_r - 1) * xr + sub.X.values - xmin
-        sub['Y'] = itr_c * yr + sub.Y.values - ymin
-        sub['j'] = sub.X.astype(str) + '_' + sub.Y.astype(str)
-        if len(gene_kept) > 0:
-            sub = sub.loc[sub.gene.isin(gene_kept), :]
-        if sub.shape[0] < 10:
-            continue
-        brc = sub[['j','X','Y']].drop_duplicates(subset=['j'])
-        brc['x'] = brc.X.values * mu_scale
-        brc['y'] = brc.Y.values * mu_scale
-        brc = brc[['j','x','y']]
-        sub['#lane'] = lane
-        sub['tile'] = tile
-        if args.merge_raw_data:
-            sub.sort_values(by = ['Y','X','gene'], inplace=True)
-            sub.loc[:, output_header].to_csv(raw_f, mode='a', sep='\t', index=False, header=False)
-        brc["kept"] = False
-        dv, iv = ref[lane].query(X=brc[['x','y']], k=1, return_distance=True, sort_results=False)
-        dv = dv.squeeze()
-        brc.loc[dv < radius, 'kept'] = True
-        sub = sub.loc[sub.j.isin( brc.loc[brc.kept.eq(True), 'j'] ), output_header]
-        feature_sub = sub.groupby(by = ['gene', 'gene_id']).agg({x:sum for x in ct_header}).reset_index()
-        feature_tot_ct = pd.concat((feature_tot_ct, feature_sub))
-        feature_tot_ct = feature_tot_ct.groupby(by = ['gene', 'gene_id']).agg({x:sum for x in ct_header}).reset_index()
-        sub.sort_values(by = ['Y','X','gene'], inplace=True)
-        n_pixel += sub.shape[0]
-        sub.to_csv(flt_f, mode='a', sep='\t', index=False, header=False)
-        logging.info(f"Write data for {lane}_{tile}, {sub.shape}. (total {n_pixel} so far)")
+f=os.path.join(path, "barcodes.tsv.gz")
+brc = pd.DataFrame()
+for sub in pd.read_csv(gzip.open(f, 'rb'), sep='\t|,', \
+    names=["barcode","j","v2","lane","tile","X","Y"]+ct_header,\
+    usecols=["j","X","Y"], engine='python', chunksize=500000):
+    sub['x'] = sub.X.values * mu_scale
+    sub['y'] = sub.Y.values * mu_scale
+    dv, iv = ref[lane].query(X=sub[['x','y']], k=1, return_distance=True, sort_results=False)
+    dv = dv.squeeze()
+    npixel = (dv < radius).sum()
+    brc = pd.concat([brc, sub.loc[dv < radius, ["j","X","Y"]]])
+    logging.info(f"Read {sub.shape[0]} pixels, kept {npixel}")
+    if args.debug:
+        break
+
+logging.info(f"Kept {brc.shape[0]} pixels")
+
+f=os.path.join(path, "features.tsv.gz")
+feature = pd.read_csv(gzip.open(f, 'rb'), sep='\t', \
+    names=["gene_id","gene","i","ct"], usecols=["i","gene","gene_id"],  engine='python')
+
+sub = mtx.merge(right = brc, on = 'j', how = 'inner')
+sub = sub.merge(right = feature, on = 'i', how = 'inner')
+sub.drop(columns = ['i', 'j'], inplace=True)
+sub['j'] = sub.X.astype(str) + '_' + sub.Y.astype(str)
+if len(gene_kept) > 0:
+    sub = sub.loc[sub.gene.isin(gene_kept), :]
+
+sub['#lane'] = lane
+sub['tile']  = tile
+sub = sub.loc[:, output_header]
+
+if args.merge_raw_data and not args.debug:
+    sub.sort_values(by = ['Y','X','gene'], inplace=True)
+    sub.to_csv(raw_f, sep='\t', index=False, header=True)
+
+feature_sub = sub.groupby(by = ['gene', 'gene_id']).agg({x:sum for x in ct_header}).reset_index()
+feature_tot_ct = pd.concat((feature_tot_ct, feature_sub))
+feature_tot_ct = feature_tot_ct.groupby(by = ['gene', 'gene_id']).agg({x:sum for x in ct_header}).reset_index()
+sub.sort_values(by = ['Y','X','gene'], inplace=True)
+n_pixel += sub.shape[0]
+sub.to_csv(flt_f, mode='a', sep='\t', index=False, header=False)
+logging.info(f"Write {n_pixel} pixels")
+
 
 feature_tot_ct = feature_tot_ct.groupby(by = ['gene', 'gene_id']).agg({x:sum for x in ct_header}).reset_index()
 f = outpath+"/feature."+args.identifier+".tsv.gz"

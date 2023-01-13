@@ -1,10 +1,9 @@
-import sys, os, gzip, copy, gc, argparse, logging
+import sys, os, gzip, copy, gc, time, argparse, logging
 import numpy as np
 import pandas as pd
 from scipy.sparse import *
 import subprocess as sp
 import random as rng
-from datetime import datetime
 
 # Add parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -18,7 +17,9 @@ parser.add_argument('--regions', type=str, default="", help='A file containing r
 parser.add_argument('--region', nargs='*', type=str, default=[], help='lane:Y_start-Y_end (Y axis in barcode coordinate unit), separate by space if multiple regions')
 parser.add_argument('--region_um', nargs='*', type=str, default=[], help='lane:Y_start-Y_end (Y axis in um), separate by space if multiple regions')
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
-parser.add_argument('--key', default = 'gn', type=str, help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced')
+
+parser.add_argument('--count_header', nargs='*', type=str, default=["gn","gt", "spl","unspl","ambig"], help="Which columns correspond to UMI counts in the input")
+parser.add_argument('--key', default = 'gn', type=str, help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced. Otherwise depending on customized ct_header')
 parser.add_argument('--precision', type=int, default=1, help='Number of digits to store spatial location (in um), 0 for integer.')
 
 parser.add_argument('--n_move', type=int, default=3, help='')
@@ -27,11 +28,27 @@ parser.add_argument('--hex_radius', type=int, default=-1, help='')
 parser.add_argument('--min_ct_per_unit', type=int, default=20, help='')
 args = parser.parse_args()
 
-r_seed = datetime.now().timestamp()
+r_seed = time.time()
 rng.seed(r_seed)
 logging.basicConfig(level= getattr(logging, "INFO", None))
 logging.info(f"Random seed {r_seed}")
 
+# Input file and numerical columns to use as counts
+ct_header = args.count_header
+key = args.key
+if key not in ct_header:
+    key = ct_header[0]
+    logging.warning(f"The designated major key is not one of the specified count columns, --key is ignored the first existing key is chosen")
+if not os.path.exists(args.input):
+    sys.exit(f"ERROR: cannot find input file \n {args.input}")
+with gzip.open(args.input, 'rt') as rf:
+    input_header=rf.readline().strip().split('\t')
+    ct_header = [v for v in input_header if v in ct_header]
+    if len(ct_header) == 0:
+        sys.exit("Input header does not contain the specified --count_header")
+print(input_header)
+
+# basic parameters
 mu_scale = 1./args.mu_scale
 radius=args.hex_radius
 diam=args.hex_width
@@ -39,26 +56,12 @@ n_move = args.n_move
 if n_move > diam // 2:
     n_move = diam // 4
 ovlp_buffer = diam * 2
-
 if radius < 0:
     radius = diam / np.sqrt(3)
 else:
     diam = int(radius*np.sqrt(3))
-if not os.path.exists(args.input):
-    sys.exit(f"ERROR: cannot find input file \n {args.input}")
-
-with gzip.open(args.input, 'rt') as rf:
-    input_header=rf.readline().strip().split('\t')
-
-print(input_header)
-ct_header = ["gn","gt", "spl","unspl","ambig"]
-output_header = copy.copy(input_header)
-output_header.insert(1, "random_index")
-with open(args.output,'w') as wf:
-    _=wf.write('\t'.join(output_header)+'\n')
 
 adt = {x:np.sum for x in ct_header}
-# bdt = {'X':np.mean,'Y':np.mean}
 bdt={}
 bdt['tile'] = lambda x : int(np.median(x))
 n_unit = 0
@@ -66,7 +69,7 @@ dty = {x:int for x in ['tile','X','Y']+ct_header}
 dty.update({x:str for x in ['#lane', 'gene', 'gene_id']})
 
 cmd = []
-if args.regions != "" and os.path.exists(args.regions):
+if os.path.exists(args.regions):
     cmd =  ["tabix", args.input, "-R", args.regions]
 elif len(args.region) > 0:
     cmd = ["tabix", args.input] + args.region
@@ -88,6 +91,11 @@ else:
     process = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.STDOUT)
 
 logging.info(cmd)
+
+output_header = copy.copy(input_header)
+output_header.insert(1, "random_index")
+with open(args.output,'w') as wf:
+    _=wf.write('\t'.join(output_header)+'\n')
 
 df_full = pd.DataFrame()
 for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
@@ -156,7 +164,7 @@ for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
                 sub = sub.astype({x:int for x in ct_header})
                 sub.loc[:, output_header].to_csv(args.output, mode='a', sep='\t', index=False, header=False)
                 n_unit += len(ct)
-                logging.info(f"Lane {l}, sliding offset {offs_x}, {offs_y}. Add {len(ct)} units, {n_unit} units so far.")
+                logging.info(f"Lane {l}, sliding offset {offs_x}, {offs_y}. Add {len(ct)} units, median count {mid_ct}, {n_unit} units so far.")
                 offs_y += 1
             offs_y = 0
             offs_x += 1

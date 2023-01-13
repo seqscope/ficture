@@ -133,12 +133,12 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, 
                 brc['Y'] = [f"{x:.{args.precision}f}" for x in brc.Y.values]
                 brc.sort_values(by = 'cRow', inplace=True)
                 with open(brc_f, 'a') as wf:
-                    _ = wf.write('\n'.join((brc.cRow+n_unit+1).astype(str).values + '_' + l + '_' + brc.tile.astype(str) + '_' + brc.X.values + '_' + brc.Y.values)+'\n')
+                    _ = wf.write('\n'.join((brc.cRow+n_unit+1).astype(str).values + '_' + l + '_' + brc.tile.astype(str) + '_' + brc.X.values + '_' + brc.Y.values + '_' + str(offs_x) + '.' + str(offs_y) )+'\n')
                 n_hex = len(hex_dict)
-                n_minib = n_hex // b_size
+                n_minib = n_hex // b_size + 1
                 print(f"{n_minib}, {n_hex} ({sub.cRow.max()}, {sub.shape[0]}), median count per unit {mid_ct}")
                 grd_minib = list(range(0, n_hex, b_size))
-                grd_minib[-1] = n_hex
+                grd_minib.append(n_hex)
                 st_minib = 0
                 n_minib = len(grd_minib) - 1
                 while st_minib < n_minib:
@@ -146,9 +146,7 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, 
                     npixel_minib = sum(indx_minib)
                     offset = sub.loc[indx_minib, 'cRow'].min()
                     nhex_minib = sub.loc[indx_minib, 'cRow'].max() - offset + 1
-
                     mtx = coo_matrix((np.ones(npixel_minib, dtype=bool), (sub.loc[indx_minib, 'cRow'].values-offset, sub.loc[indx_minib, 'cCol'].values)), shape=(nhex_minib, N) ).tocsr() @ dge_mtx
-
                     mtx.eliminate_zeros()
                     r, c = mtx.nonzero()
                     r = np.array(r,dtype=int) + offset + n_unit + 1
@@ -158,6 +156,7 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, 
                     mtx['i'] = mtx.i.astype(int)
                     mtx['j'] = mtx.j.astype(int)
                     mtx.to_csv(mtx_f, mode='a', sep=' ', index=False, header=False)
+                    print(mtx.shape[0])
                     st_minib += 1
                     print(f"{st_minib}/{n_minib}. Wrote {nhex_minib} units.")
                 n_unit += brc.shape[0]

@@ -17,25 +17,22 @@ class OnlineLDA:
     """
     Implements online VB for LDA as described in (Hoffman et al. 2010).
     """
-    def __init__(self, vocab, K, D, alpha = None, eta = None, tau0=9, kappa=0.7, iter_inner = 50, tol = 1e-4, verbose = 0):
+    def __init__(self, vocab, K, N, alpha = None, eta = None, tau0=9, kappa=.7, iter_inner = 50, tol = 1e-4, verbose = 0):
         """
         Arguments:
         K: Number of topics
         vocab: A list of features
-        D:     Total number of documents in the population. For a fixed corpus,
-               this is the size of the corpus. In the truly online setting,
-               this can be an estimate of the maximum number of documents that
-               could ever be seen.
+        D:     Total number of pixels in the entire dataset.
         alpha: Hyperparameter for the prior on weight vectors theta
         eta:   Hyperparameter for prior on topics beta
-        tau0:  A (positive) learning parameter that downweights earl iterations
+        tau0:  A (non-negative) learning parameter that downweights earl iterations
         kappa: Learning rate (exponential decay), should be between
                (0.5, 1.0] to guarantee asymptotic convergence.
         """
         self._vocab = vocab
         self._K = K
         self._M = len(self._vocab)
-        self._n = D
+        self._N = N
         self._tau0 = tau0 + 1
         self._kappa = kappa
         self._updatect = 0
@@ -99,6 +96,8 @@ class OnlineLDA:
             batch.psi.data = psi_hat
             batch.psi += batch.ElogO
             batch.psi.data = expit(batch.psi.data)
+            batch.psi = sklearn.preprocessing.normalize(batch.psi, norm='l1', axis=1)
+
             batch.gamma = batch.alpha + batch.psi.T @ batch.phi
             Elog_theta = utilt.dirichlet_expectation(batch.gamma)
 
@@ -108,7 +107,7 @@ class OnlineLDA:
             if self._verbose > 2 or (self._verbose > 1 and it % 10 == 0):
                 print(f"E-step, update phi, psi, gamma: {it}-th iteration, mean change {meanchange:.4f}")
 
-        sstats = np.multiply(batch.phi, batch.psi.sum(axis = 1).reshape((-1, 1)) ).T @ batch.mtx
+        sstats = batch.phi.T @ batch.mtx # K x M
         batch.ll = batch.psi.T @ batch.mtx @ self._Elog_beta.T
         ll_norm = logsumexp(batch.ll, axis = 1)
         ll_tot = 0
@@ -123,8 +122,7 @@ class OnlineLDA:
         """
         # rhot will be between 0 and 1, and says how much to weight
         # the information we got from this mini-batch.
-        rhot = pow(self._tau0 + self._updatect, -self._kappa)
-        self._rhot = rhot
+
         # E step to update gamma, phi | lambda for mini-batch
         sstats = self.do_e_step(batch)
         # Estimate likelihood for current values of lambda.
@@ -132,8 +130,9 @@ class OnlineLDA:
         if self._verbose > 0:
             print(f"{self._updatect}-th global update. Scores: " + ", ".join(['%.2e'%x for x in scores]))
 
+        rhot = pow(self._tau0 + self._updatect, -self._kappa)
         self._lambda = (1-rhot) * self._lambda + \
-                       rhot * (self._eta + self._n * sstats / batch.n)
+                       rhot * ((self._N / batch.N) * (self._eta + sstats) )
         self._Elog_beta = utilt.dirichlet_expectation(self._lambda)
         self._updatect += 1
         return scores
@@ -158,7 +157,7 @@ class OnlineLDA:
         score_beta += np.sum((self._eta-self._lambda)*self._Elog_beta)
         score_beta += np.sum(gammaln(self._lambda)) - np.sum(gammaln(np.sum(self._lambda, 1)))
 
-        return((score_pixel, score_patch, score_gamma, score_beta, self._n * (score_patch+score_gamma) + score_beta))
+        return((score_pixel, score_patch, score_gamma, score_beta, self._N * (score_patch+score_gamma) + score_beta))
 
     def coherence_pmi(self, pw, pseudo_ct = 200, top_gene_n = 100):
         """

@@ -41,7 +41,8 @@ for x in df.columns:
 K = len(factor_header)
 # Temporary
 df.rename(columns = {'Hex_center_x':'x', 'Hex_center_y':'y'}, inplace=True)
-#
+df.rename(columns = {'X':'x', 'Y':'y'}, inplace=True)
+
 print(f"Read X coordinates {df.x.min(), df.x.max()}, Y coordinates {df.y.min(), df.y.max()}, {K} factors.")
 print(factor_header)
 

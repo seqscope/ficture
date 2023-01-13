@@ -8,6 +8,8 @@ def layout_map(meta_data, layout, lane = None):
     mani=pd.read_csv(meta_data, sep='\t')
     mani["lane"] = mani["id"].map(lambda x : x.split('_')[0])
     mani["tile"] = mani["id"].map(lambda x : x.split('_')[1])
+    mani["ybin"] = mani.ymax - mani.ymin
+    mani["xbin"] = mani.xmax - mani.xmin
 
     ### Layout
     layout = pd.read_csv(layout, sep='\t', dtype=str)
@@ -33,10 +35,11 @@ def layout_map(meta_data, layout, lane = None):
     for i in range(nrows):
         lanes.append( [None] * ncols )
         tiles.append( [None] * ncols )
-    for index, row in df.iterrows():
+    for it, row in df.iterrows():
         i = row['row']
         j = row['col']
-        lanes[i][j] = str(row['lane'])
-        tiles[i][j] = str(row['tile'])
+        lanes[i][j] = row['lane']
+        tiles[i][j] = row['tile']
+    df.set_index(["lane", "tile"], inplace=True)
 
     return df, lanes, tiles

@@ -187,7 +187,7 @@ for itr_r in range(len(lanes)):
                 brc['Y'] = [f"{x:.{args.precision}f}" for x in brc.Y.values]
                 brc.sort_values(by = 'cRow', inplace=True)
                 with open(brc_f, 'a') as wf:
-                    _ = wf.write('\n'.join((brc.cRow+n_unit+1).astype(str).values + '_' + lane + '_' + tile + '_' + brc.X.values + '_' + brc.Y.values)+'\n')
+                    _ = wf.write('\n'.join((brc.cRow+n_unit+1).astype(str).values + '_' + lane + '_' + tile + '_' + brc.X.values + '_' + brc.Y.values + '_' + str(offs_x) + '.' + str(offs_y))+'\n')
                 st_minib = 0
                 offset= 0
                 while st_minib < n_hex:
