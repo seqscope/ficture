@@ -230,7 +230,7 @@ else:
     pd.concat([pd.DataFrame({'gene': lda.feature_names_in_}),\
                 pd.DataFrame(sklearn.preprocessing.normalize(lda.components_, axis = 1, norm='l1').T,\
                 columns = ["Factor_"+str(k) for k in range(K)], dtype='float64')],\
-                axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.4e')
+                axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.4e', compression={"method":"gzip"})
 
 
 
@@ -291,13 +291,13 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=100000, 
     brc = brc.astype(dtp)
     print(brc.shape)
     if nbatch == 0:
-        brc.to_csv(res_f, sep='\t', mode='w', float_format="%.5f", index=False, header=True)
+        brc.to_csv(res_f, sep='\t', mode='w', float_format="%.5f", index=False, header=True, compression={"method":"gzip"})
     else:
-        brc.to_csv(res_f, sep='\t', mode='a', float_format="%.5f", index=False, header=False)
+        brc.to_csv(res_f, sep='\t', mode='a', float_format="%.5f", index=False, header=False, compression={"method":"gzip"})
     nbatch += 1
     df = copy.copy(left)
 
-# Total molecule count per unit
+# Leftover
 brc = df.groupby(by = ['j']).agg({args.key: sum}).reset_index()
 brc = brc[brc[args.key] > args.min_ct_per_unit]
 brc.index = range(brc.shape[0])
@@ -325,8 +325,8 @@ if brc.shape[0] > 0:
     brc = brc.astype(dtp)
     print(brc.shape)
     if nbatch == 0:
-        brc.to_csv(res_f, sep='\t', mode='w', float_format="%.5f", index=False, header=True)
+        brc.to_csv(res_f, sep='\t', mode='w', float_format="%.5f", index=False, header=True, compression={"method":"gzip"})
     else:
-        brc.to_csv(res_f, sep='\t', mode='a', float_format="%.5f", index=False, header=False)
+        brc.to_csv(res_f, sep='\t', mode='a', float_format="%.5f", index=False, header=False, compression={"method":"gzip"})
 
 logging.info(f"Finished ({nbatch})")

@@ -73,35 +73,37 @@ class OnlineLDA:
         Update local parameters, compute sufficient stats for M step
         """
         Xb = batch.mtx @ self._Elog_beta.T         # Dense, N x K
-        c_indx, r_indx = batch.psi.nonzero()
         if issparse(Xb):
             Xb = Xb.toarray()
+        c_indx, r_indx = batch.psi.nonzero()
         # Initialize the variational distribution q(theta|gamma)
         if batch.alpha is None:
             batch.alpha = np.broadcast_to(self._alpha, (batch.n, self._K))
+        if batch.gamma is None:
+            batch.gamma = copy.copy(batch.alpha)
+        gamma_old = copy.copy(batch.gamma)
         Elog_theta = utilt.dirichlet_expectation(batch.alpha) # n x K
-        gamma_old = copy.copy(batch.alpha) # n x K
         meanchange = self._tol + 1
         it = 0
 
         while it < self._max_iter_inner and meanchange > self._tol:
 
-            batch.phi = np.exp( batch.psi @ Elog_theta + np.multiply(Xb, batch.psi.sum(axis=1).reshape((-1, 1))) )
+            batch.phi = np.exp( batch.psi @ Elog_theta + Xb )
             batch.phi = sklearn.preprocessing.normalize(batch.phi, norm='l1', axis=1)
 
-            psi_hat = batch.phi[c_indx, 0] * Elog_theta[r_indx, 0]
+            psi_hat = batch.phi[c_indx, 0] * Elog_theta[r_indx, 0] # \sum_k phi_ik Elog[theta_jk]
             for k in range(1, self._K):
                 psi_hat += batch.phi[c_indx, k] * Elog_theta[r_indx, k]
-            psi_hat += np.multiply(Xb, batch.phi).sum(axis = 1).reshape(-1)[c_indx]
+            psi_hat += np.multiply(Xb, batch.phi).sum(axis = 1).reshape(-1)[c_indx] # \sum_k phi_ik log Pik
             batch.psi.data = psi_hat
             batch.psi += batch.ElogO
-            batch.psi.data = expit(batch.psi.data)
+            batch.psi.data = np.exp(batch.psi.data)
             batch.psi = sklearn.preprocessing.normalize(batch.psi, norm='l1', axis=1)
 
             batch.gamma = batch.alpha + batch.psi.T @ batch.phi
             Elog_theta = utilt.dirichlet_expectation(batch.gamma)
 
-            meanchange = np.abs(batch.gamma - gamma_old).mean()
+            meanchange = np.abs(batch.gamma - gamma_old).max(axis=1).mean()
             gamma_old = copy.copy(batch.gamma)
             it += 1
             if self._verbose > 2 or (self._verbose > 1 and it % 10 == 0):

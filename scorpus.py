@@ -1,5 +1,8 @@
 from scipy import sparse
-from scipy.special import logit
+# from scipy.special import logit
+import sklearn.preprocessing
+import numpy as np
+import copy
 
 class corpus:
 
@@ -11,37 +14,38 @@ class corpus:
         self.psi = None   # N x n: P(j|i)
         self.phi = None   # N x K: P(j|i)
         self.gamma = None # n x K: P(k|n)
-        self.alpha = None # Dir prior for gamma
-        self.ElogO = None # Prior weight for psi E[log w_{ij}], w_ij \in (0,1]
+        self.alpha = None # Prior for gamma
+        self.ElogO = None # d_psi E_q[log P(Cij)]
         self.ll = 0       # log likelihood
 
-    def init_from_matrix(self, mtx, doc_pts, logw, psi = None, phi = None, m_gamma = None, features = None, barcodes = None):
+    def init_from_matrix(self, mtx, doc_pts, w, psi = None, phi = None, m_gamma = None, features = None, barcodes = None):
         self.mtx = mtx.tocsr()
         self.N, self.M = mtx.shape
         self.doc_pts = doc_pts
         self.n = self.doc_pts.shape[0]
 
-        assert sparse.issparse(logw), "Invalid logw"
-        assert logw.shape == (self.N, self.n), "Inconsistent dimensions of logw"
-        self.ElogO = logw
+        assert sparse.issparse(w), "Invalid w - must be sparse"
+        assert np.min(w.data) >= 0, "Invalid w - value must be nonnegative"
+        assert w.shape == (self.N, self.n), "Inconsistent dimensions of w"
+        self.ElogO = copy.copy(w)
         self.ElogO.eliminate_zeros()
         if psi is not None:
-            assert sparse.issparse(psi),  "Invalid psi"
+            assert sparse.issparse(psi),  "Invalid psi: must be sparse matrix"
             assert psi.shape  == (self.N, self.n), "Inconsistent dimensions of psi"
             self.psi = psi
             self.psi = (self.ElogO != 0).multiply(self.psi)
         else:
             self.psi = copy.copy(self.ElogO)
-            self.psi.data = expit(self.psi.data)
+        self.ElogO.data = np.log(self.ElogO.data)
 
         if phi is not None:
             assert phi.shape[0] == self.N, "Inconsistent dimensions of phi"
-            self.phi = phi
-            self.phi = self.phi / self.phi.sum(axis = 1).reshape((-1, 1))
+            self.phi = sklearn.preprocessing.normalize(phi, norm='l1', axis=1)
 
         if m_gamma is not None:
             assert m_gamma.shape[0] == self.n, "Inconsistent dimensions of gamma"
             self.alpha = m_gamma
+            self.gamma = m_gamma
 
         if features is None:
             self.feature = list(range(self.M))

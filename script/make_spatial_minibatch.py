@@ -104,9 +104,9 @@ for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
             continue
 
         logging.info(f"Read blocks of pixels from lane {l}: {x_range/args.mu_scale:.2f} x {y_range/args.mu_scale:.2f}")
-        x_grd_st = np.arange(x_min, x_max-batch_size+1, batch_step)
+        x_grd_st = np.arange(x_min, x_max-batch_size/2+1, batch_step)
         x_grd_ed = [x + batch_size for x in x_grd_st]
-        y_grd_st = np.arange(y_min, y_max-batch_size+1, batch_step)
+        y_grd_st = np.arange(y_min, y_max-batch_size/2+1, batch_step)
         y_grd_ed = [x + batch_size for x in y_grd_st]
         x_grd_st[0]  = x_min - 1
         y_grd_st[0]  = y_min - 1
