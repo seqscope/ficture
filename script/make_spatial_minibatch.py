@@ -2,7 +2,7 @@
 ### global-randomize-local-contiguous
 ### Output has the same columns as input with an extra column (1st) being the minibatch index
 
-import sys, io, os, argparse, gzip, logging, glob, copy, re, time, importlib, warnings, pickle
+import sys, os, argparse, gzip, logging, copy, time, importlib, warnings, pickle
 import subprocess as sp
 import numpy as np
 import pandas as pd
@@ -15,6 +15,7 @@ parser.add_argument('--input', type=str, help='')
 parser.add_argument('--output', type=str, help='')
 
 # Basic parameter
+parser.add_argument('--major_axis', type=str, default="Y", help='X or Y')
 parser.add_argument('--batch_size', type=float, default=500, help='Length of the side (um) of square minibatches')
 parser.add_argument('--batch_buff', type=float, default=50, help='Overlap between minibatches')
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
@@ -82,13 +83,9 @@ with open(args.output,'w') as wf:
 df = pd.DataFrame()
 for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
                 names=input_header, dtype=dty):
-    if chunk.shape[0] == 0:
-        logging.info(f"Empty? Left over size {df.shape[0]}.")
-        continue
     chunk["random_index"] = -1
     chunk.random_index = chunk.random_index.astype(int)
     df = pd.concat([df, chunk])
-    df['j'] = df.X.astype(str) + '_' + df.Y.astype(str)
     df["random_index"] = -1
     l_list = df['#lane'].unique()
 
@@ -100,10 +97,9 @@ for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
         y_max = df.loc[lane_indx, "Y"].max()
         x_range = x_max - x_min
         y_range = y_max - y_min
+        logging.info(f"Read blocks of pixels from lane {l}: {x_range/args.mu_scale:.2f} x {y_range/args.mu_scale:.2f}")
         if x_range < batch_size or y_range < batch_size:
             continue
-
-        logging.info(f"Read blocks of pixels from lane {l}: {x_range/args.mu_scale:.2f} x {y_range/args.mu_scale:.2f}")
         x_grd_st = np.arange(x_min, x_max-batch_size/2+1, batch_step)
         x_grd_ed = [x + batch_size for x in x_grd_st]
         y_grd_st = np.arange(y_min, y_max-batch_size/2+1, batch_step)
@@ -113,28 +109,30 @@ for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
         x_grd_ed[-1] = x_max
         y_grd_ed[-1] = y_max
 
-        if len(l_list) > 1 and l == l_list[0]:
-            # This is the last bit of the current lane, including everything
-            x_grd_ed[-1] = x_max
-            y_grd_ed[-1] = y_max
-
         for it_x in range(len(x_grd_st)):
             for it_y in range(len(y_grd_st)):
                 xst = x_grd_st[it_x]
                 xed = x_grd_ed[it_x]
                 yst = y_grd_st[it_y]
                 yed = y_grd_ed[it_y]
-
                 indx = (df.X > xst) & (df.X <= xed) & (df.Y > yst) & (df.Y <= yed) & df['#lane'].eq(l)
-
                 if sum(indx) < args.min_pixel:
                     continue
                 df.loc[indx, "random_index"] = rng.randint(1, sys.maxsize//100)
                 ### Output
+                xst /= args.mu_scale
+                xed /= args.mu_scale
+                yst /= args.mu_scale
+                yed /= args.mu_scale
+                logging.info(f"Output region ({xed-xst:.2f}, {yed-yst:.2f}) ({xst:.1f}, {xed:.1f}) x ({yst:.1f}, {yed:.1f})")
                 df.loc[indx, output_header].to_csv(args.output, mode='a', sep='\t', index=False, header=False)
 
     ### Leftover
-    y_max = df.loc[df["#lane"].eq(l_list[-1]), "Y"].max()
-    left_indx = (df.random_index < 0) | (df["#lane"].eq(l_list[-1]) & (df.Y > y_max - batch_buff))
+    df = df.loc[df["#lane"].eq(l_list[-1]), :]
+    mj_max = df.loc[:, args.major_axis].max()
+    left_indx = (df.random_index < 0) |\
+                (df[args.major_axis] > mj_max-batch_buff)
     df = df.loc[left_indx, :]
-    logging.info(f"Left over size {df.shape[0]}")
+    w  = df[args.major_axis].max() - df[args.major_axis].min()
+    w0 = (df.random_index < 0).sum()
+    logging.info(f"Left over size {df.shape[0]} ({w0}, {w:.2f})")

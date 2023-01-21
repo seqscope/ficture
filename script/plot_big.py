@@ -1,10 +1,11 @@
-import sys, os, copy, gc, re, gzip, pickle, argparse, logging, warnings
+import sys, os, copy, re, gzip, pickle, argparse, logging, warnings
 import numpy as np
 import pandas as pd
 from random import shuffle
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
-from PIL import Image
+import png
 
 from scipy.sparse import *
 import sklearn.neighbors
@@ -19,22 +20,22 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
 parser.add_argument('--output', type=str, help='Output prefix')
 parser.add_argument('--fill_range', type=float, default=5, help="um")
-parser.add_argument('--batch_size', type=float, default=1000000, help="")
 parser.add_argument('--color_table', type=str, default='', help='Pre-defined color map')
 parser.add_argument('--cmap_name', type=str, default="turbo", help="Name of Matplotlib colormap to use")
+parser.add_argument('--binary_cmap_name', type=str, default="plasma", help="Name of Matplotlib colormap to use for ploting individual factors")
 parser.add_argument('--plot_um_per_pixel', type=float, default=1, help="Size of the output pixels in um")
 parser.add_argument('--xmin', type=float, default=-1, help="")
 parser.add_argument('--ymin', type=float, default=-1, help="")
 parser.add_argument('--xmax', type=float, default=np.inf, help="")
 parser.add_argument('--ymax', type=float, default=np.inf, help="")
-parser.add_argument("--tif", action='store_true', help="Store as 16-bit tif instead of png")
 parser.add_argument("--plot_fit", action='store_true', help="")
-parser.add_argument("--plot_individual_factor", action='store_true', help="")
 parser.add_argument("--plot_discretized", action='store_true', help="")
+parser.add_argument("--plot_individual_factor", action='store_true', help="")
 
 args = parser.parse_args()
 logging.basicConfig(level= getattr(logging, "INFO", None))
-dt = np.uint16 if args.tif else np.uint8
+radius = args.fill_range/args.plot_um_per_pixel
+dt = np.uint8
 
 # Dangerous way to detect which columns to use as factor loadings
 with gzip.open(args.input, "rt") as rf:
@@ -59,6 +60,8 @@ else:
     cmap_name = args.cmap_name
     if args.cmap_name not in plt.colormaps():
         cmap_name = "turbo"
+    if args.binary_cmap_name not in plt.colormaps():
+        args.binary_cmap_name = "plasma"
     cmap = plt.get_cmap(cmap_name, K)
     cmtx = np.array([cmap(i) for i in range(K)] )
     indx = np.arange(K)
@@ -94,97 +97,78 @@ if args.plot_fit or args.ymin < 0:
 
 N0 = df.shape[0]
 df.index = range(N0)
-hsize, wsize = df[['x_indx','y_indx']].max(axis = 0) + 1
-hsize_um = hsize * args.plot_um_per_pixel
-wsize_um = wsize * args.plot_um_per_pixel
-logging.info(f"Read region {N0} pixels in region {hsize_um} x {wsize_um}")
+width, height = df[['x_indx','y_indx']].max(axis = 0) + 1
+height_um = height * args.plot_um_per_pixel
+width_um  = width  * args.plot_um_per_pixel
+logging.info(f"Read region {N0} pixels in region {height_um} x {width_um}")
 
 
-# Make images
-binary_mtx = coo_matrix((np.ones(N0,dtype=bool),\
-        (range(N0), np.array(df[factor_header]).argmax(axis = 1))),\
-        shape=(N0, K)).toarray()
-wst = df.y_indx.min()
-wed = df.y_indx.max()
-wstep = np.max([10, int(args.batch_size / hsize)])
-rgb_mtx = np.clip(np.around(np.array(df[factor_header]) @ cmtx * 255),0,255).astype(dt)
-rgb_mtx_hard = np.clip(np.around(binary_mtx @ cmtx * 255),0,255).astype(dt)
-pts = np.array(df[['x_indx', 'y_indx']], dtype=int)
-pts_indx = list(df.index)
-ref = sklearn.neighbors.BallTree(pts)
+class RowIterator:
+    def __init__(self, pts, mtx, radius, verbose=200):
+        self.pts = pts
+        self.ref = sklearn.neighbors.BallTree(\
+                      np.array(pts, dtype=int))
+        self.width, self.height = pts.max(axis = 0) + 1
+        self.current = -1
+        self.mtx = mtx
+        self.dt = mtx.dtype
+        self.verbose = verbose
+        self.radius = radius
+        print(f"Image size (w x h): {self.width} x {self.height}")
+        return
 
-st = wst
-while st < wed:
-    ed = min([st + wstep, wed])
-    print(st, ed, pts.shape[0])
-    if ((df.y_indx > st) & (df.y_indx < ed)).sum() < 10:
-        st = ed
-        continue
-    mesh = np.meshgrid(np.arange(hsize), np.arange(st, ed))
-    nodes = np.array(list(zip(*(dim.flat for dim in mesh))), dtype=int)
-    dv, iv = ref.query(nodes, k = 1, dualtree=True)
-    indx = (dv[:, 0] < args.fill_range/args.plot_um_per_pixel) & (dv[:, 0] > 0)
-    iv = iv[indx, 0]
-    if sum(indx) == 0:
-        st = ed
-        continue
-    pts = np.vstack((pts, nodes[indx, :]) )
-    pts_indx += list(df.index[iv] )
-    rgb_mtx = np.vstack((rgb_mtx,\
-        np.clip(np.around( np.array(\
-            df.loc[iv,factor_header]) @ cmtx * 255),0,255).astype(dt)))
-    if args.plot_discretized:
-        rgb_mtx_hard = np.vstack((rgb_mtx_hard,\
-            np.clip(np.around(np.array(\
-                binary_mtx[iv, :]) @ cmtx * 255),0,255).astype(dt)))
-    st = ed
+    def __iter__(self):
+        return self
 
-pts[:,0] = np.clip(hsize - pts[:, 0], 0, hsize-1) # Origin is lower-left
-pts[:,1] = np.clip(pts[:, 1], 0, wsize-1)
+    def __next__(self):
+        self.current += 1
+        if self.current >= self.height:
+            raise StopIteration
+        nodes = np.array([[i, self.current] for i in range(self.width)])
+        dv, iv = self.ref.query(nodes, k = 1)
+        indx = (dv[:, 0] < self.radius) & (dv[:, 0] > 0)
+        iv = iv[indx, 0]
+        iu = np.arange(self.width)[indx]
+        if sum(indx) == 0:
+            return np.zeros(self.width * 3, dtype = self.dt)
+        out = np.zeros(self.width * 3, dtype = self.dt)
+        for c in range(3):
+            out[iu*3+c] = self.mtx[iv, c]
+        if self.current % self.verbose == 0:
+            print(f"{self.current}/{self.height}")
+        return out
 
-img = np.zeros( (hsize, wsize, 3), dtype=dt)
-for r in range(3):
-    img[:, :, r] = coo_array((rgb_mtx[:, r], (pts[:,0], pts[:,1])),\
-        shape=(hsize, wsize), dtype = dt).toarray()
-if args.tif:
-    img = Image.fromarray(img, mode="I;16")
-else:
-    img = Image.fromarray(img)
 
-outf = args.output
-outf += ".tif" if args.tif else ".png"
-img.save(outf)
+
+mtx = np.clip(np.around( np.array(\
+    df.loc[:,factor_header]) @ cmtx * 255),0,255).astype(dt)
+outf = args.output + ".png"
+obj  = RowIterator(df.loc[:, ["x_indx", "y_indx"]], mtx, radius)
+wpng = png.Writer(size=(width, height),greyscale=False,bitdepth=8,planes=3)
+with open(outf, 'wb') as f:
+    wpng.write(f, obj)
 logging.info(f"Made fractional image\n{outf}")
 
-if args.plot_discretized:
-    img = np.zeros( (hsize, wsize, 3), dtype=dt)
-    for r in range(3):
-        img[:, :, r] = coo_array((rgb_mtx_hard[:, r], (pts[:,0], pts[:,1])),\
-            shape=(hsize, wsize), dtype = dt).toarray()
-    if args.tif:
-        img = Image.fromarray(img, mode="I;16")
-    else:
-        img = Image.fromarray(img)
-
-    outf = args.output + ".top"
-    outf += ".tif" if args.tif else ".png"
-    img.save(outf)
-    logging.info(f"Made hard threshold image\n{outf}")
 
 if args.plot_individual_factor:
-    binary_rgb = np.array([[255,153,0], [17,101,154]])
     for k in range(K):
-        v = np.clip(df.loc[pts_indx, factor_header[k]].values,0,1)
-        rgb_mtx = np.clip(np.vstack((v, 1-v)).T @ binary_rgb, 0, 255).astype(dt)
-        img = np.zeros( (hsize, wsize, 3), dtype=dt)
-        for r in range(3):
-            img[:, :, r] = coo_array((rgb_mtx[:, r], (pts[:,0], pts[:,1])),\
-                shape=(hsize, wsize), dtype = dt).toarray()
-        if args.tif:
-            img = Image.fromarray(img, mode="I;16")
-        else:
-            img = Image.fromarray(img)
-        outf = args.output + ".F_"+str(k)
-        outf += ".tif" if args.tif else ".png"
-        img.save(outf)
+        v = np.clip(df.loc[:, factor_header[k]].values,0,1)
+        mtx = np.clip(mpl.colormaps[args.binary_cmap_name](v)[:,:3]*255,0,255).astype(dt)
+        outf = args.output + ".F_"+str(k)+".png"
+        obj  = RowIterator(df.loc[:, ["x_indx", "y_indx"]], mtx, radius)
+        wpng = png.Writer(size=(width, height),greyscale=False,bitdepth=8,planes=3)
+        with open(outf, 'wb') as f:
+            wpng.write(f, obj)
         logging.info(f"Made factor specific image - {k}\n{outf}")
+
+if args.plot_discretized:
+    mtx = coo_matrix( (np.ones(N0,dtype=dt),\
+        (range(N0), np.array(df.loc[:, factor_header]).argmax(axis = 1))),\
+        shape=(N0, K)).toarray()
+    mtx = np.clip(np.around(mtx @ cmtx * 255),0,255).astype(dt)
+    outf = args.output + ".top.png"
+    obj  = RowIterator(df.loc[:, ["x_indx", "y_indx"]], mtx, radius)
+    wpng = png.Writer(size=(width, height),greyscale=False,bitdepth=8,planes=3)
+    with open(outf, 'wb') as f:
+        wpng.write(f, obj)
+    logging.info(f"Made hard threshold image\n{outf}")

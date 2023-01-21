@@ -154,6 +154,8 @@ if args.gene_type_info != '' and os.path.exists(args.gene_type_info):
     gene_kept = list(gencode.Name)
     print(f"Read {len(gene_kept)} genes from gene_type_info")
 
+
+### Detect tissue region
 if os.path.exists(args.ref_pts) and not args.redo_filter:
     pt = pd.read_csv(args.ref_pts,sep='\t',header=0)
     logging.info(f"Read existing anchor positions:\n{args.ref_pts}, {pt.shape}. (Use --redo_filter to avoid using existing files)")

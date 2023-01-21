@@ -13,6 +13,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
 parser.add_argument('--output', type=str, help='')
 
+parser.add_argument('--major_axis', type=str, default="Y", help='X or Y')
 parser.add_argument('--regions', type=str, default="", help='A file containing region intervals, same as that used by tabix -R (e.g. tab delimited, lane start end)')
 parser.add_argument('--region', nargs='*', type=str, default=[], help='lane:Y_start-Y_end (Y axis in barcode coordinate unit), separate by space if multiple regions')
 parser.add_argument('--region_um', nargs='*', type=str, default=[], help='lane:Y_start-Y_end (Y axis in um), separate by space if multiple regions')
@@ -32,6 +33,7 @@ r_seed = time.time()
 rng.seed(r_seed)
 logging.basicConfig(level= getattr(logging, "INFO", None))
 logging.info(f"Random seed {r_seed}")
+mj = args.major_axis
 
 # Input file and numerical columns to use as counts
 ct_header = args.count_header
@@ -104,19 +106,23 @@ for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
     if chunk.shape[0] == 0:
         logging.info(f"Empty? Left over size {df_full.shape[0]}.")
         continue
-    ed = chunk.Y.iloc[-1]
+    # ed = chunk.Y.iloc[-1]
+    ed = chunk[mj].iloc[-1]
     df_full = pd.concat([df_full, chunk])
     df_full['j'] = df_full.X.astype(str) + '_' + df_full.Y.astype(str)
     l1 = df_full['#lane'].iloc[-1]
     l_list = df_full['#lane'].unique()
     print(l_list)
 
-    if len(l_list) == 1 and df_full.Y.iloc[-1] - df_full.Y.iloc[0] < ovlp_buffer * args.mu_scale:
+    if len(l_list) == 1 and df_full[mj].iloc[-1] -\
+        df_full[mj].iloc[0] < ovlp_buffer * args.mu_scale:
         # This chunk is too narrow, leave to process together with neighbors
-        logging.info(f"Left over size {df_full.shape[0]}.")
+        r = int(df_full[mj].iloc[-1]*args.mu_scale)
+        l = int(df_full[mj].iloc[0] *args.mu_scale)
+        logging.info(f"Left over size {df_full.shape[0]} ({l}, {r}).")
         continue
 
-    left = copy.copy(df_full[df_full['#lane'].eq(l1) & (df_full.Y > ed - ovlp_buffer * args.mu_scale)])
+    left = copy.copy(df_full[df_full['#lane'].eq(l1) & (df_full[mj] > ed - ovlp_buffer * args.mu_scale)])
 
     for l in l_list:
         logging.info(f"Lane {l}")
@@ -125,8 +131,8 @@ for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
         brc.index = range(brc.shape[0])
         brc['X'] = brc.X.astype(float).values * mu_scale
         brc['Y'] = brc.Y.astype(float).values * mu_scale
-        st = brc.Y.min()
-        ed = brc.Y.max()
+        st = brc[mj].min()
+        ed = brc[mj].max()
         pts = np.asarray(brc[['X','Y']])
         logging.info(f"Read {brc.shape[0]} pixels.")
         brc["hex_id"] = ""
@@ -137,9 +143,9 @@ for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
             while offs_y < n_move:
                 x,y = pixel_to_hex(pts, radius, offs_x/n_move, offs_y/n_move)
                 hex_crd = list(zip(x,y))
-                ct = pd.DataFrame({'hex_id':hex_crd, 'tot':brc[args.key].values, 'y':pts[:,1]}).groupby(by = 'hex_id').agg({'tot': sum, 'y':np.min}).reset_index()
+                ct = pd.DataFrame({'hex_id':hex_crd, 'tot':brc[args.key].values, 'X':pts[:, 0], 'Y':pts[:,1]}).groupby(by = 'hex_id').agg({'tot': sum, 'X':np.min, 'Y':np.min}).reset_index()
                 mid_ct = np.median(ct.loc[ct.tot >= args.min_ct_per_unit, 'tot'].values)
-                ct = set(ct.loc[(ct.tot >= args.min_ct_per_unit) & (ct.y > st + diam/2) & (ct.y < ed - diam/2), 'hex_id'].values)
+                ct = set(ct.loc[(ct.tot >= args.min_ct_per_unit) & (ct[mj] > st + diam/2) & (ct[mj] < ed - diam/2), 'hex_id'].values)
                 if len(ct) < 2:
                     offs_y += 1
                     continue
