@@ -22,6 +22,19 @@ for x in header:
         factor_header.append(y.group(0))
 K = len(factor_header)
 
+try:
+    f = os.path.split(os.path.dirname(f))[0] + "/coordinate_minmax.tsv"
+    if not os.path.exists(f):
+        xmin, ymin = df[["x", "y"]].min(axis = 0)
+        xmax, ymax = df[["x", "y"]].max(axis = 0)
+        line = ["xmin\t"+str(xmin), "xmax\t"+str(xmax),\
+                "ymin\t"+str(ymin), "ymax\t"+str(ymax)]
+        line = "\n".join(line) + "\n"
+        with open(f, "w") as wf:
+            wf.write(line)
+except:
+    print("Did not output coordinate limits, probabily because the input file does not contain header x and y")
+
 # Colormap
 cmap_name = args.cmap_name
 if args.cmap_name not in plt.colormaps():

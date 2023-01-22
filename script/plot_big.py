@@ -8,18 +8,18 @@ import matplotlib.pyplot as plt
 import png
 
 from scipy.sparse import *
-import sklearn.neighbors
-import sklearn.preprocessing
 
 # Add parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from hexagon_fn import *
 from utilt import plot_colortable
+from image_fn import ImgRowIterator as RowIterator
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
 parser.add_argument('--output', type=str, help='Output prefix')
 parser.add_argument('--fill_range', type=float, default=5, help="um")
+parser.add_argument('--horizontal_axis', type=str, default="x", help="Which coordinate is horizontal, x or y")
 parser.add_argument('--color_table', type=str, default='', help='Pre-defined color map')
 parser.add_argument('--cmap_name', type=str, default="turbo", help="Name of Matplotlib colormap to use")
 parser.add_argument('--binary_cmap_name', type=str, default="plasma", help="Name of Matplotlib colormap to use for ploting individual factors")
@@ -36,6 +36,9 @@ args = parser.parse_args()
 logging.basicConfig(level= getattr(logging, "INFO", None))
 radius = args.fill_range/args.plot_um_per_pixel
 dt = np.uint8
+haxis = args.horizontal_axis.lower()
+if haxis not in ["x", "y"]:
+    sys.exit("Unrecognized --horizontal_axis")
 
 # Dangerous way to detect which columns to use as factor loadings
 with gzip.open(args.input, "rt") as rf:
@@ -56,6 +59,7 @@ K = len(factor_header)
 if os.path.exists(args.color_table):
     color_info = pd.read_csv(args.color_table, sep='\t', header=0)
     cmtx = np.array(color_info.loc[:, ["R","G","B"]])
+    logging.info(f"Read color map")
 else:
     cmap_name = args.cmap_name
     if args.cmap_name not in plt.colormaps():
@@ -78,6 +82,7 @@ else:
 # Read data
 adt={x:float for x in ["x", "y"]+factor_header}
 df = pd.DataFrame()
+nc = 0
 for chunk in pd.read_csv(gzip.open(args.input, 'rt'), sep='\t', \
     chunksize=1000000, skiprows=1, names=header, dtype=adt):
     chunk = chunk[(chunk.y > args.ymin) & (chunk.y < args.ymax)]
@@ -86,6 +91,9 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'), sep='\t', \
     chunk['y_indx'] = np.round(chunk.y.values / args.plot_um_per_pixel, 0).astype(int)
     chunk = chunk.groupby(by = ['x_indx', 'y_indx']).agg({ x:np.mean for x in factor_header }).reset_index()
     df = pd.concat([df, chunk])
+    nr = df.shape[0]
+    nc += 1
+    logging.info(f"...reading file ({nc}, {nr})")
 
 df = df.groupby(by = ['x_indx', 'y_indx']).agg({ x:np.mean for x in factor_header }).reset_index()
 x_indx_min = int(args.xmin / args.plot_um_per_pixel )
@@ -97,48 +105,12 @@ if args.plot_fit or args.ymin < 0:
 
 N0 = df.shape[0]
 df.index = range(N0)
+if haxis != "x":
+    df.rename(columns = {"x_indx":"y_indx", "y_indx":"x_indx"}, inplace=True)
 width, height = df[['x_indx','y_indx']].max(axis = 0) + 1
 height_um = height * args.plot_um_per_pixel
 width_um  = width  * args.plot_um_per_pixel
 logging.info(f"Read region {N0} pixels in region {height_um} x {width_um}")
-
-
-class RowIterator:
-    def __init__(self, pts, mtx, radius, verbose=200):
-        self.pts = pts
-        self.ref = sklearn.neighbors.BallTree(\
-                      np.array(pts, dtype=int))
-        self.width, self.height = pts.max(axis = 0) + 1
-        self.current = -1
-        self.mtx = mtx
-        self.dt = mtx.dtype
-        self.verbose = verbose
-        self.radius = radius
-        print(f"Image size (w x h): {self.width} x {self.height}")
-        return
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        self.current += 1
-        if self.current >= self.height:
-            raise StopIteration
-        nodes = np.array([[i, self.current] for i in range(self.width)])
-        dv, iv = self.ref.query(nodes, k = 1)
-        indx = (dv[:, 0] < self.radius) & (dv[:, 0] > 0)
-        iv = iv[indx, 0]
-        iu = np.arange(self.width)[indx]
-        if sum(indx) == 0:
-            return np.zeros(self.width * 3, dtype = self.dt)
-        out = np.zeros(self.width * 3, dtype = self.dt)
-        for c in range(3):
-            out[iu*3+c] = self.mtx[iv, c]
-        if self.current % self.verbose == 0:
-            print(f"{self.current}/{self.height}")
-        return out
-
-
 
 mtx = np.clip(np.around( np.array(\
     df.loc[:,factor_header]) @ cmtx * 255),0,255).astype(dt)

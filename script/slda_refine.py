@@ -252,8 +252,9 @@ for chunk in pd.read_csv(args.input, sep='\t', chunksize=chunk_size,\
                          (tmp.Y > y_min+out_buff) & (tmp.Y < y_max-out_buff)]
         post_count += batch.phi[v, :].T @ batch.mtx[v, :]
 
-        tmp = pd.concat([brc.loc[b_indx, ['j','X','Y']].reset_index(),\
-                        pd.DataFrame(batch.phi, columns =\
+        tmp = copy.copy(brc.loc[b_indx, ['j','X','Y']] )
+        tmp.index = range(tmp.shape[0])
+        tmp = pd.concat([tmp, pd.DataFrame(batch.phi, columns =\
                         ['Topic_'+str(x) for x in range(slda._K)])], axis = 1)
         tmp["topK_org"] = np.argmax(phi_org, axis = 1)
         tmp["topP_org"] = np.max(phi_org, axis = 1)
