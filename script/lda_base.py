@@ -50,7 +50,7 @@ if args.use_model != '' and not os.path.exists(args.use_model):
     sys.exit("Invalid model file")
 
 mu_scale = 1./args.mu_scale
-key = args.key
+key = args.key.lower()
 
 ### Basic parameterse
 b_size = args.minibatch_size
@@ -60,6 +60,10 @@ factor_header = ['Topic_'+str(x) for x in range(K)]
 ### Input
 if not os.path.exists(args.input) or not os.path.exists(args.feature):
     sys.exit("ERROR: cannot find input file.")
+with gzip.open(args.input, 'rt') as rf:
+    header = rf.readline().strip().split('\t')
+header = [x.lower() for x in header]
+
 
 # If using only subset of input data
 tile_list = []
@@ -102,19 +106,21 @@ print(ymin, ymax, args.y_range_um, args.y_range)
 
 
 ### Use only the provided list of features
-feature = pd.read_csv(args.feature, sep='\t', header=0, usecols=['gene',args.key],dtype={'gene':str,args.key:int})
-feature = feature[feature[args.key] >= args.min_count_per_feature]
-feature.sort_values(by=args.key,ascending=False,inplace=True)
+feature=pd.read_csv(args.feature, sep='\t', header=0)
+feature.columns = [x.lower() for x in feature.columns]
+feature[key] = feature[key].astype(int)
+feature = feature[feature[key] >= args.min_count_per_feature]
+feature.sort_values(by=key,ascending=False,inplace=True)
 feature.drop_duplicates(subset='gene',keep='first',inplace=True)
 if os.path.exists(args.hvg):
-    hvg = pd.read_csv(args.hvg, sep='\t', header=0, usecols=['gene',args.key],dtype={'gene':str,args.key:int})
-    hvg.sort_values(by=args.key,ascending=False,inplace=True)
+    hvg = pd.read_csv(args.hvg, sep='\t', header=0, usecols=['gene',key],dtype={'gene':str,key:int})
+    hvg.sort_values(by=key,ascending=False,inplace=True)
     hvg.drop_duplicates(subset='gene',keep='first',inplace=True)
     nhvg = hvg.shape[0]
     logging.info(f"Read {nhvg} highly variable genes from " + args.hvg)
     if args.nFeature > nhvg:
         feature = feature[~feature.gene.isin(hvg.gene.values)]
-        feature.sort_values(by = args.key, ascending=False, inplace=True)
+        feature.sort_values(by = key, ascending=False, inplace=True)
         feature = pd.concat( (hvg, feature.iloc[:(args.nFactor-hvg.shape[0])] ) )
 
 feature_kept = list(feature.gene.values)
@@ -126,8 +132,8 @@ logging.info(f"{M} genes will be used")
 
 ### Stochastic model fitting
 model_f = args.output_path + "/analysis/"+args.identifier+".model.p"
-adt = {'random_index':str, '#lane':str, 'tile':str, 'X': str, 'Y':str, 'gene':str, key:int}
-adthat = {'X':float, 'Y':float}
+adt = {'random_index':str, '#lane':str, 'tile':str, 'x': str, 'y':str, 'gene':str, key:int}
+adthat = {'x':float, 'y':float}
 if os.path.exists(args.use_model):
     model_f = args.use_model
 if not args.overwrite and os.path.exists(model_f):
@@ -140,35 +146,36 @@ if not args.overwrite and os.path.exists(model_f):
 else:
     logging.info(f"Start fitting model ... model will be stored in\n{model_f}")
     lda = LDA(n_components=K, learning_method='online', batch_size=b_size, n_jobs = args.thread, verbose = 0)
-    feature_mf = np.array(feature[args.key].values).astype(float)
+    feature_mf = np.array(feature[key].values).astype(float)
     feature_mf/= feature_mf.sum()
     epoch = 0
+    df = pd.DataFrame()
     while epoch < args.epoch:
         df = pd.DataFrame()
-        for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, header=0, usecols=["random_index","#lane","tile","X","Y","gene",key], dtype=adt):
+        for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, skiprows=1, names=header, usecols=["random_index","#lane","tile","x","y","gene",key], dtype=adt):
             chunk = chunk[chunk.gene.isin(feature_kept)]
-            chunk['j'] = chunk.random_index.values + '_' + chunk.X.values + '_' + chunk.Y.values
+            chunk['j'] = chunk.random_index.values + '_' + chunk.x.values + '_' + chunk.y.values
             chunk['tile'] = chunk["#lane"].values + ':' + chunk.tile.values
             chunk = chunk.astype(adthat)
             i = 0
-            indx = (chunk.X >= xmin[i]) & (chunk.X <= xmax[i]) & (chunk.Y >= ymin[i]) & (chunk.Y <= ymax[i])
+            indx = (chunk.x >= xmin[i]) & (chunk.x <= xmax[i]) & (chunk.y >= ymin[i]) & (chunk.y <= ymax[i])
             while i < len(xmin):
-                indx = indx | ((chunk.X >= xmin[i]) & (chunk.X <= xmax[i]) & (chunk.Y >= ymin[i]) & (chunk.Y <= ymax[i]))
+                indx = indx | ((chunk.x >= xmin[i]) & (chunk.x <= xmax[i]) & (chunk.y >= ymin[i]) & (chunk.y <= ymax[i]))
                 i += 1
             if len(tile_list) > 0:
                 indx = indx & chunk.tile.isin(tile_list)
             if sum(indx) == 0:
                 continue
             chunk = chunk[indx]
-            chunk.drop(columns = ['random_index','X','Y'], inplace=True)
+            chunk.drop(columns = ['random_index','x','y'], inplace=True)
             last_indx = chunk.j.iloc[-1]
             df = pd.concat([df, chunk[~chunk.j.eq(last_indx)]])
             if len(df.j.unique()) < b_size * 1.5: # Left to next chunk
                 df = pd.concat((df, chunk[chunk.j.eq(last_indx)]))
                 continue
             # Total mulecule count per unit
-            brc = df.groupby(by = ['j']).agg({args.key: sum}).reset_index()
-            brc = brc[brc[args.key] > args.min_ct_per_unit]
+            brc = df.groupby(by = ['j']).agg({key: sum}).reset_index()
+            brc = brc[brc[key] > args.min_ct_per_unit]
             brc.index = range(brc.shape[0])
             df = df[df.j.isin(brc.j.values)]
             # Make DGE
@@ -177,7 +184,7 @@ else:
             indx_row = [ bc_dict[x] for x in df['j']]
             indx_col = [ ft_dict[x] for x in df['gene']]
             N = len(barcode_kept)
-            mtx = coo_matrix((df[args.key].values, (indx_row, indx_col)), shape=(N, M)).tocsr()
+            mtx = coo_matrix((df[key].values, (indx_row, indx_col)), shape=(N, M)).tocsr()
             x1 = np.median(brc[key].values)
             x2 = np.mean(brc[key].values)
             logging.info(f"Made DGE {mtx.shape}, median/mean count: {x1:.1f}/{x2:.1f}")
@@ -207,8 +214,8 @@ else:
         epoch += 1
 
     if len(df.j.unique()) > b_size:
-        brc = df.groupby(by = ['j']).agg({args.key: sum}).reset_index()
-        brc = brc[brc[args.key] > args.min_ct_per_unit]
+        brc = df.groupby(by = ['j']).agg({key: sum}).reset_index()
+        brc = brc[brc[key] > args.min_ct_per_unit]
         brc.index = range(brc.shape[0])
         df = df[df.j.isin(brc.j.values)]
         barcode_kept = list(brc.j.values)
@@ -216,7 +223,7 @@ else:
         indx_row = [ bc_dict[x] for x in df['j']]
         indx_col = [ ft_dict[x] for x in df['gene']]
         N = len(barcode_kept)
-        mtx = coo_matrix((df[args.key].values, (indx_row, indx_col)), shape=(N, M)).tocsr()
+        mtx = coo_matrix((df[key].values, (indx_row, indx_col)), shape=(N, M)).tocsr()
         x1 = np.median(brc[key].values)
         x2 = np.mean(brc[key].values)
         logging.info(f"Made DGE {mtx.shape}, median/mean count: {x1:.1f}/{x2:.1f}")
@@ -236,29 +243,30 @@ else:
 
 
 ### Rerun all units once and store results
-dtp = {'topK':int,args.key:int,'j':str, 'x':str, 'y':str}
+dtp = {'topK':int,key:int,'j':str, 'x':str, 'y':str}
 dtp.update({x:float for x in ['topP']+factor_header})
 res_f = args.output_path+"/analysis/"+args.identifier+".fit_result.tsv.gz"
 nbatch = 0
 logging.info(f"Result file {res_f}")
 
+post_count = np.zeros((K, M))
 df = pd.DataFrame()
-for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=100000, header=0, usecols=["random_index","#lane","tile","X","Y","gene",key], dtype=adt):
+for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, skiprows=1, names=header, usecols=["random_index","#lane","tile","x","y","gene",key], dtype=adt):
     chunk = chunk[chunk.gene.isin(feature_kept)]
-    chunk['j'] = chunk.random_index.values + '_' + chunk.X.values + '_' + chunk.Y.values
+    chunk['j'] = chunk.random_index.values + '_' + chunk.x.values + '_' + chunk.y.values
     chunk['tile'] = chunk["#lane"].values + ':' + chunk.tile.values
     chunk = chunk.astype(adthat)
     i = 0
-    indx = (chunk.X >= xmin[i]) & (chunk.X <= xmax[i]) & (chunk.Y >= ymin[i]) & (chunk.Y <= ymax[i])
+    indx = (chunk.x >= xmin[i]) & (chunk.x <= xmax[i]) & (chunk.y >= ymin[i]) & (chunk.y <= ymax[i])
     while i < len(xmin):
-        indx = indx | ((chunk.X >= xmin[i]) & (chunk.X <= xmax[i]) & (chunk.Y >= ymin[i]) & (chunk.Y <= ymax[i]))
+        indx = indx | ((chunk.x >= xmin[i]) & (chunk.x <= xmax[i]) & (chunk.y >= ymin[i]) & (chunk.y <= ymax[i]))
         i += 1
     if len(tile_list) > 0:
         indx = indx & chunk.tile.isin(tile_list)
     if sum(indx) == 0:
         continue
     chunk = chunk[indx]
-    chunk.drop(columns = ['random_index','X','Y'], inplace=True)
+    chunk.drop(columns = ['random_index','x','y'], inplace=True)
     last_indx = chunk.j.iloc[-1]
     left = copy.copy(chunk[chunk.j.eq(last_indx)])
     df = pd.concat([df, chunk[~chunk.j.eq(last_indx)]])
@@ -266,8 +274,8 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=100000, 
         df = pd.concat((df, chunk[chunk.j.eq(last_indx)]))
         continue
     # Total mulecule count per unit
-    brc = df.groupby(by = ['j']).agg({args.key: sum}).reset_index()
-    brc = brc[brc[args.key] > args.min_ct_per_unit]
+    brc = df.groupby(by = ['j']).agg({key: sum}).reset_index()
+    brc = brc[brc[key] > args.min_ct_per_unit]
     brc.index = range(brc.shape[0])
     df = df[df.j.isin(brc.j.values)]
     # Make DGE
@@ -276,12 +284,13 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=100000, 
     indx_row = [ bc_dict[x] for x in df['j']]
     indx_col = [ ft_dict[x] for x in df['gene']]
     N = len(barcode_kept)
-    mtx = coo_matrix((df[args.key].values, (indx_row, indx_col)), shape=(N, M)).tocsr()
+    mtx = coo_array((df[key].values, (indx_row, indx_col)), shape=(N, M)).tocsr()
     x1 = np.median(brc[key].values)
     x2 = np.mean(brc[key].values)
     logging.info(f"Made DGE {mtx.shape}, median/mean count: {x1:.1f}/{x2:.1f}")
 
     theta = lda.transform(mtx)
+    post_count += np.array(theta.T @ mtx)
     brc['x'] = brc.j.map(lambda x : x.split('_')[1])
     brc['y'] = brc.j.map(lambda x : x.split('_')[2])
     brc['j'] = brc.j.map(lambda x : x.split('_')[0])
@@ -298,8 +307,8 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=100000, 
     df = copy.copy(left)
 
 # Leftover
-brc = df.groupby(by = ['j']).agg({args.key: sum}).reset_index()
-brc = brc[brc[args.key] > args.min_ct_per_unit]
+brc = df.groupby(by = ['j']).agg({key: sum}).reset_index()
+brc = brc[brc[key] > args.min_ct_per_unit]
 brc.index = range(brc.shape[0])
 print(brc.shape)
 if brc.shape[0] > 0:
@@ -310,12 +319,13 @@ if brc.shape[0] > 0:
     indx_row = [ bc_dict[x] for x in df['j']]
     indx_col = [ ft_dict[x] for x in df['gene']]
     N = len(barcode_kept)
-    mtx = coo_matrix((df[args.key].values, (indx_row, indx_col)), shape=(N, M)).tocsr()
+    mtx = coo_array((df[key].values, (indx_row, indx_col)), shape=(N, M)).tocsr()
     x1 = np.median(brc[key].values)
     x2 = np.mean(brc[key].values)
     logging.info(f"Made DGE {mtx.shape}, median/mean count: {x1:.1f}/{x2:.1f}")
 
     theta = lda.transform(mtx)
+    post_count += np.array(theta.T @ mtx)
     brc['x'] = brc.j.map(lambda x : x.split('_')[1])
     brc['y'] = brc.j.map(lambda x : x.split('_')[2])
     brc['j'] = brc.j.map(lambda x : x.split('_')[0])
@@ -330,3 +340,9 @@ if brc.shape[0] > 0:
         brc.to_csv(res_f, sep='\t', mode='a', float_format="%.5f", index=False, header=False, compression={"method":"gzip"})
 
 logging.info(f"Finished ({nbatch})")
+
+out_f = args.output_path+"/analysis/"+args.identifier+".posterior.count.tsv.gz"
+pd.concat([pd.DataFrame({'gene': feature_kept}),\
+           pd.DataFrame(post_count.T, dtype='float64',\
+                        columns = [str(k) for k in range(K)])],\
+        axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.2f', compression={"method":"gzip"})

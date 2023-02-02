@@ -47,6 +47,8 @@ parser.add_argument('--hex_n_move', type=int, default=6, help='')
 parser.add_argument('--redo_filter', action='store_true')
 parser.add_argument('--merge_raw_data', action='store_true')
 parser.add_argument('--debug', action='store_true')
+parser.add_argument('--anchor_only', action='store_true')
+
 
 args = parser.parse_args()
 
@@ -84,6 +86,69 @@ if os.path.exists(flt_f):
     warnings.warn("Output file already exists and will be overwritten")
 
 
+if os.path.exists(args.ref_pts) and not args.redo_filter:
+    pt = pd.read_csv(args.ref_pts,sep='\t',header=0)
+    logging.info(f"Read existing anchor positions:\n{args.ref_pts}, {pt.shape}. (Use --redo_filter to avoid using existing files)")
+else:
+    ### Read barcode
+    f=os.path.join(path, "barcodes.tsv.gz")
+    if not os.path.exists(f):
+        sys.exit("Input directory does not contain barcodes.tsv.gz")
+
+    df=pd.DataFrame()
+    for chunk in pd.read_csv(gzip.open(f, 'rb'), sep='\t|,',\
+            names=["barcode","j","v2","lane","tile","X","Y"]+ct_header,\
+            usecols=["Y","X",key], engine='python', chunksize=1000000):
+        chunk = chunk[chunk[key] > 0]
+        chunk['X'] = chunk.X.values * mu_scale
+        chunk['Y'] = chunk.Y.values * mu_scale
+        npixel = chunk.shape[0]
+        if args.precision_um > 0:
+            chunk['X'] = np.around(chunk.X.values/args.precision_um,0).astype(int)*args.precision_um
+            chunk['Y'] = np.around(chunk.Y.values/args.precision_um,0).astype(int)*args.precision_um
+        chunk = chunk.groupby(by = ["X", "Y"]).agg({key:sum}).reset_index()
+        df = pd.concat([df, chunk])
+        logging.info(f"Read {npixel} pixels, collapsed into {chunk.shape[0]} pts ({df.shape[0]} so far)")
+
+    xmax,xmin = df.X.max(), df.X.min()
+    ymax,ymin = df.Y.max(), df.Y.min()
+    bsize_row = np.max([1, (ymax-ymin)//args.filter_by_box_nrow])
+    bsize_col = np.max([1, (xmax-xmin)//args.filter_by_box_ncol])
+    df['win'] = ((df.Y-ymin)/bsize_row).astype(int).astype(str) + '_' +\
+                ((df.X-xmin)/bsize_col).astype(int).astype(str)
+
+    logging.info(f"Read barcodes, collapsed into {df.shape[0]} pts")
+    ### Detect grid points falling inside dense tissue region
+    pt = pd.DataFrame()
+    for w in df.win.unique():
+        indx = df.win.eq(w)
+        indx = df.win.eq(w)
+        sub, m0, m1 = filter_by_density_mixture(df.loc[indx, :], key, radius, n_move, args)
+        pt = pd.concat([pt, sub])
+        logging.info(f"Window {str(w)}:\t{m0:.3f} v.s. {m1:.3f}")
+
+    pt.x = np.around(np.clip(pt.x.values,0,np.inf)/args.precision_um,0).astype(int)
+    pt.y = np.around(np.clip(pt.y.values,0,np.inf)/args.precision_um,0).astype(int)
+    pt.drop_duplicates(inplace=True)
+    pt.x = pt.x * args.precision_um
+    pt.y = pt.y * args.precision_um
+    pt.to_csv(args.ref_pts, sep='\t', index=False, header=True)
+    del df
+    gc.collect()
+
+
+if args.anchor_only:
+    sys.exit()
+
+
+pt = pt.astype({'x':float, 'y':float, 'lane':str})
+ref = {}
+for lane in pt.lane.unique():
+    ref[lane] = sklearn.neighbors.BallTree(np.array(pt.loc[pt.lane.eq(lane), ['x','y']]))
+logging.info(f"Built balltree for reference points")
+
+
+
 ### If work on subset of genes
 gene_kept = []
 if args.gene_type_info != '' and os.path.exists(args.gene_type_info):
@@ -111,108 +176,6 @@ if args.gene_type_info != '' and os.path.exists(args.gene_type_info):
     gene_kept = list(gencode.Name)
     print(f"Read {len(gene_kept)} genes from gene_type_info")
 
-
-if os.path.exists(args.ref_pts) and not args.redo_filter:
-    pt = pd.read_csv(args.ref_pts,sep='\t',header=0)
-    logging.info(f"Read existing anchor positions:\n{args.ref_pts}, {pt.shape}. (Use --redo_filter to avoid using existing files)")
-else:
-    ### Read barcode
-    f=os.path.join(path, "barcodes.tsv.gz")
-    if not os.path.exists(f):
-        sys.exit("Input directory does not contain barcodes.tsv.gz")
-
-    df=pd.DataFrame()
-    for chunk in pd.read_csv(gzip.open(f, 'rb'), sep='\t|,',\
-            names=["barcode","j","v2","lane","tile","X","Y"]+ct_header,\
-            usecols=["Y","X",key], engine='python', chunksize=500000):
-        chunk = chunk[chunk[key] > 0]
-        chunk['X'] = chunk.X.values * mu_scale
-        chunk['Y'] = chunk.Y.values * mu_scale
-        npixel = chunk.shape[0]
-        if args.precision_um > 0:
-            chunk['X'] = np.around(chunk.X.values/args.precision_um,0).astype(int)*args.precision_um
-            chunk['Y'] = np.around(chunk.Y.values/args.precision_um,0).astype(int)*args.precision_um
-        chunk = chunk.groupby(by = ["X", "Y"]).agg({key:sum}).reset_index()
-        df = pd.concat([df, chunk])
-        logging.info(f"Read {npixel} pixels, collapsed into {chunk.shape[0]} pts ({df.shape[0]} so far)")
-
-    xmax,xmin = df.X.max(), df.X.min()
-    ymax,ymin = df.Y.max(), df.Y.min()
-    bsize_row = np.max([1, (ymax-ymin)//args.filter_by_box_nrow])
-    bsize_col = np.max([1, (xmax-xmin)//args.filter_by_box_ncol])
-    df['win'] = ((df.Y-ymin)/bsize_row).astype(int).astype(str) + '_' +\
-                ((df.X-xmin)/bsize_col).astype(int).astype(str)
-
-    logging.info(f"Read barcodes, collapsed into {df.shape[0]} pts")
-    df['hex_x'] = 0
-    df['hex_y'] = 0
-
-    ### Detect grid points falling inside dense tissue region
-    anchor = np.zeros((0,2))
-    pt = pd.DataFrame()
-    for w in df.win.unique():
-        indx = df.win.eq(w)
-        m0v=[]
-        m1v=[]
-        for i in range(n_move):
-            for j in range(n_move):
-                df.loc[indx, 'hex_x'], df.loc[indx, 'hex_y'] = pixel_to_hex(np.asarray(df.loc[indx, ['X','Y']]), radius, i/n_move, j/n_move)
-                cnt = df.loc[indx, :].groupby(by = ['hex_x','hex_y']).agg({key:sum}).reset_index()
-                cnt = cnt[cnt[key] > hex_area * args.min_abs_mol_density_squm]
-                if cnt.shape[0] < 10:
-                    continue
-                if args.hard_threshold > 0:
-                    cnt['det'] = cnt[key] > hex_area * args.hard_threshold
-                else:
-                    v = np.log10(cnt[key].values).reshape(-1, 1)
-                    gm = sklearn.mixture.GaussianMixture(n_components=2, random_state=0).fit(v)
-                    lab_keep = np.argmax(gm.means_.squeeze())
-                    cnt['det'] = gm.predict(v) == lab_keep
-                    m0=(10**gm.means_.squeeze()[lab_keep])/hex_area
-                    m1=(10**gm.means_.squeeze()[1-lab_keep])/hex_area
-                    if m1 > m0 * 0.5 or m0 < args.min_abs_mol_density_squm:
-                        v = cnt[key].values.reshape(-1, 1)
-                        gm = sklearn.mixture.GaussianMixture(n_components=2, random_state=0).fit(v)
-                        lab_keep = np.argmax(gm.means_.squeeze())
-                        lab = gm.predict(v)
-                        cnt['det'] = gm.predict(v) == lab_keep
-                        m0=gm.means_.squeeze()[lab_keep]/hex_area
-                        m1=gm.means_.squeeze()[1-lab_keep]/hex_area
-                    if m0 < args.min_abs_mol_density_squm:
-                        continue
-                    if m1 > m0 * .7:
-                        cnt['det'] = 1
-                    m0v.append(m0)
-                    m1v.append(m1)
-                if cnt.det.eq(True).sum() < 2:
-                    continue
-                m0 = cnt.loc[cnt.det.eq(True), key].median()/hex_area
-                m1 = cnt.loc[cnt.det.eq(False), key].median()/hex_area
-                m0v.append(m0)
-                m1v.append(m1)
-                anchor_x, anchor_y = hex_to_pixel(cnt.loc[cnt.det.eq(True), 'hex_x'].values, cnt.loc[cnt.det.eq(True), 'hex_y'].values, radius,i/n_move,j/n_move)
-                pt = pd.concat([pt,\
-                     pd.DataFrame({'x':anchor_x, 'y':anchor_y, 'lane':lane})])
-                logging.info(f"{m0:.3f} v.s. {m1:.3f}")
-        m0 = np.mean(m0v)
-        m1 = np.mean(m1v)
-        logging.info(f"Window {str(w)}:\t{m0:.3f} v.s. {m1:.3f}")
-
-    pt.x = np.around(np.clip(pt.x.values,0,np.inf)/args.precision_um,0).astype(int)
-    pt.y = np.around(np.clip(pt.y.values,0,np.inf)/args.precision_um,0).astype(int)
-    pt.drop_duplicates(inplace=True)
-    pt.x = pt.x * args.precision_um
-    pt.y = pt.y * args.precision_um
-    pt.to_csv(args.ref_pts, sep='\t', index=False, header=True)
-    del df
-    gc.collect()
-
-
-pt = pt.astype({'x':float, 'y':float, 'lane':str})
-ref = {}
-for lane in pt.lane.unique():
-    ref[lane] = sklearn.neighbors.BallTree(np.array(pt.loc[pt.lane.eq(lane), ['x','y']]))
-logging.info(f"Built balltree for reference points")
 
 ### Read pixels and keep only those close to the kept grid points
 feature_tot_ct = pd.DataFrame()

@@ -23,7 +23,7 @@ for x in header:
 K = len(factor_header)
 
 try:
-    f = os.path.split(os.path.dirname(f))[0] + "/coordinate_minmax.tsv"
+    f = os.path.split(os.path.dirname(args.input))[0] + "/coordinate_minmax.tsv"
     if not os.path.exists(f):
         xmin, ymin = df[["x", "y"]].min(axis = 0)
         xmax, ymax = df[["x", "y"]].max(axis = 0)
@@ -46,10 +46,9 @@ mtx = np.array(df.loc[:, factor_header].corr())
 linear = MDS(n_components=1, dissimilarity="precomputed").fit_transform(1-mtx).squeeze()
 c_order = np.argsort(linear)
 
+# Output RGB table
 df = pd.DataFrame({"Name":range(K), "Color_index":c_order,\
         "R":cmtx[c_order, 0], "G":cmtx[c_order, 1], "B":cmtx[c_order, 2]})
-
-# Output RGB table
 f = args.output + ".rgb.tsv"
 df.to_csv(f, sep='\t', index=False)
 

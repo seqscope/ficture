@@ -126,6 +126,8 @@ tile_ll = tiles[-1][0]
 tile_ur = tiles[0][-1]
 logging.info(f"Read layout info.")
 
+if args.hard_threshold > 0:
+    logging.info(f"Filter by hard thresholding ({args.hard_threshold})")
 
 ### If work on subset of genes
 gene_kept = []
@@ -329,6 +331,8 @@ for itr_r in range(len(lanes)):
         logging.info(f"Write data for {lane}_{tile}, {sub.shape}. (total {n_pixel} so far)")
 
 feature_tot_ct = feature_tot_ct.groupby(by = ['gene', 'gene_id']).agg({x:sum for x in ct_header}).reset_index()
+feature_tot_ct.sort_values(by = key, ascending=False, inplace=True)
+feature_tot_ct.drop_duplicates(subset="gene", inplace=True)
 f = outpath+"/feature."+args.identifier+".tsv.gz"
 feature_tot_ct.to_csv(f, sep='\t', index=False, header=True)
 logging.info(f"Finish filtering")

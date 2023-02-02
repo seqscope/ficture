@@ -4,17 +4,28 @@ import pandas as pd
 import sklearn.neighbors
 
 class ImgRowIterator:
-    def __init__(self, pts, mtx, radius, verbose=500):
+    def __init__(self, pts, mtx, radius, verbose=500, chunksize=500):
         self.pts = pts
-        self.ref = sklearn.neighbors.BallTree(\
-                      np.array(pts, dtype=int))
-        self.width, self.height = pts.max(axis = 0) + 1
+        self.N = self.pts.shape[0]
+        self.width, self.height = self.pts.max(axis = 0) + 1
         self.current = -1
         self.mtx = mtx
         self.dt = mtx.dtype
         self.verbose = verbose
         self.radius = radius
+        self.chunksize = chunksize
         print(f"Image size (w x h): {self.width} x {self.height}")
+        self.buffer_lower = self.pts[:, 1].min()
+        self.buffer_upper = self.buffer_lower + self.chunksize
+        indx = (self.pts[:, 1] >= self.buffer_lower) & (self.pts[:, 1] <= self.buffer_upper)
+        self.buffer_index = np.arange(self.N)[indx]
+        while len(self.buffer_index) < 2 and self.buffer_upper < self.height:
+            self.buffer_upper += self.chunksize
+            indx = (self.pts[:, 1] >= self.buffer_lower) & (self.pts[:, 1] <= self.buffer_upper)
+            self.buffer_index = np.arange(self.N)[indx]
+        assert len(self.buffer_index) > 1, "Input coordinates are ouside input range"
+        self.ref = sklearn.neighbors.BallTree(self.pts[self.buffer_index, :])
+        print(f"Initialized buffer for block {self.buffer_lower} - {self.buffer_upper}")
         return
 
     def __iter__(self):
@@ -26,10 +37,11 @@ class ImgRowIterator:
             print(f"{self.current}/{self.height}")
         if self.current >= self.height:
             raise StopIteration
+        self.update_buffer()
         nodes = np.array([[i, self.current] for i in range(self.width)])
         dv, iv = self.ref.query(nodes, k = 1)
-        indx = (dv[:, 0] < self.radius) & (dv[:, 0] > 0)
-        iv = iv[indx, 0]
+        indx = dv[:, 0] < self.radius
+        iv = self.buffer_index[iv[indx, 0]]
         iu = np.arange(self.width)[indx]
         if sum(indx) == 0:
             return np.zeros(self.width * 3, dtype = self.dt)
@@ -38,7 +50,22 @@ class ImgRowIterator:
             out[iu*3+c] = self.mtx[iv, c]
         return out
 
-
+    def update_buffer(self):
+        if self.current < self.buffer_upper - self.radius - 1:
+            return
+        if self.buffer_upper >= self.height:
+            return
+        self.buffer_lower = self.current - self.radius - 1
+        self.buffer_upper = self.buffer_lower + self.chunksize
+        indx = (self.pts[:, 1] >= self.buffer_lower) & (self.pts[:, 1] <= self.buffer_upper)
+        self.buffer_index = np.arange(self.N)[indx]
+        while len(self.buffer_index) < 2 and self.buffer_upper < self.height:
+            self.buffer_upper += self.chunksize
+            indx = (self.pts[:, 1] >= self.buffer_lower) & (self.pts[:, 1] <= self.buffer_upper)
+            self.buffer_index = np.arange(self.N)[indx]
+        if len(self.buffer_index) > 0:
+            self.ref = sklearn.neighbors.BallTree(self.pts[self.buffer_index, :])
+            return
 
 class ImgRowIterator_stream:
     def __init__(self, reader, w, h, cmtx,\
@@ -110,23 +137,26 @@ class ImgRowIterator_stream:
             return 1
         chunk.x -= self.xmin
         chunk.y -= self.ymin
+        # Concatenate with leftover
         chunk = pd.concat([self.leftover.loc[:, self.data_header],\
                            chunk.loc[:, self.data_header]])
-        # Collapse
+        # Translate into image pixel coordinates
         chunk['x'] = np.round(chunk.x.values / self.pixel_size, 0).astype(int)
         chunk['y'] = np.round(chunk.y.values / self.pixel_size, 0).astype(int)
-        chunk = chunk.groupby(by = ['x', 'y']).agg({\
-                      x:np.mean for x in self.feature_header }).reset_index()
         # Save the last row (incomplete) for later
         indx = chunk.y.eq(chunk.y.iloc[-1])
         self.leftover = copy.copy(chunk.loc[indx, self.data_header])
-        self.leftover.x *= self.pixel_size
+        self.leftover.x *= self.pixel_size # Back to um
         self.leftover.y *= self.pixel_size
-        if chunk.y.iloc[0] == chunk.y.iloc[-1]:
+        if chunk.y.iloc[0] == chunk.y.iloc[-1]: # Need to read more
             return 1
-        self.pts = chunk.loc[~indx, ["x", "y"]]
+        # Collapse
+        chunk = chunk.loc[~indx, :]
+        chunk = chunk.groupby(by = ["x", "y"]).agg({\
+                      x:np.mean for x in self.feature_header }).reset_index()
+        self.pts = chunk.loc[:, ["x", "y"]]
         self.buffer_y = self.pts.y.max()
         self.mtx = np.clip(np.around(np.array(\
-                   chunk.loc[~indx, self.feature_header]) @ self.cmtx * 255),\
+                   chunk.loc[:, self.feature_header]) @ self.cmtx * 255),\
                    0, 255).astype(self.dtype)
         return 1

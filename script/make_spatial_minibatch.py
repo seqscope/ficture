@@ -89,7 +89,7 @@ for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
     df["random_index"] = -1
     l_list = df['#lane'].unique()
 
-    for l in l_list:
+    for it_l, l in enumerate(l_list):
         lane_indx = df['#lane'].eq(l)
         x_min = df.loc[lane_indx, "X"].min()
         x_max = df.loc[lane_indx, "X"].max()
@@ -98,7 +98,7 @@ for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
         x_range = x_max - x_min
         y_range = y_max - y_min
         logging.info(f"Read blocks of pixels from lane {l}: {x_range/args.mu_scale:.2f} x {y_range/args.mu_scale:.2f}")
-        if x_range < batch_size or y_range < batch_size:
+        if (x_range < batch_size or y_range < batch_size) and len(l_list)-1 == it_l:
             continue
         x_grd_st = np.arange(x_min, x_max-batch_size/2+1, batch_step)
         x_grd_ed = [x + batch_size for x in x_grd_st]
@@ -136,3 +136,48 @@ for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
     w  = df[args.major_axis].max() - df[args.major_axis].min()
     w0 = (df.random_index < 0).sum()
     logging.info(f"Left over size {df.shape[0]} ({w0}, {w:.2f})")
+
+
+
+
+
+
+
+if df.shape[0] > 0:
+    df["random_index"] = -1
+    l_list = df['#lane'].unique()
+    for l in l_list:
+        lane_indx = df['#lane'].eq(l)
+        x_min = df.loc[lane_indx, "X"].min()
+        x_max = df.loc[lane_indx, "X"].max()
+        y_min = df.loc[lane_indx, "Y"].min()
+        y_max = df.loc[lane_indx, "Y"].max()
+        x_range = x_max - x_min
+        y_range = y_max - y_min
+        logging.info(f"Read blocks of pixels from lane {l}: {x_range/args.mu_scale:.2f} x {y_range/args.mu_scale:.2f}")
+        x_grd_st = np.arange(x_min, x_max-batch_size/2+1, batch_step)
+        x_grd_ed = [x + batch_size for x in x_grd_st]
+        y_grd_st = np.arange(y_min, y_max-batch_size/2+1, batch_step)
+        y_grd_ed = [x + batch_size for x in y_grd_st]
+        x_grd_st[0]  = x_min - 1
+        y_grd_st[0]  = y_min - 1
+        x_grd_ed[-1] = x_max
+        y_grd_ed[-1] = y_max
+
+        for it_x in range(len(x_grd_st)):
+            for it_y in range(len(y_grd_st)):
+                xst = x_grd_st[it_x]
+                xed = x_grd_ed[it_x]
+                yst = y_grd_st[it_y]
+                yed = y_grd_ed[it_y]
+                indx = (df.X > xst) & (df.X <= xed) & (df.Y > yst) & (df.Y <= yed) & df['#lane'].eq(l)
+                if sum(indx) < args.min_pixel:
+                    continue
+                df.loc[indx, "random_index"] = rng.randint(1, sys.maxsize//100)
+                ### Output
+                xst /= args.mu_scale
+                xed /= args.mu_scale
+                yst /= args.mu_scale
+                yed /= args.mu_scale
+                logging.info(f"Output region ({xed-xst:.2f}, {yed-yst:.2f}) ({xst:.1f}, {xed:.1f}) x ({yst:.1f}, {yed:.1f})")
+                df.loc[indx, output_header].to_csv(args.output, mode='a', sep='\t', index=False, header=False)

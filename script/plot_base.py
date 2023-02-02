@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from random import shuffle
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from PIL import Image
 
@@ -19,9 +20,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
 parser.add_argument('--output', type=str, help='Output prefix')
 parser.add_argument('--fill_range', type=float, default=5, help="um")
-parser.add_argument('--batch_size', type=float, default=1000000, help="")
+parser.add_argument('--batch_size', type=float, default=10000, help="")
 parser.add_argument('--color_table', type=str, default='', help='Pre-defined color map')
 parser.add_argument('--cmap_name', type=str, default="turbo", help="Name of Matplotlib colormap to use")
+parser.add_argument('--binary_cmap_name', type=str, default="plasma", help="Name of Matplotlib colormap to use for ploting individual factors")
 parser.add_argument('--plot_um_per_pixel', type=float, default=1, help="Size of the output pixels in um")
 parser.add_argument('--xmin', type=float, default=-1, help="")
 parser.add_argument('--ymin', type=float, default=-1, help="")
@@ -31,6 +33,7 @@ parser.add_argument("--tif", action='store_true', help="Store as 16-bit tif inst
 parser.add_argument("--plot_fit", action='store_true', help="")
 parser.add_argument("--plot_individual_factor", action='store_true', help="")
 parser.add_argument("--plot_discretized", action='store_true', help="")
+parser.add_argument("--skip_mixture_plot", action='store_true', help="")
 
 args = parser.parse_args()
 logging.basicConfig(level= getattr(logging, "INFO", None))
@@ -101,65 +104,65 @@ logging.info(f"Read region {N0} pixels in region {hsize_um} x {wsize_um}")
 
 
 # Make images
-binary_mtx = coo_matrix((np.ones(N0,dtype=bool),\
-        (range(N0), np.array(df[factor_header]).argmax(axis = 1))),\
-        shape=(N0, K)).toarray()
 wst = df.y_indx.min()
 wed = df.y_indx.max()
 wstep = np.max([10, int(args.batch_size / hsize)])
-rgb_mtx = np.clip(np.around(np.array(df[factor_header]) @ cmtx * 255),0,255).astype(dt)
-rgb_mtx_hard = np.clip(np.around(binary_mtx @ cmtx * 255),0,255).astype(dt)
-pts = np.array(df[['x_indx', 'y_indx']], dtype=int)
-pts_indx = list(df.index)
-ref = sklearn.neighbors.BallTree(pts)
+radius = args.fill_range/args.plot_um_per_pixel
 
+pts = np.zeros((0, 2), dtype=int)
+pts_indx = []
 st = wst
 while st < wed:
     ed = min([st + wstep, wed])
-    print(st, ed, pts.shape[0])
+    logging.info(f"Filling pixels {st} - {ed}")
     if ((df.y_indx > st) & (df.y_indx < ed)).sum() < 10:
         st = ed
         continue
+    block = df.index[(df.y_indx > st - 2*radius) & (df.y_indx < ed + 2*radius)]
+    ref = sklearn.neighbors.BallTree(np.array(df.loc[block, ['x_indx', 'y_indx']]))
     mesh = np.meshgrid(np.arange(hsize), np.arange(st, ed))
     nodes = np.array(list(zip(*(dim.flat for dim in mesh))), dtype=int)
     dv, iv = ref.query(nodes, k = 1, dualtree=True)
-    indx = (dv[:, 0] < args.fill_range/args.plot_um_per_pixel) & (dv[:, 0] > 0)
-    iv = iv[indx, 0]
+    indx = dv[:, 0] < radius
+    iv = block[iv[indx, 0] ]
     if sum(indx) == 0:
         st = ed
         continue
     pts = np.vstack((pts, nodes[indx, :]) )
-    pts_indx += list(df.index[iv] )
-    rgb_mtx = np.vstack((rgb_mtx,\
-        np.clip(np.around( np.array(\
-            df.loc[iv,factor_header]) @ cmtx * 255),0,255).astype(dt)))
-    if args.plot_discretized:
-        rgb_mtx_hard = np.vstack((rgb_mtx_hard,\
-            np.clip(np.around(np.array(\
-                binary_mtx[iv, :]) @ cmtx * 255),0,255).astype(dt)))
+    pts_indx += list(iv)
     st = ed
 
 pts[:,0] = np.clip(hsize - pts[:, 0], 0, hsize-1) # Origin is lower-left
 pts[:,1] = np.clip(pts[:, 1], 0, wsize-1)
 
-img = np.zeros( (hsize, wsize, 3), dtype=dt)
-for r in range(3):
-    img[:, :, r] = coo_array((rgb_mtx[:, r], (pts[:,0], pts[:,1])),\
-        shape=(hsize, wsize), dtype = dt).toarray()
-if args.tif:
-    img = Image.fromarray(img, mode="I;16")
-else:
-    img = Image.fromarray(img)
+logging.info(f"Start constructing RGB image")
 
-outf = args.output
-outf += ".tif" if args.tif else ".png"
-img.save(outf)
-logging.info(f"Made fractional image\n{outf}")
-
-if args.plot_discretized:
+if not args.skip_mixture_plot:
+    rgb_mtx = np.clip(np.around(np.array(df.loc[pts_indx,factor_header]) @\
+                                cmtx * 255),0,255).astype(dt)
     img = np.zeros( (hsize, wsize, 3), dtype=dt)
     for r in range(3):
-        img[:, :, r] = coo_array((rgb_mtx_hard[:, r], (pts[:,0], pts[:,1])),\
+        img[:, :, r] = coo_array((rgb_mtx[:, r], (pts[:,0], pts[:,1])),\
+            shape=(hsize, wsize), dtype = dt).toarray()
+    if args.tif:
+        img = Image.fromarray(img, mode="I;16")
+    else:
+        img = Image.fromarray(img)
+
+    outf = args.output
+    outf += ".tif" if args.tif else ".png"
+    img.save(outf)
+    logging.info(f"Made fractional image\n{outf}")
+
+if args.plot_discretized:
+    binary_mtx = coo_matrix((np.ones(N0,dtype=bool),\
+            (range(N0), np.array(df[factor_header]).argmax(axis = 1))),\
+            shape=(N0, K)).toarray()
+    rgb_mtx = np.clip(np.around(np.array(binary_mtx[pts_indx, :]) @\
+                                cmtx * 255),0,255).astype(dt)
+    img = np.zeros( (hsize, wsize, 3), dtype=dt)
+    for r in range(3):
+        img[:, :, r] = coo_array((rgb_mtx[:, r], (pts[:,0], pts[:,1])),\
             shape=(hsize, wsize), dtype = dt).toarray()
     if args.tif:
         img = Image.fromarray(img, mode="I;16")
@@ -172,10 +175,13 @@ if args.plot_discretized:
     logging.info(f"Made hard threshold image\n{outf}")
 
 if args.plot_individual_factor:
-    binary_rgb = np.array([[255,153,0], [17,101,154]])
-    for k in range(K):
+    if args.binary_cmap_name not in plt.colormaps():
+        args.binary_cmap_name = "plasma"
+    v = np.array(df.loc[pts_indx, factor_header].sum(axis = 0) )
+    u = np.argsort(-v)
+    for k in u:
         v = np.clip(df.loc[pts_indx, factor_header[k]].values,0,1)
-        rgb_mtx = np.clip(np.vstack((v, 1-v)).T @ binary_rgb, 0, 255).astype(dt)
+        rgb_mtx = np.clip(mpl.colormaps[args.binary_cmap_name](v)[:,:3]*255,0,255).astype(dt)
         img = np.zeros( (hsize, wsize, 3), dtype=dt)
         for r in range(3):
             img[:, :, r] = coo_array((rgb_mtx[:, r], (pts[:,0], pts[:,1])),\

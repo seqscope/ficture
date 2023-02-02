@@ -22,16 +22,17 @@ parser.add_argument('--output', type=str, help='')
 parser.add_argument('--anchor', type=str, default='', help='')
 
 # Data realted parameters
-parser.add_argument('--anchor_radius', type=float, default=15, help='Radius to initialize anchor points. Only used if --anchor file is not available')
-parser.add_argument('--anchor_resolution', type=float, default=3, help='Distance (um) between two neighboring anchor point. Only used if --anchor file is not available')
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
-parser.add_argument('--precision', type=float, default=.25, help='If positive, collapse pixels within X um.')
 parser.add_argument('--key', type=str, default = 'gn', help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced')
+parser.add_argument('--precision', type=float, default=.25, help='If positive, collapse pixels within X um.')
+parser.add_argument('--anchor_radius', type=float, default=15, help='Radius to initialize anchor points. Only used if --anchor file is not available')
 
 # Learning related parameters
+parser.add_argument('--decode_only', action='store_true')
 parser.add_argument('--total_pixel', type=float, default=1e5, help='(An estimate of) total number of pixels just for calculating the learning rate')
+parser.add_argument('--anchor_resolution', type=float, default=3, help='Distance (um) between two neighboring anchor point. Only used if --anchor file is not available')
 parser.add_argument('--neighbor_radius', type=float, default=25, help='The radius (um) of each anchor point\'s territory')
-parser.add_argument('--min_ct_per_unit', type=int, default=10, help='Keep anchor points with at least x reads inside its territory during initialization. Would only be used if --anchor file is not provided')
+parser.add_argument('--min_ct_per_unit', type=int, default=20, help='Keep anchor points with at least x reads inside its territory during initialization. Would only be used if --anchor file is not provided')
 parser.add_argument('--halflife', type=float, default=0.7, help='Control the decay of distance-based weight')
 
 # Other
@@ -62,7 +63,7 @@ if os.path.exists(args.anchor):
 mu_scale = 1./args.mu_scale
 radius = args.anchor_radius
 precision = args.precision
-key = args.key
+key = args.key.lower()
 nu = np.log(.5) / np.log(args.halflife)
 out_buff = args.neighbor_radius * args.halflife
 
@@ -78,6 +79,7 @@ logging.info(f"{M} genes and {K} factors are read from input model")
 ### Input pixel info (input has to contain certain columns with correct header)
 with gzip.open(args.input, 'rt') as rf:
     oheader = rf.readline().strip().split('\t')
+oheader = [x.lower() if len(x) > 1 else x for x in oheader]
 input_header = ["random_index","X","Y","gene",key]
 dty = {x:int for x in ['X','Y',key]}
 dty.update({x:str for x in ['random_index', 'gene']})
@@ -88,11 +90,11 @@ if len(mheader) > 0:
 oheader_indx = [input_header.index(x) for x in input_header]
 
 ### Model fitting
-betaksum = model.components_.sum(axis = 1)
-global_scale = np.min([1, 1000 / np.median(betaksum)])
-_lambda = model.components_ * global_scale
-if args.debug:
-    print(global_scale, np.median(_lambda.sum(axis=1)), sorted(np.around(betaksum*global_scale, 0)) )
+_lambda = model.components_
+if not args.decode_only:
+    betaksum = model.components_.sum(axis = 1)
+    global_scale = np.min([1, 1000 / np.median(betaksum)])
+    _lambda *= global_scale
 slda = OnlineLDA(vocab=gene_kept, K=K, N=args.total_pixel,
                  iter_inner=30, verbose = 1)
 slda.init_global_parameter(_lambda)
@@ -103,12 +105,12 @@ chunk_size = 1000000
 post_count = np.zeros((K, M))
 
 for chunk in pd.read_csv(args.input, sep='\t', chunksize=chunk_size,\
-                        header = 0, usecols=input_header, dtype=dty):
+                         skiprows=1, names=oheader, usecols=input_header, dtype=dty):
     full_chunk = chunk.shape[0] == chunk_size
     chunk = chunk.loc[(chunk[key] > 0)&chunk.gene.isin(gene_kept), :]
-    if chunk.shape[0] == 0:
-        continue
     df_full = pd.concat([df_full, chunk])
+    if df_full.shape[0] == 0:
+        continue
     left    = pd.DataFrame(columns = input_header)
 
     # Save the incomplete minibatch for later
@@ -245,7 +247,10 @@ for chunk in pd.read_csv(args.input, sep='\t', chunksize=chunk_size,\
         batch = scorpus.corpus()
         batch.init_from_matrix(mtx, grid_pt, wij, psi = psi_org, phi = phi_org,\
                                m_gamma = theta, features = gene_kept)
-        scores = slda.update_lambda(batch)
+        if args.decode_only:
+            sstats = slda.do_e_step(batch)
+        else:
+            scores = slda.update_lambda(batch)
 
         tmp = brc.iloc[b_indx, :]
         v = np.arange(N)[(tmp.X > x_min+out_buff) & (tmp.X < x_max-out_buff) &\
@@ -295,16 +300,17 @@ for chunk in pd.read_csv(args.input, sep='\t', chunksize=chunk_size,\
 nleft = df_full.shape[0]
 logging.info(f"Finished {n_batch} batches ({nleft} lines)")
 
-### Output updated parameters
-
-out_f = args.output + ".updated.model.tsv.gz"
-pd.concat([pd.DataFrame({'gene': gene_kept}),\
-           pd.DataFrame(slda._lambda.T, dtype='float64',\
-            columns = ["Factor_"+str(k) for k in range(K)])],\
-        axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.4e', compression={"method":"gzip"})
+### Output posterior summaries
 
 out_f = args.output + ".posterior.count.tsv.gz"
 pd.concat([pd.DataFrame({'gene': gene_kept}),\
            pd.DataFrame(post_count.T, dtype='float64',\
             columns = ["Factor_"+str(k) for k in range(K)])],\
         axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.2f', compression={"method":"gzip"})
+
+if not args.decode_only:
+    out_f = args.output + ".updated.model.tsv.gz"
+    pd.concat([pd.DataFrame({'gene': gene_kept}),\
+            pd.DataFrame(slda._lambda.T, dtype='float64',\
+                columns = ["Factor_"+str(k) for k in range(K)])],\
+            axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.4e', compression={"method":"gzip"})

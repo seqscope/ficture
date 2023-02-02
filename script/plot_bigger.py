@@ -12,7 +12,7 @@ from utilt import plot_colortable
 from image_fn import ImgRowIterator_stream as RowIterator
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--input', type=str, help="Input file has to be sorted according to the y-axis (if --horizontal_axis = x, default) or the x-axis if --horizontal_axis = y")
+parser.add_argument('--input', type=str, help="Input file has to be sorted according to the y-axis (if --horizontal_axis x, default) or the x-axis if --horizontal_axis y")
 parser.add_argument('--output', type=str, help='Output prefix')
 parser.add_argument('--xmin', type=float, help="")
 parser.add_argument('--ymin', type=float, help="")
@@ -21,17 +21,15 @@ parser.add_argument('--ymax', type=float, help="")
 parser.add_argument('--horizontal_axis', type=str, default="x", help="Which coordinate is horizontal, x or y")
 parser.add_argument('--color_table', type=str, default='', help='Pre-defined color map')
 parser.add_argument('--cmap_name', type=str, default="turbo", help="Name of Matplotlib colormap to use")
-parser.add_argument('--binary_cmap_name', type=str, default="plasma", help="Name of Matplotlib colormap to use for ploting individual factors")
 parser.add_argument('--plot_um_per_pixel', type=float, default=1, help="Size of the output pixels in um")
-parser.add_argument("--plot_fit", action='store_true', help="")
-parser.add_argument("--plot_discretized", action='store_true', help="")
-parser.add_argument("--plot_individual_factor", action='store_true', help="")
+parser.add_argument('--chunksize', type=float, default=1e6, help="How many lines to read from input file at a time")
 
 args = parser.parse_args()
 logging.basicConfig(level= getattr(logging, "INFO", None))
 haxis = args.horizontal_axis.lower()
 if haxis not in ["x", "y"]:
     sys.exit("Unrecognized --horizontal_axis")
+chunksize = int(args.chunksize)
 
 with gzip.open(args.input, "rt") as rf:
     header = rf.readline().strip().split('\t')
@@ -63,8 +61,6 @@ else:
     cmap_name = args.cmap_name
     if args.cmap_name not in plt.colormaps():
         cmap_name = "turbo"
-    if args.binary_cmap_name not in plt.colormaps():
-        args.binary_cmap_name = "plasma"
     cmap = plt.get_cmap(cmap_name, K)
     cmtx = np.array([cmap(i) for i in range(K)] )
     indx = np.arange(K)
@@ -84,7 +80,7 @@ else:
 
 adt={x:float for x in ["x","y"]+factor_header}
 reader = pd.read_csv(gzip.open(args.input, 'rt'), sep='\t', \
-                     chunksize=1000000, skiprows=1, names=header, dtype=adt)
+                     chunksize=chunksize, skiprows=1, names=header, dtype=adt)
 h = args.ymax - args.ymin
 w = args.xmax - args.xmin
 outf = args.output + ".png"

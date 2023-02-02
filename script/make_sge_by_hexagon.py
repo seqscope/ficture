@@ -174,7 +174,7 @@ with open(mtx_header, 'w') as wf:
     line += " ".join([str(x) for x in [M, n_unit, T]]) + "\n"
     wf.write(line)
 
-arg = " ".join(["cat",mtx_header,mtx_f,"|gzip -c > ", mtx_f+".gz"])
+arg = " ".join(["cat",mtx_header,mtx_f,"| gzip -c > ", mtx_f+".gz"])
 if os.system(arg) == 0:
     _ = os.system("rm " + mtx_f)
     _ = os.system("rm " + mtx_header)
