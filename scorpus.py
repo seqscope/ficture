@@ -19,12 +19,14 @@ class corpus:
         self.ll = 0       # log likelihood
 
     def init_from_matrix(self, mtx, doc_pts, w, psi = None, phi = None, m_gamma = None, features = None, barcodes = None):
+        assert sparse.issparse(mtx), "Invalid matrix - must be sparse"
+        assert sparse.issparse(w), "Invalid w - must be sparse"
+
         self.mtx = mtx.tocsr()
         self.N, self.M = mtx.shape
         self.doc_pts = doc_pts
         self.n = self.doc_pts.shape[0]
 
-        assert sparse.issparse(w), "Invalid w - must be sparse"
         assert np.min(w.data) >= 0, "Invalid w - value must be nonnegative"
         assert w.shape == (self.N, self.n), "Inconsistent dimensions of w"
         self.ElogO = copy.copy(w)

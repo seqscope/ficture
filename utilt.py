@@ -4,6 +4,7 @@
 import numpy as np
 import pandas as pd
 import copy
+from scipy import sparse
 from scipy.special import gammaln, psi, logsumexp, expit, logit
 from sklearn.preprocessing import normalize
 import scipy.optimize
@@ -61,6 +62,14 @@ def sb_to_real(phi):
         s += phi[:, k]
     return mtx
 
+def logsumexp_csr(X):
+    assert sparse.issparse(X), "logsumexp_csr: invalid input"
+    X = X.tocsr()
+    result = np.zeros(len(X.data))
+    for i in range(X.shape[0]):
+        result[X.indptr[i]:X.indptr[i+1]] =\
+            logsumexp(X.data[X.indptr[i]:X.indptr[i+1]])
+    return result
 
 def match_factors(mtx1, mtx2, c1, n, cmap, mode='beta'):
     """

@@ -48,10 +48,8 @@ batch_step = batch_size - batch_buff
 ### Input pixel info (input has to have correct header)
 with gzip.open(args.input, 'rt') as rf:
     input_header=rf.readline().strip().split('\t')
-for i,x in enumerate(input_header):
-    if x in ["x", "y"]:
-        input_header[i] = input_header[i].upper()
 dty = {x:int for x in ['X', 'Y']}
+dty.update({x:str for x in ['#lane', 'tile', 'gene']})
 
 ### Streaming input (Is this safe?)
 cmd = []
@@ -79,57 +77,58 @@ else:
 ### Group pixels into minibatches
 output_header = copy.copy(input_header)
 output_header.insert(1, "random_index")
-print(output_header)
+with open(args.output,'w') as wf:
+    _=wf.write('\t'.join(output_header)+'\n')
 
 df = pd.DataFrame()
-nbatch=0
 for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
                 names=input_header, dtype=dty):
     chunk["random_index"] = -1
     chunk.random_index = chunk.random_index.astype(int)
     df = pd.concat([df, chunk])
     df["random_index"] = -1
-    x_min = df["X"].min()
-    x_max = df["X"].max()
-    y_min = df["Y"].min()
-    y_max = df["Y"].max()
-    x_range = x_max - x_min
-    y_range = y_max - y_min
-    logging.info(f"Read blocks of pixels: {x_range/args.mu_scale:.2f} x {y_range/args.mu_scale:.2f}")
-    if (x_range < batch_size or y_range < batch_size):
-        continue
-    x_grd_st = np.arange(x_min, x_max-batch_size/2+1, batch_step)
-    x_grd_ed = [x + batch_size for x in x_grd_st]
-    y_grd_st = np.arange(y_min, y_max-batch_size/2+1, batch_step)
-    y_grd_ed = [x + batch_size for x in y_grd_st]
-    x_grd_st[0]  = x_min - 1
-    y_grd_st[0]  = y_min - 1
-    x_grd_ed[-1] = x_max
-    y_grd_ed[-1] = y_max
+    l_list = df['#lane'].unique()
 
-    for it_x in range(len(x_grd_st)):
-        for it_y in range(len(y_grd_st)):
-            xst = x_grd_st[it_x]
-            xed = x_grd_ed[it_x]
-            yst = y_grd_st[it_y]
-            yed = y_grd_ed[it_y]
-            indx = (df.X > xst) & (df.X <= xed) & (df.Y > yst) & (df.Y <= yed)
-            if sum(indx) < args.min_pixel:
-                continue
-            df.loc[indx, "random_index"] = rng.randint(1, sys.maxsize//100)
-            ### Output
-            xst /= args.mu_scale
-            xed /= args.mu_scale
-            yst /= args.mu_scale
-            yed /= args.mu_scale
-            logging.info(f"Output region ({xed-xst:.2f}, {yed-yst:.2f}) ({xst:.1f}, {xed:.1f}) x ({yst:.1f}, {yed:.1f})")
-            if nbatch == 0:
-                df.loc[indx, output_header].to_csv(args.output, mode='w', sep='\t', index=False, header=True)
-            else:
+    for it_l, l in enumerate(l_list):
+        lane_indx = df['#lane'].eq(l)
+        x_min = df.loc[lane_indx, "X"].min()
+        x_max = df.loc[lane_indx, "X"].max()
+        y_min = df.loc[lane_indx, "Y"].min()
+        y_max = df.loc[lane_indx, "Y"].max()
+        x_range = x_max - x_min
+        y_range = y_max - y_min
+        logging.info(f"Read blocks of pixels from lane {l}: {x_range/args.mu_scale:.2f} x {y_range/args.mu_scale:.2f}")
+        if (x_range < batch_size or y_range < batch_size) and len(l_list)-1 == it_l:
+            continue
+        x_grd_st = np.arange(x_min, x_max-batch_size/2+1, batch_step)
+        x_grd_ed = [x + batch_size for x in x_grd_st]
+        y_grd_st = np.arange(y_min, y_max-batch_size/2+1, batch_step)
+        y_grd_ed = [x + batch_size for x in y_grd_st]
+        x_grd_st[0]  = x_min - 1
+        y_grd_st[0]  = y_min - 1
+        x_grd_ed[-1] = x_max
+        y_grd_ed[-1] = y_max
+
+        for it_x in range(len(x_grd_st)):
+            for it_y in range(len(y_grd_st)):
+                xst = x_grd_st[it_x]
+                xed = x_grd_ed[it_x]
+                yst = y_grd_st[it_y]
+                yed = y_grd_ed[it_y]
+                indx = (df.X > xst) & (df.X <= xed) & (df.Y > yst) & (df.Y <= yed) & df['#lane'].eq(l)
+                if sum(indx) < args.min_pixel:
+                    continue
+                df.loc[indx, "random_index"] = rng.randint(1, sys.maxsize//100)
+                ### Output
+                xst /= args.mu_scale
+                xed /= args.mu_scale
+                yst /= args.mu_scale
+                yed /= args.mu_scale
+                logging.info(f"Output region ({xed-xst:.2f}, {yed-yst:.2f}) ({xst:.1f}, {xed:.1f}) x ({yst:.1f}, {yed:.1f})")
                 df.loc[indx, output_header].to_csv(args.output, mode='a', sep='\t', index=False, header=False)
-            nbatch += 1
 
     ### Leftover
+    df = df.loc[df["#lane"].eq(l_list[-1]), :]
     mj_max = df.loc[:, args.major_axis].max()
     left_indx = (df.random_index < 0) |\
                 (df[args.major_axis] > mj_max-batch_buff)
@@ -141,41 +140,44 @@ for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
 
 
 
+
+
+
 if df.shape[0] > 0:
     df["random_index"] = -1
-    x_min = df["X"].min()
-    x_max = df["X"].max()
-    y_min = df["Y"].min()
-    y_max = df["Y"].max()
-    x_range = x_max - x_min
-    y_range = y_max - y_min
-    logging.info(f"Read blocks of pixels: {x_range/args.mu_scale:.2f} x {y_range/args.mu_scale:.2f}")
-    x_grd_st = np.arange(x_min, x_max+1, batch_step)
-    x_grd_ed = [x + batch_size for x in x_grd_st]
-    y_grd_st = np.arange(y_min, y_max+1, batch_step)
-    y_grd_ed = [x + batch_size for x in y_grd_st]
-    x_grd_st[0]  = x_min - 1
-    y_grd_st[0]  = y_min - 1
-    x_grd_ed[-1] = x_max
-    y_grd_ed[-1] = y_max
+    l_list = df['#lane'].unique()
+    for l in l_list:
+        lane_indx = df['#lane'].eq(l)
+        x_min = df.loc[lane_indx, "X"].min()
+        x_max = df.loc[lane_indx, "X"].max()
+        y_min = df.loc[lane_indx, "Y"].min()
+        y_max = df.loc[lane_indx, "Y"].max()
+        x_range = x_max - x_min
+        y_range = y_max - y_min
+        logging.info(f"Read blocks of pixels from lane {l}: {x_range/args.mu_scale:.2f} x {y_range/args.mu_scale:.2f}")
+        x_grd_st = np.arange(x_min, x_max+1, batch_step)
+        x_grd_ed = [x + batch_size for x in x_grd_st]
+        y_grd_st = np.arange(y_min, y_max+1, batch_step)
+        y_grd_ed = [x + batch_size for x in y_grd_st]
+        x_grd_st[0]  = x_min - 1
+        y_grd_st[0]  = y_min - 1
+        x_grd_ed[-1] = x_max
+        y_grd_ed[-1] = y_max
 
-    for it_x in range(len(x_grd_st)):
-        for it_y in range(len(y_grd_st)):
-            xst = x_grd_st[it_x]
-            xed = x_grd_ed[it_x]
-            yst = y_grd_st[it_y]
-            yed = y_grd_ed[it_y]
-            indx = (df.X > xst) & (df.X <= xed) & (df.Y > yst) & (df.Y <= yed)
-            if sum(indx) < args.min_pixel:
-                continue
-            df.loc[indx, "random_index"] = rng.randint(1, sys.maxsize//100)
-            ### Output
-            xst /= args.mu_scale
-            xed /= args.mu_scale
-            yst /= args.mu_scale
-            yed /= args.mu_scale
-            logging.info(f"Output region ({xed-xst:.2f}, {yed-yst:.2f}) ({xst:.1f}, {xed:.1f}) x ({yst:.1f}, {yed:.1f})")
-            if nbatch == 0:
-                df.loc[indx, output_header].to_csv(args.output, mode='w', sep='\t', index=False, header=True)
-            else:
+        for it_x in range(len(x_grd_st)):
+            for it_y in range(len(y_grd_st)):
+                xst = x_grd_st[it_x]
+                xed = x_grd_ed[it_x]
+                yst = y_grd_st[it_y]
+                yed = y_grd_ed[it_y]
+                indx = (df.X > xst) & (df.X <= xed) & (df.Y > yst) & (df.Y <= yed) & df['#lane'].eq(l)
+                if sum(indx) < args.min_pixel:
+                    continue
+                df.loc[indx, "random_index"] = rng.randint(1, sys.maxsize//100)
+                ### Output
+                xst /= args.mu_scale
+                xed /= args.mu_scale
+                yst /= args.mu_scale
+                yed /= args.mu_scale
+                logging.info(f"Output region ({xed-xst:.2f}, {yed-yst:.2f}) ({xst:.1f}, {xed:.1f}) x ({yst:.1f}, {yed:.1f})")
                 df.loc[indx, output_header].to_csv(args.output, mode='a', sep='\t', index=False, header=False)

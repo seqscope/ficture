@@ -57,7 +57,7 @@ test_list['gene_info'] = info
 mtx = pd.read_csv(args.model,sep='\t',header=0)
 factor_header = []
 for x in mtx.columns:
-    y = re.match('^[A-Za-z]+_\d+$', x)
+    y = re.match('^[A-Za-z]*_*(\d+)$', x)
     if y:
         factor_header.append(y.group(0))
 mtx = mtx[mtx.gene.isin(info.gene.values)]

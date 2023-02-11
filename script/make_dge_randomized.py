@@ -102,7 +102,7 @@ with open(args.output,'w') as wf:
 df_full = pd.DataFrame()
 for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
                 names=input_header, dtype=dty):
-    chunk = chunk[chunk[args.key] > 0]
+    chunk = chunk[chunk[key] > 0]
     if chunk.shape[0] == 0:
         logging.info(f"Empty? Left over size {df_full.shape[0]}.")
         continue
@@ -143,7 +143,7 @@ for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
             while offs_y < n_move:
                 x,y = pixel_to_hex(pts, radius, offs_x/n_move, offs_y/n_move)
                 hex_crd = list(zip(x,y))
-                ct = pd.DataFrame({'hex_id':hex_crd, 'tot':brc[args.key].values, 'X':pts[:, 0], 'Y':pts[:,1]}).groupby(by = 'hex_id').agg({'tot': sum, 'X':np.min, 'Y':np.min}).reset_index()
+                ct = pd.DataFrame({'hex_id':hex_crd, 'tot':brc[key].values, 'X':pts[:, 0], 'Y':pts[:,1]}).groupby(by = 'hex_id').agg({'tot': sum, 'X':np.min, 'Y':np.min}).reset_index()
                 mid_ct = np.median(ct.loc[ct.tot >= args.min_ct_per_unit, 'tot'].values)
                 ct = set(ct.loc[(ct.tot >= args.min_ct_per_unit) & (ct[mj] > st + diam/2) & (ct[mj] < ed - diam/2), 'hex_id'].values)
                 if len(ct) < 2:

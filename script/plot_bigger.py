@@ -23,6 +23,7 @@ parser.add_argument('--color_table', type=str, default='', help='Pre-defined col
 parser.add_argument('--cmap_name', type=str, default="turbo", help="Name of Matplotlib colormap to use")
 parser.add_argument('--plot_um_per_pixel', type=float, default=1, help="Size of the output pixels in um")
 parser.add_argument('--chunksize', type=float, default=1e6, help="How many lines to read from input file at a time")
+parser.add_argument("--plot_discretized", action='store_true', help="")
 
 args = parser.parse_args()
 logging.basicConfig(level= getattr(logging, "INFO", None))
@@ -33,6 +34,7 @@ chunksize = int(args.chunksize)
 
 with gzip.open(args.input, "rt") as rf:
     header = rf.readline().strip().split('\t')
+    header = [x.strip() for x in header]
 # Temporary - to be compatible with older input files
 recolumn = {'Hex_center_x':'x', 'Hex_center_y':'y', 'X':'x', 'Y':'y'}
 for i,x in enumerate(header):
@@ -47,7 +49,7 @@ if args.horizontal_axis == "y": # Transpose
 factor_header = []
 for i,x in enumerate(header):
     # Dangerous way to detect which columns to use as factor loadings
-    y = re.match('^[A-Za-z]+_(\d+)$', x)
+    y = re.match('^[A-Za-z]*_*(\d+)$', x)
     if y:
         header[i] = y.group(1)
         factor_header.append(y.group(1))
@@ -85,7 +87,7 @@ h = args.ymax - args.ymin
 w = args.xmax - args.xmin
 outf = args.output + ".png"
 obj  = RowIterator(reader, w, h, cmtx, xmin = args.xmin, ymin = args.ymin,\
-        pixel_size = args.plot_um_per_pixel, verbose=1000, dtype=np.uint8)
+        pixel_size = args.plot_um_per_pixel, verbose=1000, dtype=np.uint8, plot_top=args.plot_discretized)
 wpng = png.Writer(size=(obj.width, obj.height),\
                   greyscale=False,bitdepth=8,planes=3)
 with open(outf, 'wb') as f:

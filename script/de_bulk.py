@@ -7,70 +7,37 @@ import scipy.stats
 from scipy.sparse import *
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--input', type=str, default='', help='')
-parser.add_argument('--label', type=str, default='', help='')
-parser.add_argument('--posterior_count', type=str, default='', help='')
+parser.add_argument('--input', type=str, help='')
 parser.add_argument('--output', type=str, help='')
 parser.add_argument('--feature', type=str, default='', help='')
-parser.add_argument('--unit_col_name', default='random_index', type=str, help='')
-parser.add_argument('--key', default='gn', type=str, help='')
+parser.add_argument('--feature_label', type=str, default = "gene", help='')
 parser.add_argument('--min_ct_per_feature', default=50, type=int, help='')
 parser.add_argument('--max_pval_output', default=1e-3, type=float, help='')
-parser.add_argument('--min_fold_output', default=2, type=float, help='')
+parser.add_argument('--min_fold_output', default=1.5, type=float, help='')
 args = parser.parse_args()
 
 pcut=args.max_pval_output
 fcut=args.min_fold_output
-key =args.key
 gene_kept = set()
 if os.path.exists(args.feature):
     feature = pd.read_csv(args.feature, sep='\t', header=0)
-    gene_kept = set(feature.gene.values )
+    gene_kept = set(feature[args.feature_label].values )
 
-if os.path.exists(args.posterior_count):
-    info = pd.read_csv(args.posterior_count,sep='\t',header=0)
-    oheader = []
-    header = []
-    for x in info.columns:
-        y = re.match('^[A-Za-z]+_(\d+)$', x)
-        if y:
-            header.append(y.group(1))
-            oheader.append(x)
-    K = len(header)
-    M = info.shape[0]
-    info.rename(columns = {oheader[k]:header[k] for k in range(K)}, inplace=True)
-    print(f"Read posterior count over {M} genes and {K} factors")
-
-else:
-    if not os.path.exists(args.input) or not os.path.exists(args.label):
-        sys.exit("Unable to find --input and --label")
-    pmtx = pd.read_csv(args.label,sep='\t',header=0)
-    pmtx.index =pmtx.j.astype(str)
-    oheader = []
-    header = []
-    for x in pmtx.columns:
-        y = re.match('^[A-Za-z]+_(\d+)$', x)
-        if y:
-            header.append(y.group(1))
-            oheader.append(x)
-    K = len(header)
-    pmtx = pmtx.loc[:, oheader]
-    pmtx.rename(columns = {oheader[k]:header[k] for k in range(K)}, inplace=True)
-    print(f"Read mixed membership over {K} factors")
-
-    adt = {args.unit_col_name:str, 'gene':str, "gene_tot":int}
-    info = pd.DataFrame()
-    for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=1000000, header=0, usecols=[args.unit_col_name,"gene",key], dtype=adt):
-        chunk.rename(columns = {args.unit_col_name:'j'},inplace=True)
-        chunk = chunk.loc[chunk.j.isin(pmtx.index), :]
-        ct = pd.DataFrame(np.array(pmtx.loc[chunk.j.values, header]) * chunk[key].values.reshape((-1, 1)), columns = header)
-        ct["gene"] = chunk.gene.values
-        ct = ct.groupby(by = "gene", as_index=False).agg({x:np.sum for x in header})
-        info = pd.concat([info, ct])
-        info = info.groupby(by = "gene", as_index=False).agg({x:np.sum for x in header})
-        print(info.shape)
-    print(f"Aggregated counts")
-    info = info.groupby(by = "gene", as_index=False).agg({x:np.sum for x in header})
+# Read aggregated count table
+info = pd.read_csv(args.input,sep='\t',header=0)
+oheader = []
+header = []
+for x in info.columns:
+    y = re.match('^[A-Za-z]*_*(\d+)$', x)
+    if y:
+        header.append(y.group(1))
+        oheader.append(x)
+K = len(header)
+M = info.shape[0]
+reheader = {oheader[k]:header[k] for k in range(K)}
+reheader[args.feature_label] = "gene"
+info.rename(columns = reheader, inplace=True)
+print(f"Read posterior count over {M} genes and {K} factors")
 
 if len(gene_kept) > 0:
     info = info.loc[info.gene.isin(gene_kept), :]

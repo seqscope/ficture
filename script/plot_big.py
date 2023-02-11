@@ -52,9 +52,11 @@ for i,x in enumerate(header):
         header[i] = recolumn[x]
 factor_header = []
 for x in header:
-    y = re.match('^[A-Za-z]+_\d+$', x)
+    y = re.match('^[A-Za-z]*_*(\d+)$', x)
     if y:
-        factor_header.append(y.group(0))
+        factor_header.append([y.group(0), int(y.group(1)) ])
+factor_header.sort(key = lambda x : x[1] )
+factor_header = [x[0] for x in factor_header]
 K = len(factor_header)
 
 # Colormap
@@ -85,8 +87,6 @@ df = pd.DataFrame()
 nc = 0
 for chunk in pd.read_csv(gzip.open(args.input, 'rt'), sep='\t', \
     chunksize=1000000, skiprows=1, names=header, dtype=adt):
-    print( ((chunk.y > args.ymin) & (chunk.y < args.ymax)).sum() )
-    print(chunk.y.min(), chunk.y.max(), chunk.x.min(), chunk.x.max())
     chunk = chunk.loc[(chunk.y > args.ymin) & (chunk.y < args.ymax), :]
     chunk = chunk.loc[(chunk.x > args.xmin) & (chunk.x < args.xmax), :]
     chunk['x_indx'] = np.round(chunk.x.values / args.plot_um_per_pixel, 0).astype(int)
@@ -96,6 +96,8 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'), sep='\t', \
     nr = df.shape[0]
     nc += 1
     logging.info(f"...reading file ({nc}, {nr})")
+
+logging.info(f"Finish reading file ({nc})")
 
 df = df.groupby(by = ['x_indx', 'y_indx']).agg({ x:np.mean for x in factor_header }).reset_index()
 x_indx_min = int(args.xmin / args.plot_um_per_pixel )
@@ -110,9 +112,7 @@ df.index = range(N0)
 if haxis != "x":
     df.rename(columns = {"x_indx":"y_indx", "y_indx":"x_indx"}, inplace=True)
 width, height = df[['x_indx','y_indx']].max(axis = 0) + 1
-height_um = height * args.plot_um_per_pixel
-width_um  = width  * args.plot_um_per_pixel
-logging.info(f"Read region {N0} pixels in region {height_um} x {width_um}")
+logging.info(f"Read region {N0} pixels in region {height} x {width}")
 
 pts = np.array(df.loc[:, ["x_indx", "y_indx"]], dtype=int)
 mtx = np.clip(np.around( np.array(df.loc[:,factor_header]) @\

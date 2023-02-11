@@ -10,6 +10,7 @@ import sklearn.mixture
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from hexagon_fn import *
 from layout_fn import layout_map
+from filter_fn import filter_by_density_mixture
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input_path', type=str, help='')
@@ -203,50 +204,9 @@ else:
     for w in df.win.unique():
         lane = w.split('_')[0]
         indx = df.win.eq(w)
-        m0v=[]
-        m1v=[]
-        for i in range(n_move):
-            for j in range(n_move):
-                df.loc[indx, 'hex_x'], df.loc[indx, 'hex_y'] = pixel_to_hex(np.asarray(df.loc[indx, ['X','Y']]), radius, i/n_move, j/n_move)
-                cnt = df.loc[indx, :].groupby(by = ['hex_x','hex_y']).agg({key:sum}).reset_index()
-                cnt = cnt[cnt[key] > hex_area * args.min_abs_mol_density_squm]
-                if cnt.shape[0] < 10:
-                    continue
-                if args.hard_threshold > 0:
-                    cnt['det'] = cnt[key] > hex_area * args.hard_threshold
-                else:
-                    v = np.log10(cnt[key].values).reshape(-1, 1)
-                    gm = sklearn.mixture.GaussianMixture(n_components=2, random_state=0).fit(v)
-                    lab_keep = np.argmax(gm.means_.squeeze())
-                    cnt['det'] = gm.predict(v) == lab_keep
-                    m0=(10**gm.means_.squeeze()[lab_keep])/hex_area
-                    m1=(10**gm.means_.squeeze()[1-lab_keep])/hex_area
-                    if m1 > m0 * 0.5 or m0 < args.min_abs_mol_density_squm:
-                        v = cnt[key].values.reshape(-1, 1)
-                        gm = sklearn.mixture.GaussianMixture(n_components=2, random_state=0).fit(v)
-                        lab_keep = np.argmax(gm.means_.squeeze())
-                        lab = gm.predict(v)
-                        cnt['det'] = gm.predict(v) == lab_keep
-                        m0=gm.means_.squeeze()[lab_keep]/hex_area
-                        m1=gm.means_.squeeze()[1-lab_keep]/hex_area
-                    if m0 < args.min_abs_mol_density_squm:
-                        continue
-                    if m1 > m0 * .7:
-                        cnt['det'] = 1
-                    m0v.append(m0)
-                    m1v.append(m1)
-                if cnt.det.eq(True).sum() < 2:
-                    continue
-                m0 = cnt.loc[cnt.det.eq(True), key].median()/hex_area
-                m1 = cnt.loc[cnt.det.eq(False), key].median()/hex_area
-                m0v.append(m0)
-                m1v.append(m1)
-                anchor_x, anchor_y = hex_to_pixel(cnt.loc[cnt.det.eq(True), 'hex_x'].values, cnt.loc[cnt.det.eq(True), 'hex_y'].values, radius,i/n_move,j/n_move)
-                pt = pd.concat([pt,\
-                     pd.DataFrame({'x':anchor_x, 'y':anchor_y, 'lane':lane})])
-                logging.info(f"{m0:.3f} v.s. {m1:.3f}")
-        m0 = np.mean(m0v)
-        m1 = np.mean(m1v)
+        sub, m0, m1 = filter_by_density_mixture(df.loc[indx, :], key, radius, n_move, args)
+        sub["lane"] = lane
+        pt = pd.concat([pt, sub])
         logging.info(f"Window {str(w)}:\t{m0:.3f} v.s. {m1:.3f}")
 
     pt.x = np.around(np.clip(pt.x.values,0,np.inf)/args.precision_um,0).astype(int)

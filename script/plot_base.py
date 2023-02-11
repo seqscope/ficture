@@ -49,9 +49,11 @@ for i,x in enumerate(header):
         header[i] = recolumn[x]
 factor_header = []
 for x in header:
-    y = re.match('^[A-Za-z]+_\d+$', x)
+    y = re.match('^[A-Za-z]*_*(\d+)$', x)
     if y:
-        factor_header.append(y.group(0))
+        factor_header.append([y.group(0), int(y.group(1)) ])
+factor_header.sort(key = lambda x : x[1] )
+factor_header = [x[0] for x in factor_header]
 K = len(factor_header)
 
 # Colormap
