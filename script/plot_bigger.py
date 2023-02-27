@@ -10,6 +10,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from hexagon_fn import *
 from utilt import plot_colortable
 from image_fn import ImgRowIterator_stream as RowIterator
+from image_fn import ImgRowIterator_stream_singlechannel as RowIterator_single
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help="Input file has to be sorted according to the y-axis (if --horizontal_axis x, default) or the x-axis if --horizontal_axis y")
@@ -22,6 +23,8 @@ parser.add_argument('--horizontal_axis', type=str, default="x", help="Which coor
 parser.add_argument('--color_table', type=str, default='', help='Pre-defined color map')
 parser.add_argument('--cmap_name', type=str, default="turbo", help="Name of Matplotlib colormap to use")
 parser.add_argument('--plot_um_per_pixel', type=float, default=1, help="Size of the output pixels in um")
+parser.add_argument("--plot_single_factor", type=str, default='', help="")
+parser.add_argument('--binary_cmap_name', type=str, default="plasma", help="Name of colormap to use for ploting individual factors")
 parser.add_argument('--chunksize', type=float, default=1e6, help="How many lines to read from input file at a time")
 parser.add_argument("--plot_discretized", action='store_true', help="")
 
@@ -54,6 +57,33 @@ for i,x in enumerate(header):
         header[i] = y.group(1)
         factor_header.append(y.group(1))
 K = len(factor_header)
+
+plot_single_factor = False
+if args.plot_single_factor != '':
+    if args.plot_single_factor not in factor_header:
+        sys.exit("--plot_single_factor should be an integer indicating which factor to visualize")
+    plot_single_factor = True
+    logging.info(f"Making single channel image for {args.plot_single_factor}")
+
+if plot_single_factor:
+    adt={x:float for x in ["x","y", args.plot_single_factor]}
+    reader = pd.read_csv(gzip.open(args.input, 'rt'), sep='\t', \
+                        chunksize=chunksize, skiprows=1, names=header,\
+                        usecols = ["x","y", args.plot_single_factor],
+                        dtype=adt)
+    h = args.ymax - args.ymin
+    w = args.xmax - args.xmin
+    outf = args.output + "." + args.plot_single_factor + ".png"
+    obj  = RowIterator_single(reader, w, h, key=args.plot_single_factor,\
+           cmap=args.binary_cmap_name, xmin = args.xmin, ymin = args.ymin,\
+           pixel_size = args.plot_um_per_pixel, verbose=1000, dtype=np.uint8)
+    wpng = png.Writer(size=(obj.width, obj.height),\
+                      greyscale=False,bitdepth=8,planes=3)
+    with open(outf, 'wb') as f:
+        wpng.write(f, obj)
+    logging.info(f"Made image\n{outf}")
+    sys.exit()
+
 
 # Colormap
 if os.path.exists(args.color_table):

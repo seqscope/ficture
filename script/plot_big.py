@@ -32,6 +32,8 @@ parser.add_argument('--ymax', type=float, default=np.inf, help="um")
 parser.add_argument("--plot_fit", action='store_true', help="")
 parser.add_argument("--plot_discretized", action='store_true', help="")
 parser.add_argument("--plot_individual_factor", action='store_true', help="")
+parser.add_argument("--plot_top_k", type=int, default=-1, help="")
+
 
 args = parser.parse_args()
 logging.basicConfig(level= getattr(logging, "INFO", None))
@@ -127,10 +129,14 @@ with open(outf, 'wb') as f:
 logging.info(f"Made fractional image\n{outf}")
 
 
-if args.plot_individual_factor:
+if args.plot_individual_factor or args.plot_top_k > 0:
     if args.binary_cmap_name not in plt.colormaps():
         args.binary_cmap_name = "plasma"
-    for k in range(K):
+    v = np.array(df.loc[:, factor_header].sum(axis = 0) )
+    u = np.argsort(-v)
+    if args.plot_top_k > K or args.plot_top_k <= 0:
+        args.plot_top_k = K
+    for k in u[:args.plot_top_k]:
         v = np.clip(df.loc[:, factor_header[k]].values,0,1)
         mtx = np.clip(mpl.colormaps[args.binary_cmap_name](v)[:,:3]*255,0,255).astype(dt)
         outf = args.output + ".F_"+str(k)+".png"

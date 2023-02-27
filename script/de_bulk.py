@@ -66,6 +66,6 @@ for name, v in info.iterrows():
         res.append([name,k,chi2,p,fd,v["gene_tot"]])
 
 chidf=pd.DataFrame(res,columns=['gene','factor','Chi2','pval','FoldChange','gene_total'])
-chidf=chidf.loc[(chidf.pval<pcut)&(chidf.FoldChange>fcut), :].sort_values(by=['factor','FoldChange'],ascending=[True,False])
+chidf=chidf.loc[(chidf.pval<pcut)&(chidf.FoldChange>fcut), :].sort_values(by=['factor','Chi2'],ascending=[True,False])
 outf = args.output + ".bulk_chisq.tsv"
 chidf.to_csv(outf,sep='\t',float_format="%.2e",index=False)

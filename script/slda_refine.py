@@ -229,14 +229,15 @@ for it_epoch in range(args.epoch):
                             (sub.cRow.values, sub.cCol.values)),\
                             shape=(nunit,N0) ).tocsr() @ dge_mtx
                     theta = model.transform(mtx)
-                    lines = pd.DataFrame({'offs_x':offs_x,'offs_y':offs_y, \
-                        'hex_x':hex_pt.hex_x.values, 'hex_y':hex_pt.hex_y.values})
+                    lines = pd.DataFrame(theta, columns = factor_header)
                     lines['x'], lines['y'] = hex_to_pixel(hex_pt.hex_x.values,\
                         hex_pt.hex_y.values, radius, offs_x/n_move, offs_y/n_move)
-                    lines = pd.concat((lines, pd.DataFrame(theta, \
-                        columns = factor_header)), axis = 1)
-                    lines['topK'] = np.argmax(theta, axis = 1).astype(int)
-                    lines['topP'] = np.max(theta, axis = 1)
+                    # lines = pd.DataFrame({'offs_x':offs_x,'offs_y':offs_y, \
+                    #     'hex_x':hex_pt.hex_x.values, 'hex_y':hex_pt.hex_y.values})
+                    # lines = pd.concat((lines, pd.DataFrame(theta, \
+                    #     columns = factor_header)), axis = 1)
+                    # lines['topK'] = np.argmax(theta, axis = 1).astype(int)
+                    # lines['topP'] = np.max(theta, axis = 1)
                     grid_info = pd.concat([grid_info, lines])
                     offs_y += 1
                 offs_y = 0

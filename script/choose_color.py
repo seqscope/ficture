@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.manifold import MDS
+import sklearn.neighbors
+from scipy.sparse import *
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utilt import plot_colortable
@@ -23,18 +25,6 @@ for x in header:
         factor_header.append(y.group(0))
 K = len(factor_header)
 N = df.shape[0]
-# try:
-#     f = os.path.split(os.path.dirname(args.input))[0] + "/coordinate_minmax.tsv"
-#     if not os.path.exists(f):
-#         xmin, ymin = df[["x", "y"]].min(axis = 0)
-#         xmax, ymax = df[["x", "y"]].max(axis = 0)
-#         line = ["xmin\t"+str(xmin), "xmax\t"+str(xmax),\
-#                 "ymin\t"+str(ymin), "ymax\t"+str(ymax)]
-#         line = "\n".join(line) + "\n"
-#         with open(f, "w") as wf:
-#             wf.write(line)
-# except:
-#     print("Did not output coordinate limits, probabily because the input file does not contain header x and y")
 
 # Colormap
 cmap_name = args.cmap_name
@@ -60,7 +50,7 @@ mtx = W.T @ Sig @ W
 # Translate into a symmetric dissimilarity measure
 np.fill_diagonal(mtx, 0)
 mtx /= mtx.sum(axis = 1)
-mtx = - (mtx + mtx.T)
+mtx = mtx + mtx.T
 
 # zz - Previous approach
 # mtx = 1. - np.array(df.loc[:, factor_header].corr())

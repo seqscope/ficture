@@ -112,7 +112,6 @@ for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
     df_full['j'] = df_full.X.astype(str) + '_' + df_full.Y.astype(str)
     l1 = df_full['#lane'].iloc[-1]
     l_list = df_full['#lane'].unique()
-    print(l_list)
 
     if len(l_list) == 1 and df_full[mj].iloc[-1] -\
         df_full[mj].iloc[0] < ovlp_buffer * args.mu_scale:
@@ -125,7 +124,6 @@ for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
     left = copy.copy(df_full[df_full['#lane'].eq(l1) & (df_full[mj] > ed - ovlp_buffer * args.mu_scale)])
 
     for l in l_list:
-        logging.info(f"Lane {l}")
         df = df_full.loc[df_full['#lane'].eq(l)]
         brc = df.groupby(by = ['j','tile','X','Y']).agg(adt).reset_index()
         brc.index = range(brc.shape[0])

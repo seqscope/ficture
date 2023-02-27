@@ -36,6 +36,7 @@ parser.add_argument('--thread', type=int, default=1, help='')
 parser.add_argument('--epoch', type=int, default=1, help='How many times to loop through the full data')
 parser.add_argument('--use_model', type=str, default='', help="Use provided model to transform input data")
 parser.add_argument('--overwrite', action='store_true')
+parser.add_argument('--skip_transform', action='store_true')
 
 args = parser.parse_args()
 if args.log != '':
@@ -240,10 +241,11 @@ else:
                 axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.4e', compression={"method":"gzip"})
 
 
-
+if args.skip_transfrom:
+    sys.exit()
 
 ### Rerun all units once and store results
-dtp = {'topK':int,key:int,'j':str, 'x':str, 'y':str}
+dtp = {'topK':int, key:int,'j':str, 'x':str, 'y':str}
 dtp.update({x:float for x in ['topP']+factor_header})
 res_f = args.output_path+"/analysis/"+args.identifier+".fit_result.tsv.gz"
 nbatch = 0
