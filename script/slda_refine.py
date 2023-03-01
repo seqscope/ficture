@@ -11,7 +11,8 @@ import sklearn.preprocessing
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from hexagon_fn import *
 from online_slda import *
-import scorpus, utilt
+import utilt
+from slda_minibatch import minibatch
 
 parser = argparse.ArgumentParser()
 
@@ -287,7 +288,7 @@ for it_epoch in range(args.epoch):
             phi_org = psi_org @ theta
             phi_org = sklearn.preprocessing.normalize(phi_org, norm='l1', axis=1)
 
-            batch = scorpus.corpus()
+            batch = minibatch()
             batch.init_from_matrix(mtx, grid_pt, wij, psi = psi_org, phi = phi_org,\
                                 m_gamma = theta, features = gene_kept)
             if args.decode_only or (it_epoch > 0 and it_epoch == args.epoch-1):

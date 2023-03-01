@@ -1,10 +1,9 @@
 from scipy import sparse
-# from scipy.special import logit
 import sklearn.preprocessing
 import numpy as np
 import copy
 
-class corpus:
+class minibatch:
 
     def __init__(self):
         self.doc_pts = 0  # Positions of anchor points

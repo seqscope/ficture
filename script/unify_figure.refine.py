@@ -1,35 +1,18 @@
 import sys, io, os, copy, re, time, math, glob
 import importlib, warnings, subprocess
-
-# packages = "numpy,scipy,sklearn,argparse,pandas,plotnine,matplotlib".split(',')
-# for pkg in packages:
-#     if not pkg in sys.modules:
-#         subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", pkg])
-
 import pickle, argparse
 import numpy as np
 import pandas as pd
-from random import shuffle
 
 import matplotlib
 import matplotlib.pyplot as plt
 import plotnine
 from plotnine import *
-
 from scipy.sparse import *
-import scipy.optimize
-import sklearn
-import sklearn.neighbors
-from sklearn.decomposition import LatentDirichletAllocation as LDA
-import sklearn.cluster
 
 # Add parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import hexagon_fn
 from hexagon_fn import *
-
-import online_slda
-import scorpus
 from online_slda import *
 import utilt
 

@@ -14,14 +14,14 @@ from matplotlib.patches import Rectangle
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 
-def dirichlet_expectation(alpha, tol=1e-4):
+def dirichlet_expectation(alpha):
     """
     For a vector theta ~ Dir(alpha), computes E[log(theta)] given alpha.
     """
-    assert alpha.min() >= 0, "Expecting positive Dirichlet parameters"
+    assert alpha.min() > 0, "Expecting positive Dirichlet parameters"
     if (len(alpha.shape) == 1):
-        return(psi(alpha+tol) - psi(np.sum(alpha+tol)))
-    return(psi(alpha+tol) - psi(np.sum(alpha+tol, axis=1)).reshape((-1, 1)))
+        return(psi(alpha) - psi(np.sum(alpha)))
+    return(psi(alpha) - psi(np.sum(alpha, axis=1)).reshape((-1, 1)))
 
 def pg_mean(b,c=0):
     if np.isscalar(c) and c == 0:
@@ -70,6 +70,19 @@ def logsumexp_csr(X):
         result[X.indptr[i]:X.indptr[i+1]] =\
             logsumexp(X.data[X.indptr[i]:X.indptr[i+1]])
     return result
+
+def gen_even_slices(n, n_packs):
+    start = 0
+    if n_packs < 1:
+        raise ValueError("gen_even_slices got n_packs=%s, must be >=1" % n_packs)
+    for pack_num in range(n_packs):
+        this_n = n // n_packs
+        if pack_num < n % n_packs:
+            this_n += 1
+        if this_n > 0:
+            end = start + this_n
+            yield np.arange(start, end)
+            start = end
 
 def match_factors(mtx1, mtx2, c1, n, cmap, mode='beta'):
     """
