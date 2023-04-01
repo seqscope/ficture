@@ -32,6 +32,7 @@ parser.add_argument('--nFactor', type=int, default=10, help='')
 parser.add_argument('--minibatch_size', type=int, default=256, help='')
 parser.add_argument('--min_count_per_feature', type=int, default=1, help='')
 parser.add_argument('--min_ct_per_unit', type=int, default=20, help='')
+parser.add_argument('--verbose', type=int, default=1, help='')
 parser.add_argument('--thread', type=int, default=1, help='')
 parser.add_argument('--epoch', type=int, default=1, help='How many times to loop through the full data')
 parser.add_argument('--use_model', type=str, default='', help="Use provided model to transform input data")
@@ -59,8 +60,10 @@ K = args.nFactor
 factor_header = ['Topic_'+str(x) for x in range(K)]
 
 ### Input
-if not os.path.exists(args.input) or not os.path.exists(args.feature):
+if not os.path.exists(args.input):
     sys.exit("ERROR: cannot find input file.")
+if not os.path.exists(args.feature):
+    sys.exit("ERROR: cannot find input feature file.")
 with gzip.open(args.input, 'rt') as rf:
     header = rf.readline().strip().split('\t')
 header = [x.lower() for x in header]
@@ -192,26 +195,28 @@ else:
             _ = lda.partial_fit(mtx)
 
             # Evaluation Training Performance
-            logl = lda.score(mtx) / mtx.shape[0]
-            # Compute topic coherence
-            topic_pmi = []
-            top_gene_n = np.min([50, mtx.shape[1]])
-            pseudo_ct = 100
-            for k in range(K):
-                b = lda.exp_dirichlet_component_[k,:]
-                b = np.clip(b, 1e-6, 1.-1e-6)
-                indx = np.argsort(-b)[:top_gene_n]
-                w = 1. - np.power(1.-feature_mf[indx], pseudo_ct)
-                w = w.reshape((-1, 1)) @ w.reshape((1, -1))
-                p0 = 1.-np.power(1-b[indx], pseudo_ct)
-                p0 = p0.reshape((-1, 1)) @ p0.reshape((1, -1))
-                pmi = np.log(p0) - np.log(w)
-                np.fill_diagonal(pmi, 0)
-                pmi = np.round(pmi.mean(), 3)
-                topic_pmi.append(pmi)
+            if args.verbose > 0:
+                logl = lda.score(mtx) / mtx.shape[0]
+                logging.info(f"logl: {logl:.4f}")
+            if args.verbose > 1:
+                # Compute topic coherence
+                topic_pmi = []
+                top_gene_n = np.min([50, mtx.shape[1]])
+                pseudo_ct = 100
+                for k in range(K):
+                    b = lda.exp_dirichlet_component_[k,:]
+                    b = np.clip(b, 1e-6, 1.-1e-6)
+                    indx = np.argsort(-b)[:top_gene_n]
+                    w = 1. - np.power(1.-feature_mf[indx], pseudo_ct)
+                    w = w.reshape((-1, 1)) @ w.reshape((1, -1))
+                    p0 = 1.-np.power(1-b[indx], pseudo_ct)
+                    p0 = p0.reshape((-1, 1)) @ p0.reshape((1, -1))
+                    pmi = np.log(p0) - np.log(w)
+                    np.fill_diagonal(pmi, 0)
+                    pmi = np.round(pmi.mean(), 3)
+                    topic_pmi.append(pmi)
+                logging.info("Coherence: "+", ".join([str(x) for x in topic_pmi]))
             df = copy.copy(chunk[chunk.j.eq(last_indx)] )
-            logging.info(f"logl: {logl:.4f}")
-            logging.info("Coherence: "+", ".join([str(x) for x in topic_pmi]))
         epoch += 1
 
     if len(df.j.unique()) > b_size:
@@ -241,7 +246,7 @@ else:
                 axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.4e', compression={"method":"gzip"})
 
 
-if args.skip_transfrom:
+if args.skip_transform:
     sys.exit()
 
 ### Rerun all units once and store results

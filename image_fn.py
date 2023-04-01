@@ -149,7 +149,9 @@ class ImgRowIterator_stream:
         except StopIteration:
             print(f"Reach the end of file")
             return 0
-        # Crop
+        if chunk.y.min() > self.ymax:
+            print(f"Read all pixels in range")
+            return 0
         chunk = chunk[(chunk.x > self.xmin) & (chunk.x < self.xmax) &\
                       (chunk.y > self.ymin) & (chunk.y < self.ymax)]
         if chunk.shape[0] == 0:
@@ -167,15 +169,15 @@ class ImgRowIterator_stream:
         self.leftover = copy.copy(chunk.loc[indx, self.data_header])
         if np.sum(indx) == chunk.shape[0]: # Need to read more
             return 1
-        # Collapse
         chunk = chunk.loc[~indx, :]
+        # Collapse
         chunk = chunk.groupby(by = ["x", "y"]).agg({\
                       x:np.mean for x in self.feature_header }).reset_index()
         self.pts = chunk.loc[:, ["x", "y"]]
         self.buffer_y = self.pts.y.max()
         if self.plot_top:
             N = self.pts.shape[0]
-            self.mtx = coo_matrix((np.ones(N,dtype=self.dtype), (range(N),\
+            self.mtx = coo_array((np.ones(N,dtype=self.dtype), (range(N),\
                 np.array(chunk.loc[:, self.feature_header]).argmax(axis = 1))),\
                 shape=(N, self.K)).toarray()
             self.mtx = np.clip(np.around(self.mtx @ self.cmtx * 255),0,255).astype(self.dtype)

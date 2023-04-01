@@ -61,11 +61,12 @@ for name, v in info.iterrows():
         tab[1,0]=total_k[k]-tab[0,0]
         tab[1,1]=total_umi-total_k[k]-v["gene_tot"]+tab[0,0]
         fd=tab[0,0]/total_k[k]/tab[0,1]*(total_umi-total_k[k])
+        if fd < fcut:
+            continue
         tab = np.around(tab, 0).astype(int) + 1
         chi2, p, dof, ex = scipy.stats.chi2_contingency(tab, correction=False)
         res.append([name,k,chi2,p,fd,v["gene_tot"]])
 
 chidf=pd.DataFrame(res,columns=['gene','factor','Chi2','pval','FoldChange','gene_total'])
 chidf=chidf.loc[(chidf.pval<pcut)&(chidf.FoldChange>fcut), :].sort_values(by=['factor','Chi2'],ascending=[True,False])
-outf = args.output + ".bulk_chisq.tsv"
-chidf.to_csv(outf,sep='\t',float_format="%.2e",index=False)
+chidf.to_csv(args.output,sep='\t',float_format="%.2e",index=False)

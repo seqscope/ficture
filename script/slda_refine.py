@@ -284,13 +284,10 @@ for it_epoch in range(args.epoch):
             wij.data = np.clip(wij.data, .05, .95)
             psi_org = copy.copy(wij)
             psi_org = sklearn.preprocessing.normalize(psi_org, norm='l1', axis=1)
-
-            phi_org = psi_org @ theta
-            phi_org = sklearn.preprocessing.normalize(phi_org, norm='l1', axis=1)
+            # phi_org = psi_org @ theta
 
             batch = minibatch()
-            batch.init_from_matrix(mtx, grid_pt, wij, psi = psi_org, phi = phi_org,\
-                                m_gamma = theta, features = gene_kept)
+            batch.init_from_matrix(mtx, grid_pt, wij, psi = psi_org, phi = None, m_gamma = theta, features = gene_kept)
             if args.decode_only or (it_epoch > 0 and it_epoch == args.epoch-1):
                 sstats = slda.do_e_step(batch)
             else:
@@ -307,11 +304,11 @@ for it_epoch in range(args.epoch):
                 tmp.index = range(tmp.shape[0])
                 tmp = pd.concat([tmp, pd.DataFrame(batch.phi, columns =\
                                 ['Topic_'+str(x) for x in range(slda._K)])], axis = 1)
-                tmp["topK_org"] = np.argmax(phi_org, axis = 1)
-                tmp["topP_org"] = np.max(phi_org, axis = 1)
+                # tmp["topK_org"] = np.argmax(phi_org, axis = 1)
+                # tmp["topP_org"] = np.max(phi_org, axis = 1)
                 tmp = tmp[(tmp.X > x_min+out_buff) & (tmp.X < x_max-out_buff)]
                 tmp = tmp[(tmp.Y > y_min+out_buff) & (tmp.Y < y_max-out_buff)]
-                tmp.topP_org = tmp.topP_org.map('{:.6f}'.format)
+                # tmp.topP_org = tmp.topP_org.map('{:.6f}'.format)
                 tmp.X = tmp.X.map('{:.2f}'.format)
                 tmp.Y = tmp.Y.map('{:.2f}'.format)
 
@@ -326,11 +323,11 @@ for it_epoch in range(args.epoch):
                 tmp['avg_size'] = np.array(batch.psi.sum(axis = 0)).reshape(-1)
                 for v in range(slda._K):
                     tmp['Topic_'+str(v)] = expElog_theta[:, v]
-                tmp["topK_org"] = theta.argmax(axis = 1)
-                tmp["topP_org"] = theta.max(axis = 1)
+                # tmp["topK_org"] = theta.argmax(axis = 1)
+                # tmp["topP_org"] = theta.max(axis = 1)
                 tmp = tmp[(tmp.X > x_min+out_buff) & (tmp.X < x_max-out_buff)]
                 tmp = tmp[(tmp.Y > y_min+out_buff) & (tmp.Y < y_max-out_buff)]
-                tmp.topP_org = tmp.topP_org.map('{:.6f}'.format)
+                # tmp.topP_org = tmp.topP_org.map('{:.6f}'.format)
                 tmp.X = tmp.X.map('{:.2f}'.format)
                 tmp.Y = tmp.Y.map('{:.2f}'.format)
                 if n_batch == 0:

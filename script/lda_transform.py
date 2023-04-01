@@ -23,6 +23,7 @@ parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to
 parser.add_argument('--key', default = 'gn', type=str, help='')
 parser.add_argument('--precision', type=int, default=1, help='Number of digits to store spatial location (in um), 0 for integer.')
 
+parser.add_argument('--thread', type=int, default=-1, help='')
 parser.add_argument('--n_move', type=int, default=3, help='')
 parser.add_argument('--hex_width', type=int, default=24, help='')
 parser.add_argument('--hex_radius', type=int, default=-1, help='')
@@ -39,7 +40,9 @@ lda.feature_names_in_ = None
 ft_dict = {x:i for i,x in enumerate( feature_kept ) }
 K, M = lda.components_.shape
 factor_header = [str(k) for k in range(K)]
-logging.info(f"Read existing model with {K} factors and {M} genes")
+if args.thread > 0:
+    lda.n_jobs = args.thread
+logging.info(f"Read existing model with {K} factors and {M} genes. Attempting to use {lda.n_jobs} threads")
 
 
 # Input

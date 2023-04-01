@@ -32,6 +32,7 @@ parser.add_argument('--ymax', type=float, default=np.inf, help="um")
 parser.add_argument("--plot_fit", action='store_true', help="")
 parser.add_argument("--plot_discretized", action='store_true', help="")
 parser.add_argument("--plot_individual_factor", action='store_true', help="")
+parser.add_argument("--skip_mixture_plot", action='store_true', help="")
 parser.add_argument("--plot_top_k", type=int, default=-1, help="")
 
 
@@ -117,16 +118,31 @@ width, height = df[['x_indx','y_indx']].max(axis = 0) + 1
 logging.info(f"Read region {N0} pixels in region {height} x {width}")
 
 pts = np.array(df.loc[:, ["x_indx", "y_indx"]], dtype=int)
-mtx = np.clip(np.around( np.array(df.loc[:,factor_header]) @\
-              cmtx * 255),0,255).astype(dt)
 
-logging.info(f"Got RGB matrix ({mtx.shape}) for {pts.shape[0]} datapoints.\nStart making fractional image...")
-outf = args.output + ".png"
-obj  = RowIterator(pts, mtx, radius)
-wpng = png.Writer(size=(width, height),greyscale=False,bitdepth=8,planes=3)
-with open(outf, 'wb') as f:
-    wpng.write(f, obj)
-logging.info(f"Made fractional image\n{outf}")
+
+if not args.skip_mixture_plot:
+    mtx = np.clip(np.around( np.array(df.loc[:,factor_header]) @\
+                cmtx * 255),0,255).astype(dt)
+    logging.info(f"Got RGB matrix ({mtx.shape}) for {pts.shape[0]} datapoints.\nStart making fractional image...")
+    outf = args.output + ".png"
+    obj  = RowIterator(pts, mtx, radius)
+    wpng = png.Writer(size=(width, height),greyscale=False,bitdepth=8,planes=3)
+    with open(outf, 'wb') as f:
+        wpng.write(f, obj)
+    logging.info(f"Made fractional image\n{outf}")
+
+
+if args.plot_discretized:
+    mtx = coo_matrix( (np.ones(N0,dtype=dt),\
+        (range(N0), np.array(df.loc[:, factor_header]).argmax(axis = 1))),\
+        shape=(N0, K)).toarray()
+    mtx = np.clip(np.around(mtx @ cmtx * 255),0,255).astype(dt)
+    outf = args.output + ".top.png"
+    obj  = RowIterator(pts, mtx, radius)
+    wpng = png.Writer(size=(width, height),greyscale=False,bitdepth=8,planes=3)
+    with open(outf, 'wb') as f:
+        wpng.write(f, obj)
+    logging.info(f"Made hard threshold image\n{outf}")
 
 
 if args.plot_individual_factor or args.plot_top_k > 0:
@@ -145,15 +161,3 @@ if args.plot_individual_factor or args.plot_top_k > 0:
         with open(outf, 'wb') as f:
             wpng.write(f, obj)
         logging.info(f"Made factor specific image - {k}\n{outf}")
-
-if args.plot_discretized:
-    mtx = coo_matrix( (np.ones(N0,dtype=dt),\
-        (range(N0), np.array(df.loc[:, factor_header]).argmax(axis = 1))),\
-        shape=(N0, K)).toarray()
-    mtx = np.clip(np.around(mtx @ cmtx * 255),0,255).astype(dt)
-    outf = args.output + ".top.png"
-    obj  = RowIterator(pts, mtx, radius)
-    wpng = png.Writer(size=(width, height),greyscale=False,bitdepth=8,planes=3)
-    with open(outf, 'wb') as f:
-        wpng.write(f, obj)
-    logging.info(f"Made hard threshold image\n{outf}")
