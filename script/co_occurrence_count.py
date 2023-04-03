@@ -7,7 +7,7 @@ from scipy.sparse import *
 
 # Add parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from read_chunk_fn import StreamUnit
+from data_loader import StreamUnit
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
