@@ -139,6 +139,7 @@ for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
         offs_y = 0
         while offs_x < n_move:
             while offs_y < n_move:
+                prefix  = str(offs_x)+str(offs_y)
                 x,y = pixel_to_hex(pts, radius, offs_x/n_move, offs_y/n_move)
                 hex_crd = list(zip(x,y))
                 ct = pd.DataFrame({'hex_id':hex_crd, 'tot':brc[key].values, 'X':pts[:, 0], 'Y':pts[:,1]}).groupby(by = 'hex_id').agg({'tot': sum, 'X':np.min, 'Y':np.min}).reset_index()
@@ -166,6 +167,8 @@ for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
                 sub['X'] = [f"{x:.{args.precision}f}" for x in sub.X.values]
                 sub['Y'] = [f"{x:.{args.precision}f}" for x in sub.Y.values]
                 sub = sub.astype({x:int for x in ct_header})
+                # Add offset combination as suffix to random_index
+                sub.random_index = prefix + sub.random_index.values
                 sub.loc[:, output_header].to_csv(args.output, mode='a', sep='\t', index=False, header=False)
                 n_unit += len(ct)
                 logging.info(f"Lane {l}, sliding offset {offs_x}, {offs_y}. Add {len(ct)} units, median count {mid_ct}, {n_unit} units so far.")

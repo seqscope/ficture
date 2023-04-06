@@ -7,9 +7,7 @@ from sklearn.preprocessing import normalize
 
 # Add parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import utilt
-from data_loader import factor_space_stream
-from read_chunk_fn import SlidingPosteriorCount
+from data_loader import factor_space
 
 parser = argparse.ArgumentParser()
 
@@ -24,19 +22,10 @@ parser.add_argument('--impute_resolution', type=float, default=.5, help='')
 # Data realted parameters
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
 parser.add_argument('--key', type=str, default = 'gn', help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced')
-parser.add_argument('--precision', type=float, default=.5, help='If positive, collapse pixels within X um. Used for computing local factor profiles.')
 parser.add_argument('--index_axis', type=str, default = 'Y', help='')
-# Control the size of neighborhood to use to guess factor loading
-parser.add_argument('--radius', type=float, default=5, help='')
-parser.add_argument('--halflife', type=float, default=.7, help='')
-parser.add_argument('--knn', type=int, default=6, help='')
-# Control the size of neighborhood to use to adjust factor profile
-parser.add_argument('--factor_adjust_window', type=float, default=800, help='')
-parser.add_argument('--factor_adjust_window_slide', type=int, default=4, help='')
-# Weight between local and global factor profile
-parser.add_argument('--weight_local', type=float, default=.3, help='')
-parser.add_argument('--local_count_lower', type=float, default=1000, help='Minimum factor specific read counts to use local factor profile.')
-parser.add_argument('--local_count_upper', type=float, default=10000, help='Threshold of factor specific read counts. Above thie threshold the local weight provided in --weight_local will be used.')
+# Control the size of neighborhood to use to guess factor
+parser.add_argument('--radius', type=float, default=36, help='Maximum distance to use for guessing factor')
+parser.add_argument('--knn', type=int, default=1, help='')
 # Other
 parser.add_argument('--log', type=str, default = '', help='files to write log to')
 parser.add_argument('--debug', type=int, default=0, help='debug mode')
@@ -59,15 +48,10 @@ if not os.path.exists(args.factor_map):
 
 ### Basic parameterse
 mu_scale = 1./args.mu_scale
-precision = args.precision
 key = args.key.lower()
-slide_step = args.factor_adjust_window_slide
 chunk_size = 200000
-unit_block = args.factor_adjust_window / args.factor_adjust_window_slide
 
 ### Target gene to impute
-target_gene_unmodeled = []
-target_gene_modeled = []
 target_gene_list = []
 if args.gene_list != '':
     target_gene_list = args.gene_list.split(',')
@@ -81,39 +65,17 @@ else:
 model = pd.read_csv(args.model, sep='\t')
 gene_kept = model["gene"].tolist()
 model_gene_set = set(gene_kept)
-for x in target_gene_list:
-    if x in model_gene_set:
-        target_gene_modeled.append(x)
-    else:
-        target_gene_unmodeled.append(x)
-if args.weight_local > 0:
-    gene_kept += target_gene_unmodeled
-else:
-    target_gene_unmodeled = []
-    target_gene_list = copy.copy(target_gene_modeled)
+target_gene_list = [v for v in target_gene_list if v in model_gene_set]
 ft_dict = {x:i for i,x in enumerate( gene_kept ) }
 M = len(ft_dict)
 model = np.array(model.iloc[:,1:]).T
 K = model.shape[0]
-model = np.hstack((model, np.zeros((K, len(target_gene_unmodeled)))))
-model = normalize(model, norm='l1', axis=1, copy=False) # K x M
-T1 = len(target_gene_modeled)
-T2 = len(target_gene_unmodeled)
-target_gene_indx_modeled = [ft_dict[x] for x in target_gene_modeled]
-target_gene_indx_unmodeled = [ft_dict[x] for x in target_gene_unmodeled]
-logging.info(f"{K} factors x {M} genes. {T1} target genes are in the provided model and {T2} genes are not. Unmodeled genes will only be imputed based on factor-specific local average.")
+target_gene_indx = [ft_dict[x] for x in target_gene_list]
+T = len(target_gene_indx)
+logging.info(f"{K} factors x {M} genes. {T} target genes are in the provided model.")
 
 ### Load factor map
-factor_map = factor_space_stream(file = args.factor_map, index_axis = args.index_axis, debug = args.debug)
-
-### Local factor profile
-dty = {x:int for x in ['X','Y',key]}
-dty.update({x:str for x in ['gene']})
-if args.weight_local > 0:
-    pixel_reader = pd.read_csv(args.input, sep='\t', chunksize=chunk_size,\
-                            usecols = ['X','Y','gene',key], dtype=dty)
-    local_profile = SlidingPosteriorCount(pixel_reader, index_axis = args.index_axis, key = key, factor_file = args.factor_map, ft_dict = ft_dict, size_um = args.factor_adjust_window, slide_step = slide_step, mu_scale = mu_scale, precision = precision, radius = args.radius, debug = args.debug)
-
+factor_map = factor_space(args.factor_map, debug = args.debug)
 
 def clps(df, resolution, key):
     df['X'] = (df.X / resolution).astype(int)
@@ -133,6 +95,7 @@ oheader = ['X','Y','brc_total'] + target_gene_list + [x+"_obs" for x in target_g
 with gzip.open(out_full, 'wt') as wf:
     wf.write('\t'.join(oheader) + '\n')
 left_over = pd.DataFrame()
+dty = {'X':int,'Y':int,'gene':str,key:int}
 for chunk in pd.read_csv(args.input, sep='\t', chunksize=chunk_size,\
                          usecols = ['X','Y','gene',key], dtype=dty):
     chunk.X *= mu_scale
@@ -145,41 +108,20 @@ for chunk in pd.read_csv(args.input, sep='\t', chunksize=chunk_size,\
         continue
     df['brc_total'] = df.groupby(by = 'j')[key].transform(sum)
     brc = df.loc[:, ['j', 'X', 'Y', 'brc_total']].drop_duplicates(subset = 'j')
-    yst, yed = brc[args.index_axis].min(), brc[args.index_axis].max()
-    # impute factor loading from neighboring pixels
-    theta = factor_map.impute_factor_loading(pos = np.array(brc.loc[:, ['X','Y']]), k = args.knn, radius = args.radius, halflife = args.halflife, include_self = False) # N x K
+    # impute factor loading from neighboring anchor points
+    theta = factor_map.impute_factor_loading(pos = np.array(brc.loc[:, ['X','Y']]), k = args.knn, radius = args.radius, include_self = True) # N x K
+    v = theta.sum(axis = 1)
+    if args.debug:
+        print(sum(v > 0), len(v))
+    if sum(v > 0) == 0:
+        continue
     theta = normalize(theta, norm='l1', axis=1, copy=False)
-    if args.weight_local > 0:
-        # load local factor specific expression profile
-        local_profile.update_reference(yst, yed)
-    x = (brc.X / unit_block).astype(int)
-    y = (brc.Y / unit_block).astype(int)
-    brc['block'] = list(zip(x,y))
-    result = pd.DataFrame()
-    for b in brc.block.unique():
-        block_indx = brc.block == b
-        x = np.median(brc.loc[block_indx, 'X'] )
-        y = np.median(brc.loc[block_indx, 'Y'] )
-        if args.weight_local > 0:
-            d, beta = local_profile.query(x, y)
-            if d > args.factor_adjust_window / 2:
-                continue
-            beta = normalize(beta, norm = 'l1', axis = 1, copy = False)
-            local_count = np.clip(beta.sum(axis = 1), args.local_count_lower, args.local_count_upper) # K
-            local_weight = ((local_count - args.local_count_lower)/(args.local_count_upper - args.local_count_lower) * args.weight_local).reshape((K, 1)) # K
-            prob_hat_modeled = theta[block_indx, :] @ \
-                (np.multiply(model[:, target_gene_indx_modeled], 1-local_weight) +\
-                np.multiply(beta[:, target_gene_indx_modeled], local_weight)) # N x T1
-            prob_hat_unmodeled = theta[block_indx, :] @ beta[:, target_gene_indx_unmodeled] # N x T2
-        else:
-            prob_hat_modeled = theta[block_indx, :] @ model[:, target_gene_indx_modeled] # N x T1
-            prob_hat_unmodeled = np.empty((prob_hat_modeled.shape[0], 0))
-        prob_hat = np.hstack((prob_hat_modeled, prob_hat_unmodeled))
-        prob_hat = pd.DataFrame(prob_hat, columns = target_gene_modeled + target_gene_unmodeled)
-        prob_hat['j'] = brc.loc[block_indx, 'j'].values
-        prob_hat['brc_total'] = brc.loc[block_indx, 'brc_total'].values
-        result = pd.concat([result, prob_hat])
-    result = result.merge(right = brc[['j','X','Y']], on = 'j', how = 'left')
+    result = theta @ model[:, target_gene_indx] # N x T
+    result = pd.DataFrame(result, columns = target_gene_list)
+    result['j'] = brc.j.values
+    result = pd.concat([result, result])
+    result = result.merge(right = brc[['j','X','Y','brc_total']], on = 'j', how = 'left')
+    # observed counts
     for x in target_gene_list:
         obs = df.loc[df.gene.eq(x), ['j', key]].rename(columns = {key:x+'_obs'})
         result = result.merge(right = obs, on = 'j', how = 'left')

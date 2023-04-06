@@ -68,4 +68,4 @@ df.to_csv(f, sep='\t', index=False)
 cdict = {i:cmtx[x,:] for i,x in enumerate(c_order)}
 fig = plot_colortable(cdict, "Factor label", sort_colors=False, ncols=4)
 f = args.output + ".cbar"
-fig.savefig(f, format="png")
+fig.savefig(f, format="png", transparent=True)

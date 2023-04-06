@@ -3,7 +3,7 @@
 ''' helper functions '''
 import numpy as np
 import pandas as pd
-import copy
+import copy, re
 from scipy import sparse
 from scipy.special import gammaln, psi, logsumexp, expit, logit
 from sklearn.preprocessing import normalize
@@ -83,6 +83,22 @@ def gen_even_slices(n, n_packs):
             end = start + this_n
             yield np.arange(start, end)
             start = end
+
+def get_string_with_integer_suff(in_array):
+    out = []
+    for u in in_array:
+        v = re.match('^[A-Za-z]*_*(\d+)$', u.strip())
+        if v:
+            out.append(v.group(0))
+    return out
+
+def get_integer_suff_from_string(in_array):
+    out = []
+    for u in in_array:
+        v = re.match('^[A-Za-z]*_*(\d+)$', u.strip())
+        if v:
+            out.append(v.group(1))
+    return out
 
 def match_factors(mtx1, mtx2, c1, n, cmap, mode='beta'):
     """
@@ -185,14 +201,9 @@ def match_factors(mtx1, mtx2, c1, n, cmap, mode='beta'):
     df_arrow = pd.DataFrame({'xst':xst,'yst':yst,'xed':xed,'yed':yed,'Weight':sl,'Color':cl})
     return df, df_arrow, c2
 
-def plot_colortable(colors, title, sort_colors=True, ncols=4):
-
-    cell_width = 212
-    cell_height = 22
-    swatch_width = 48
-    margin = 12
-    topmargin = 40
-
+def plot_colortable(colors, title, sort_colors=True, ncols=4, dpi = 80,\
+                    cell_width = 212, cell_height = 22,\
+                    swatch_width = 48, margin = 12, topmargin = 40):
     # Sort colors by hue, saturation, value and name.
     if sort_colors is True:
         by_hsv = sorted((tuple(mcolors.rgb_to_hsv(mcolors.to_rgb(color))),
@@ -207,7 +218,7 @@ def plot_colortable(colors, title, sort_colors=True, ncols=4):
 
     width = cell_width * 4 + 2 * margin
     height = cell_height * nrows + margin + topmargin
-    dpi = 72
+
 
     fig, ax = plt.subplots(figsize=(width / dpi, height / dpi), dpi=dpi)
     fig.subplots_adjust(margin/width, margin/height,

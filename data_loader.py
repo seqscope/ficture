@@ -1,9 +1,10 @@
 import sys, os, copy, gzip, logging, re
 import numpy as np
 import pandas as pd
-from scipy.sparse import *
+from scipy.sparse import coo_array, csr_array, vstack
 import sklearn.neighbors
 from sklearn.preprocessing import normalize
+import utilt
 
 class factor_space_stream:
     """
@@ -26,11 +27,7 @@ class factor_space_stream:
         if self.factor_header is None:
             with gzip.open(self.file, 'rt') as rf:
                 input_header = rf.readline().strip().split('\t')
-            self.factor_header = []
-            for i, u in enumerate(input_header):
-                v = re.match('^[A-Za-z]*_*(\d+)$', u)
-                if v:
-                    self.factor_header.append(v.group(0))
+            self.factor_header = utilt.get_string_with_integer_suff(input_header)
         self.K = len(self.factor_header)
         self.reader = pd.read_csv(gzip.open(self.file, 'rt'), sep='\t', \
                                   usecols = [x,y] + self.factor_header, \
@@ -61,7 +58,7 @@ class factor_space_stream:
         self.pts = np.vstack((self.pts, chunk.loc[:, ["X","Y"]].values))
         chunk = np.array(chunk.loc[:, self.factor_header].values)
         chunk[chunk < self.sparsify] = 0
-        chunk = csr_matrix(chunk)
+        chunk = csr_array(chunk)
         chunk.eliminate_zeros()
         self.factor_loading = vstack((self.factor_loading, chunk))
         self.current_ymax = self.pts[-1, self.index_axis]
@@ -114,43 +111,42 @@ class factor_space:
     Load spatial factor decoding results
     Answer queries of spatial locations by averaging over the nearest neighbors
     """
-    def __init__(self, file, sparsify = 1e-4, x = "X", y = "Y", factor_header = None) -> None:
+    def __init__(self, file, debug = 0, sparsify = 1e-4,\
+                 x = "x", y = "y", factor_header = None) -> None:
         assert os.path.exists(file), "File does not exist: {}".format(file)
         self.file = file
+        self.debug = debug
         self.sparsify = sparsify
         self.factor_header = factor_header
         with gzip.open(self.file, 'rt') as rf:
             input_header = rf.readline().strip().split('\t')
         if self.factor_header is None:
-            self.factor_header = []
-            for i, u in enumerate(input_header):
-                v = re.match('^[A-Za-z]*_*(\d+)$', u)
-                if v:
-                    self.factor_header.append(v.group(1))
+            self.factor_header = utilt.get_string_with_integer_suff(input_header)
         self.K = len(self.factor_header)
         self.reader = pd.read_csv(gzip.open(self.file, 'rt'), sep='\t', \
-                                  usecols = [x,y] + self.factor_header, \
                                   chunksize=100000)
-        self.recolumn = {x:"X", y:"Y"}
-        self.recolumn.update({x:str(k) for k,x in enumerate(self.factor_header)})
+        self.recolumn = {x.lower():"X", y.lower():"Y"}
+        self.recolumn.update({x.lower():str(k) for k,x in enumerate(self.factor_header)})
         self.factor_header = [str(k) for k in range(self.K)]
-        self.pts = np.array((0, 2))
+        self.pts = np.empty((0, 2))
         self.factor_loading = csr_array((0, self.K))
         self.update_reference()
 
     def read_chunk(self):
         try:
             chunk = next(self.reader)
+            chunk.columns = [x.lower() for x in chunk.columns]
         except StopIteration:
             return 0
         chunk.rename(columns=self.recolumn, inplace=True)
         self.pts = np.vstack((self.pts, chunk.loc[:, ["X","Y"]].values))
         chunk = np.array(chunk.loc[:, self.factor_header].values)
         chunk[chunk < self.sparsify] = 0
-        chunk = csr_matrix(chunk)
+        chunk = csr_array(chunk)
         chunk.eliminate_zeros()
         self.factor_loading = vstack((self.factor_loading, chunk))
-        self.current_ymax = self.pts[-1, self.index_axis]
+        if self.debug > 1:
+            print(f"Read chunk {chunk.shape}, {self.factor_loading.shape}")
         return 1
 
     def update_reference(self):
@@ -158,6 +154,8 @@ class factor_space:
             if self.read_chunk() == 0:
                 break
         self.ref = sklearn.neighbors.BallTree(self.pts)
+        if self.debug:
+            print(f"Build reference with {self.pts.shape[0]} points")
 
     def impute_factor_loading(self, pos, k = 1, radius = 5, halflife = .7, include_self = False):
         nu = np.log(.5) / np.log(halflife)
@@ -165,6 +163,9 @@ class factor_space:
         min_dist = 0
         if include_self:
             min_dist = -1
+        if self.debug > 1:
+            v = np.min(dist,axis=1)
+            print(radius, sum(v > radius), len(v))
         mask = (dist > min_dist) & (dist < radius)
         indx = [[x for k,x in enumerate(v) if mask[i,k]] for i,v in enumerate(indx) ]
         dist = 1. - (dist / radius) ** nu
