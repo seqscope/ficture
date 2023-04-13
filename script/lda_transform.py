@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 from scipy.sparse import *
 import subprocess as sp
-from sklearn.decomposition import LatentDirichletAllocation as LDA
 
 # Add parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -11,7 +10,8 @@ from hexagon_fn import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
-parser.add_argument('--output', type=str, help='')
+parser.add_argument('--output', type=str, help='Output file to store factor membership')
+parser.add_argument('--outpost', type=str, default='', help='Output file to store posterior count')
 parser.add_argument('--model', type=str, help='')
 
 parser.add_argument('--major_axis', type=str, default="Y", help='X or Y')
@@ -98,6 +98,7 @@ dtp = {'topK':int,key:int,'j':str, 'x':str, 'y':str}
 dtp.update({x:float for x in ['topP']+factor_header})
 dty = {x:int for x in ['X','Y',key]}
 dty.update({x:str for x in ['#lane', 'gene']})
+post_count = np.zeros((K, M))
 df_full = pd.DataFrame()
 chunk_size = 1000000
 for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=chunk_size,\
@@ -154,6 +155,7 @@ for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=chunk_size,\
                 mtx = coo_array((sub[key].values, (indx_row, indx_col)), shape=(N, M)).tocsr()
 
                 theta = lda.transform(mtx)
+                post_count += np.array(theta.T @ mtx)
 
                 # Output
                 result = pd.DataFrame({"j":kept_unit, key:np.array(mtx.sum(axis = 1)).squeeze()})
@@ -179,3 +181,11 @@ for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=chunk_size,\
     df_full = df_full.loc[df_full['#lane'].eq(l1) &\
                           (df_full[mj] > ed - ovlp_buffer * args.mu_scale), :]
     logging.info(f"Left over size {df_full.shape[0]}.")
+
+
+if args.outpost == '':
+    args.outpost = args.output.replace(".tsv.gz", ".posterior.count.tsv.gz")
+pd.concat([pd.DataFrame({'gene': feature_kept}),\
+           pd.DataFrame(post_count.T, dtype='float64',\
+                        columns = [str(k) for k in range(K)])],\
+        axis = 1).to_csv(args.outpost, sep='\t', index=False, float_format='%.2f', compression={"method":"gzip"})

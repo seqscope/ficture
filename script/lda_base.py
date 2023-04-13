@@ -2,6 +2,7 @@ import sys, os, copy, gzip, logging
 import pickle, argparse
 import numpy as np
 import pandas as pd
+import random as rng
 
 from scipy.sparse import *
 import sklearn.neighbors
@@ -14,13 +15,15 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
 parser.add_argument('--feature', type=str, help='')
-parser.add_argument('--output_path', type=str, help='')
-parser.add_argument('--identifier', type=str, help='')
+parser.add_argument('--output_path', type=str, default='', help='')
+parser.add_argument('--output_pref', type=str, default='', help='')
+parser.add_argument('--identifier', type=str, default='', help='')
 parser.add_argument('--hvg', type=str, default='', help='')
 parser.add_argument('--nFeature', type=int, default=-1, help='If boath nFeature and hvg are provided and nFeature is larger than the number of genes in hvg, top-expressed genes will be added.')
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate, only used if --x_range and --y_range are used')
 parser.add_argument('--key', default = 'gn', type=str, help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced')
 parser.add_argument('--log', default = '', type=str, help='files to write log to')
+parser.add_argument('--seed', type=int, default=-1, help='')
 
 parser.add_argument('--region', type=str, nargs='*', default=[], help="List of lane:tile1-tile2 or lane:tile to work on")
 parser.add_argument('--x_range_um', type=float, nargs='*', default=[], help="Lower and upper bound of the x-axis, in um")
@@ -34,7 +37,8 @@ parser.add_argument('--min_count_per_feature', type=int, default=1, help='')
 parser.add_argument('--min_ct_per_unit', type=int, default=20, help='')
 parser.add_argument('--verbose', type=int, default=1, help='')
 parser.add_argument('--thread', type=int, default=1, help='')
-parser.add_argument('--epoch', type=int, default=1, help='How many times to loop through the full data')
+parser.add_argument('--epoch', type=int, default=-1, help='How many times to loop through the full data')
+parser.add_argument('--epoch_id_length', type=int, default=-1, help='')
 parser.add_argument('--use_model', type=str, default='', help="Use provided model to transform input data")
 parser.add_argument('--overwrite', action='store_true')
 parser.add_argument('--skip_transform', action='store_true')
@@ -58,6 +62,19 @@ key = args.key.lower()
 b_size = args.minibatch_size
 K = args.nFactor
 factor_header = ['Topic_'+str(x) for x in range(K)]
+seed = args.seed
+if seed <= 0:
+    rng.seed()
+    seed = rng.randrange(1, 2**31)
+output_pref = args.output_pref
+if output_pref == '':
+    if not os.path.exists(args.output_path + "/analysis"):
+        os.makedirs(args.output_path + "/analysis")
+    output_pref = args.output_path + "/analysis/"+args.identifier
+else:
+    if not os.path.exists(os.path.dirname(output_pref)):
+        os.makedirs(os.path.dirname(output_pref))
+
 
 ### Input
 if not os.path.exists(args.input):
@@ -67,7 +84,6 @@ if not os.path.exists(args.feature):
 with gzip.open(args.input, 'rt') as rf:
     header = rf.readline().strip().split('\t')
 header = [x.lower() for x in header]
-
 
 # If using only subset of input data
 tile_list = []
@@ -135,7 +151,7 @@ logging.info(f"{M} genes will be used")
 
 
 ### Stochastic model fitting
-model_f = args.output_path + "/analysis/"+args.identifier+".model.p"
+model_f = output_pref+".model.p"
 adt = {'random_index':str, '#lane':str, 'tile':str, 'x': str, 'y':str, 'gene':str, key:int}
 adthat = {'x':float, 'y':float}
 if os.path.exists(args.use_model):
@@ -149,75 +165,78 @@ if not args.overwrite and os.path.exists(model_f):
     M = len(feature_kept)
 else:
     logging.info(f"Start fitting model ... model will be stored in\n{model_f}")
-    lda = LDA(n_components=K, learning_method='online', batch_size=b_size, n_jobs = args.thread, verbose = 0)
+    lda = LDA(n_components=K, learning_method='online', batch_size=b_size, n_jobs = args.thread, verbose = 0, random_state=seed)
     feature_mf = np.array(feature[key].values).astype(float)
     feature_mf/= feature_mf.sum()
-    epoch = 0
+    epoch_id = set()
     df = pd.DataFrame()
-    while epoch < args.epoch:
-        df = pd.DataFrame()
-        for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, skiprows=1, names=header, usecols=["random_index","#lane","tile","x","y","gene",key], dtype=adt):
-            chunk = chunk[chunk.gene.isin(feature_kept)]
-            chunk['j'] = chunk.random_index.values + '_' + chunk.x.values + '_' + chunk.y.values
-            chunk['tile'] = chunk["#lane"].values + ':' + chunk.tile.values
-            chunk = chunk.astype(adthat)
-            i = 0
-            indx = (chunk.x >= xmin[i]) & (chunk.x <= xmax[i]) & (chunk.y >= ymin[i]) & (chunk.y <= ymax[i])
-            while i < len(xmin):
-                indx = indx | ((chunk.x >= xmin[i]) & (chunk.x <= xmax[i]) & (chunk.y >= ymin[i]) & (chunk.y <= ymax[i]))
-                i += 1
-            if len(tile_list) > 0:
-                indx = indx & chunk.tile.isin(tile_list)
-            if sum(indx) == 0:
-                continue
-            chunk = chunk[indx]
-            chunk.drop(columns = ['random_index','x','y'], inplace=True)
-            last_indx = chunk.j.iloc[-1]
-            df = pd.concat([df, chunk[~chunk.j.eq(last_indx)]])
-            if len(df.j.unique()) < b_size * 1.5: # Left to next chunk
-                df = pd.concat((df, chunk[chunk.j.eq(last_indx)]))
-                continue
-            # Total mulecule count per unit
-            brc = df.groupby(by = ['j']).agg({key: sum}).reset_index()
-            brc = brc[brc[key] > args.min_ct_per_unit]
-            brc.index = range(brc.shape[0])
-            df = df[df.j.isin(brc.j.values)]
-            # Make DGE
-            barcode_kept = list(brc.j.values)
-            bc_dict = {x:i for i,x in enumerate( barcode_kept ) }
-            indx_row = [ bc_dict[x] for x in df['j']]
-            indx_col = [ ft_dict[x] for x in df['gene']]
-            N = len(barcode_kept)
-            mtx = coo_matrix((df[key].values, (indx_row, indx_col)), shape=(N, M)).tocsr()
-            x1 = np.median(brc[key].values)
-            x2 = np.mean(brc[key].values)
-            logging.info(f"Made DGE {mtx.shape}, median/mean count: {x1:.1f}/{x2:.1f}")
-            _ = lda.partial_fit(mtx)
+    for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, skiprows=1, names=header, usecols=["random_index","#lane","tile","x","y","gene",key], dtype=adt):
+        chunk = chunk[chunk.gene.isin(feature_kept)]
+        if args.epoch_id_length > 0:
+            v = chunk.random_index.map(lambda x: x[:args.epoch_id_length]).values
+            v = set(v)
+            epoch_id.update(v)
+        chunk['j'] = chunk.random_index.values + '_' + chunk.x.values + '_' + chunk.y.values
+        chunk['tile'] = chunk["#lane"].values + ':' + chunk.tile.values
+        chunk = chunk.astype(adthat)
+        i = 0
+        indx = (chunk.x >= xmin[i]) & (chunk.x <= xmax[i]) & (chunk.y >= ymin[i]) & (chunk.y <= ymax[i])
+        while i < len(xmin):
+            indx = indx | ((chunk.x >= xmin[i]) & (chunk.x <= xmax[i]) & (chunk.y >= ymin[i]) & (chunk.y <= ymax[i]))
+            i += 1
+        if len(tile_list) > 0:
+            indx = indx & chunk.tile.isin(tile_list)
+        if sum(indx) == 0:
+            continue
+        chunk = chunk[indx]
+        chunk.drop(columns = ['random_index','x','y'], inplace=True)
+        last_indx = chunk.j.iloc[-1]
+        df = pd.concat([df, chunk[~chunk.j.eq(last_indx)]])
+        if len(df.j.unique()) < b_size * 1.5: # Left to next chunk
+            df = pd.concat((df, chunk[chunk.j.eq(last_indx)]))
+            continue
+        # Total mulecule count per unit
+        brc = df.groupby(by = ['j']).agg({key: sum}).reset_index()
+        brc = brc[brc[key] > args.min_ct_per_unit]
+        brc.index = range(brc.shape[0])
+        df = df[df.j.isin(brc.j.values)]
+        # Make DGE
+        barcode_kept = list(brc.j.values)
+        bc_dict = {x:i for i,x in enumerate( barcode_kept ) }
+        indx_row = [ bc_dict[x] for x in df['j']]
+        indx_col = [ ft_dict[x] for x in df['gene']]
+        N = len(barcode_kept)
+        mtx = coo_matrix((df[key].values, (indx_row, indx_col)), shape=(N, M)).tocsr()
+        x1 = np.median(brc[key].values)
+        x2 = np.mean(brc[key].values)
+        logging.info(f"Made DGE {mtx.shape}, median/mean count: {x1:.1f}/{x2:.1f}")
+        _ = lda.partial_fit(mtx)
 
-            # Evaluation Training Performance
-            if args.verbose > 0:
-                logl = lda.score(mtx) / mtx.shape[0]
-                logging.info(f"logl: {logl:.4f}")
-            if args.verbose > 1:
-                # Compute topic coherence
-                topic_pmi = []
-                top_gene_n = np.min([50, mtx.shape[1]])
-                pseudo_ct = 100
-                for k in range(K):
-                    b = lda.exp_dirichlet_component_[k,:]
-                    b = np.clip(b, 1e-6, 1.-1e-6)
-                    indx = np.argsort(-b)[:top_gene_n]
-                    w = 1. - np.power(1.-feature_mf[indx], pseudo_ct)
-                    w = w.reshape((-1, 1)) @ w.reshape((1, -1))
-                    p0 = 1.-np.power(1-b[indx], pseudo_ct)
-                    p0 = p0.reshape((-1, 1)) @ p0.reshape((1, -1))
-                    pmi = np.log(p0) - np.log(w)
-                    np.fill_diagonal(pmi, 0)
-                    pmi = np.round(pmi.mean(), 3)
-                    topic_pmi.append(pmi)
-                logging.info("Coherence: "+", ".join([str(x) for x in topic_pmi]))
-            df = copy.copy(chunk[chunk.j.eq(last_indx)] )
-        epoch += 1
+        # Evaluation Training Performance
+        if args.verbose > 0:
+            logl = lda.score(mtx) / mtx.shape[0]
+            logging.info(f"logl: {logl:.4f}")
+        if args.verbose > 1:
+            # Compute topic coherence
+            topic_pmi = []
+            top_gene_n = np.min([50, mtx.shape[1]])
+            pseudo_ct = 100
+            for k in range(K):
+                b = lda.exp_dirichlet_component_[k,:]
+                b = np.clip(b, 1e-6, 1.-1e-6)
+                indx = np.argsort(-b)[:top_gene_n]
+                w = 1. - np.power(1.-feature_mf[indx], pseudo_ct)
+                w = w.reshape((-1, 1)) @ w.reshape((1, -1))
+                p0 = 1.-np.power(1-b[indx], pseudo_ct)
+                p0 = p0.reshape((-1, 1)) @ p0.reshape((1, -1))
+                pmi = np.log(p0) - np.log(w)
+                np.fill_diagonal(pmi, 0)
+                pmi = np.round(pmi.mean(), 3)
+                topic_pmi.append(pmi)
+            logging.info("Coherence: "+", ".join([str(x) for x in topic_pmi]))
+        df = copy.copy(chunk[chunk.j.eq(last_indx)] )
+        if args.epoch > 0 and len(epoch_id) > args.epoch:
+            break
 
     if len(df.j.unique()) > b_size:
         brc = df.groupby(by = ['j']).agg({key: sum}).reset_index()
@@ -252,14 +271,23 @@ if args.skip_transform:
 ### Rerun all units once and store results
 dtp = {'topK':int, key:int,'j':str, 'x':str, 'y':str}
 dtp.update({x:float for x in ['topP']+factor_header})
-res_f = args.output_path+"/analysis/"+args.identifier+".fit_result.tsv.gz"
 nbatch = 0
+res_f = output_pref+".fit_result.tsv.gz"
 logging.info(f"Result file {res_f}")
 
 post_count = np.zeros((K, M))
+epoch_id = ''
 df = pd.DataFrame()
 for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, skiprows=1, names=header, usecols=["random_index","#lane","tile","x","y","gene",key], dtype=adt):
     chunk = chunk[chunk.gene.isin(feature_kept)]
+    end_of_epoch = False
+    if args.epoch_id_length > 0:
+        v = chunk.random_index.map(lambda x: x[:args.epoch_id_length]).values
+        if epoch_id == '':
+            epoch_id = v[0]
+        if len([x for x in v if x != epoch_id]) > 0:
+            end_of_epoch = True
+            chunk = chunk.loc[v == epoch_id, :]
     chunk['j'] = chunk.random_index.values + '_' + chunk.x.values + '_' + chunk.y.values
     chunk['tile'] = chunk["#lane"].values + ':' + chunk.tile.values
     chunk = chunk.astype(adthat)
@@ -305,19 +333,21 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, 
     brc['topK'] = np.argmax(theta, axis = 1).astype(int)
     brc['topP'] = np.max(theta, axis = 1)
     brc = brc.astype(dtp)
-    print(brc.shape)
+    print(brc.shape[0])
     if nbatch == 0:
         brc.to_csv(res_f, sep='\t', mode='w', float_format="%.5f", index=False, header=True, compression={"method":"gzip"})
     else:
         brc.to_csv(res_f, sep='\t', mode='a', float_format="%.5f", index=False, header=False, compression={"method":"gzip"})
     nbatch += 1
     df = copy.copy(left)
+    if end_of_epoch:
+        break
 
 # Leftover
 brc = df.groupby(by = ['j']).agg({key: sum}).reset_index()
 brc = brc[brc[key] > args.min_ct_per_unit]
 brc.index = range(brc.shape[0])
-print(brc.shape)
+print(brc.shape[0])
 if brc.shape[0] > 0:
     df = df[df.j.isin(brc.j.values)]
     # Make DGE
@@ -348,7 +378,7 @@ if brc.shape[0] > 0:
 
 logging.info(f"Finished ({nbatch})")
 
-out_f = args.output_path+"/analysis/"+args.identifier+".posterior.count.tsv.gz"
+out_f = output_pref+".posterior.count.tsv.gz"
 pd.concat([pd.DataFrame({'gene': feature_kept}),\
            pd.DataFrame(post_count.T, dtype='float64',\
                         columns = [str(k) for k in range(K)])],\

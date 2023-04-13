@@ -51,6 +51,8 @@ with gzip.open(args.input, 'rt') as rf:
 print(input_header)
 
 # basic parameters
+random_index_max=sys.maxsize//100000
+random_index_length=int(np.log10(random_index_max) ) + 1
 mu_scale = 1./args.mu_scale
 radius=args.hex_radius
 diam=args.hex_width
@@ -150,7 +152,7 @@ for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
                     continue
                 hex_list = list(ct)
                 suff = [str(x[0])[-1]+str(x[1])[-1] for x in hex_list]
-                hex_dict = {x:str(rng.randint(1, sys.maxsize//100))+suff[i] for i,x in enumerate(hex_list)}
+                hex_dict = {x: str(rng.randint(1, random_index_max)).zfill(random_index_length) + suff[i] for i,x in enumerate(hex_list)}
                 brc["hex_id"] = hex_crd
                 brc["random_index"] = brc.hex_id.map(hex_dict)
                 sub = copy.copy(brc[brc.hex_id.isin(ct)] )
@@ -167,7 +169,7 @@ for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
                 sub['X'] = [f"{x:.{args.precision}f}" for x in sub.X.values]
                 sub['Y'] = [f"{x:.{args.precision}f}" for x in sub.Y.values]
                 sub = sub.astype({x:int for x in ct_header})
-                # Add offset combination as suffix to random_index
+                # Add offset combination as prefix to random_index
                 sub.random_index = prefix + sub.random_index.values
                 sub.loc[:, output_header].to_csv(args.output, mode='a', sep='\t', index=False, header=False)
                 n_unit += len(ct)

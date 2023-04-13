@@ -4,7 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.manifold import MDS
 import sklearn.neighbors
-from scipy.sparse import *
+from scipy.sparse import coo_array
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utilt import plot_colortable
@@ -26,12 +26,10 @@ for x in header:
 K = len(factor_header)
 N = df.shape[0]
 
-# Colormap
-cmap_name = args.cmap_name
-if args.cmap_name not in plt.colormaps():
-    cmap_name = "turbo"
-cmap = plt.get_cmap(cmap_name, K)
-cmtx = np.array([cmap(i) for i in range(K)] )
+# Posterior weight of factors
+weight = df.loc[:, factor_header].sum(axis = 0)
+weight = np.log(weight)
+weight /= weight.sum()
 
 # Find neearest neighbors
 bt = sklearn.neighbors.BallTree(df.loc[:, ["x", "y"]])
@@ -48,15 +46,27 @@ Sig = coo_array((np.ones(len(r_indx)), (r_indx, c_indx)), shape=(N, N)).tocsr()
 W = np.array(df.loc[:, factor_header])
 mtx = W.T @ Sig @ W
 # Translate into a symmetric dissimilarity measure
+# Large values in mtx indicate close proximity, to be mapped to distinct colors
 np.fill_diagonal(mtx, 0)
 mtx /= mtx.sum(axis = 1)
 mtx = mtx + mtx.T
-
 # zz - Previous approach
 # mtx = 1. - np.array(df.loc[:, factor_header].corr())
-
 linear = MDS(n_components=1, dissimilarity="precomputed").fit_transform(mtx).squeeze()
 c_order = np.argsort(linear)
+
+# Allocate color range to factors depending on factor weight
+c_order = np.argsort(linear)
+c_weight = weight[c_order]
+c_up = np.cumsum(c_weight)
+c_down = np.concatenate([[0], np.cumsum(c_weight[:-1]) ])
+c_pos = (c_up + c_down)/2
+
+# Colormap
+cmap_name = args.cmap_name
+if args.cmap_name not in plt.colormaps():
+    cmap_name = "turbo"
+cmtx = plt.get_cmap('turbo')(c_pos) # K x 4
 
 # Output RGB table
 df = pd.DataFrame({"Name":range(K), "Color_index":c_order,\
