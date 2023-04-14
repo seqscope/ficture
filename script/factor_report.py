@@ -10,7 +10,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 parser = argparse.ArgumentParser()
 parser.add_argument('--path', type=str, help='')
 parser.add_argument('--pref', type=str, help='')
+parser.add_argument('--color_table', type=str, default='', help='')
 parser.add_argument('--n_top_gene', type=int, default=20, help='')
+parser.add_argument('--min_top_gene', type=int, default=10, help='')
 parser.add_argument('--max_pval', type=float, default=0.001, help='')
 parser.add_argument('--min_fc', type=float, default=1.5, help='')
 args = parser.parse_args()
@@ -18,14 +20,18 @@ args = parser.parse_args()
 path=args.path
 pref=args.pref
 ntop = args.n_top_gene
+mtop = args.min_top_gene
 pval_max = args.max_pval
 fc_min = args.min_fc
 ejs = os.path.dirname(os.path.abspath(__file__))+"/factor_report.template.html"
 
 
 # Color code
-f=path+"/figure/"+pref+".rgb.tsv"
-color_table = pd.read_csv(f, sep='\t')
+if os.path.isfile(args.color_table):
+    color_table = pd.read_csv(args.color_table, sep='\t')
+else:
+    f=path+"/figure/"+pref+".rgb.tsv"
+    color_table = pd.read_csv(f, sep='\t')
 
 # DE genes
 f=path+"/DE/"+pref+".bulk_chisq.tsv"
@@ -34,9 +40,13 @@ de = pd.read_csv(f, sep='\t')
 # Posterior count
 f=path+"/"+pref+".posterior.count.tsv.gz"
 post = pd.read_csv(f, sep='\t')
+recol = {}
+for u in post.columns:
+    v = re.match('^[A-Za-z]*_*(\d+)$', u.strip())
+    if v:
+        recol[v.group(0)] = v.group(1)
+post.rename(columns=recol, inplace=True)
 
-
-de = de.loc[(de.pval < pval_max) & (de.FoldChange > fc_min), :]
 de.factor = de.factor.astype(int)
 color_table.Name = color_table.Name.astype(int)
 color_table.sort_values(by = 'Name', inplace=True)
@@ -50,25 +60,39 @@ post_weight = post.loc[:, factor_header].sum(axis = 0).values
 post_weight /= post_weight.sum()
 
 top_gene = []
+de['Rank'] = 0
+# Top genes by Chi2
 de.sort_values(by=['factor','Chi2'],ascending=False,inplace=True)
 for k in range(K):
-    v = de.loc[de.factor.eq(k), 'gene'].iloc[:ntop].values
+    de.loc[de.factor.eq(k), 'Rank'] = np.arange(de.factor.eq(k).sum())
+    v = de.loc[de.factor.eq(k) & ( (de.Rank < mtop) | \
+               ((de.pval <= pval_max) & (de.FoldChange >= fc_min)) ), \
+               'gene'].iloc[:ntop].values
     if len(v) == 0:
         top_gene.append([k, '.'])
     else:
         top_gene.append([k, ', '.join(v)])
+# Top genes by fold change
 de.sort_values(by=['factor','FoldChange'],ascending=False,inplace=True)
 for k in range(K):
-    v = de.loc[de.factor.eq(k), 'gene'].iloc[:ntop].values
+    de.loc[de.factor.eq(k), 'Rank'] = np.arange(de.factor.eq(k).sum())
+    v = de.loc[de.factor.eq(k) & ( (de.Rank < mtop) | \
+               ((de.pval <= pval_max) & (de.FoldChange >= fc_min)) ), \
+               'gene'].iloc[:ntop].values
     if len(v) == 0:
         top_gene[k].append('.')
     else:
         top_gene[k].append(', '.join(v))
+# Top genes by basolute weight
+for k in range(K):
+    v = post.gene.iloc[np.argsort(post.loc[:, str(k)].values)[::-1][:ntop] ].values
+    top_gene[k].append(', '.join(v))
 
 table = pd.DataFrame({'Factor':np.arange(K), 'RGB':color_table.RGB.values,
                       'Weight':post_weight, 'PostUMI':post_umi,
                       'TopGene_pval':[x[1] for x in top_gene],
-                      'TopGene_fc':[x[2] for x in top_gene]})
+                      'TopGene_fc':[x[2] for x in top_gene],
+                      'TopGene_weight':[x[3] for x in top_gene] })
 table.sort_values(by = 'Weight', ascending = False, inplace=True)
 
 f = path+"/"+pref+".factor.info.tsv"

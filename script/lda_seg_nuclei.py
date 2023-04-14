@@ -18,10 +18,9 @@ parser.add_argument('--feature', type=str, help='')
 parser.add_argument('--output_path', type=str, default='', help='')
 parser.add_argument('--output_pref', type=str, default='', help='')
 parser.add_argument('--identifier', type=str, default='', help='')
-parser.add_argument('--hvg', type=str, default='', help='')
-parser.add_argument('--nFeature', type=int, default=-1, help='If boath nFeature and hvg are provided and nFeature is larger than the number of genes in hvg, top-expressed genes will be added.')
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate, only used if --x_range and --y_range are used')
 parser.add_argument('--key', default = 'gn', type=str, help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced')
+parser.add_argument('--clps_key', type=str, nargs='*', default=[], help='')
 parser.add_argument('--log', default = '', type=str, help='files to write log to')
 parser.add_argument('--seed', type=int, default=-1, help='')
 
@@ -76,7 +75,6 @@ if output_pref == '':
 else:
     if not os.path.exists(os.path.dirname(output_pref)):
         os.makedirs(os.path.dirname(output_pref))
-
 
 ### Input
 if not os.path.exists(args.input):
@@ -134,27 +132,25 @@ feature[key] = feature[key].astype(int)
 feature = feature[feature[key] >= args.min_count_per_feature]
 feature.sort_values(by=key,ascending=False,inplace=True)
 feature.drop_duplicates(subset='gene',keep='first',inplace=True)
-if os.path.exists(args.hvg):
-    hvg = pd.read_csv(args.hvg, sep='\t', header=0, usecols=['gene',key],dtype={'gene':str,key:int})
-    hvg.sort_values(by=key,ascending=False,inplace=True)
-    hvg.drop_duplicates(subset='gene',keep='first',inplace=True)
-    nhvg = hvg.shape[0]
-    logging.info(f"Read {nhvg} highly variable genes from " + args.hvg)
-    if args.nFeature > nhvg:
-        feature = feature[~feature.gene.isin(hvg.gene.values)]
-        feature.sort_values(by = key, ascending=False, inplace=True)
-        feature = pd.concat( (hvg, feature.iloc[:(args.nFactor-hvg.shape[0])] ) )
 
+clps_v = []
+if len(args.clps_key) > 0:
+    for v in args.clps_key:
+        clps_v.append(['_'+v, feature.loc[:, v].sum() ] )
+feature = pd.concat([feature[['gene',key]], pd.DataFrame(clps_v, columns = ['gene',key])])
 feature_kept = list(feature.gene.values)
 ft_dict = {x:i for i,x in enumerate( feature_kept ) }
 M = len(feature_kept)
 logging.info(f"{M} genes will be used")
 
 
-
 ### Stochastic model fitting
 model_f = output_pref+".model.p"
-adt = {'random_index':str, '#lane':str, 'tile':str, 'x': str, 'y':str, 'gene':str, key:int}
+unit_header = ["random_index","#lane","tile","x","y"]
+adt = {x:str for x in unit_header}
+adt.update({'gene':str, key:int} )
+for v in args.clps_key:
+    adt['_'+v] = int
 adthat = {'x':float, 'y':float}
 if os.path.exists(args.use_model):
     model_f = args.use_model
@@ -172,12 +168,25 @@ else:
     feature_mf/= feature_mf.sum()
     epoch_id = set()
     df = pd.DataFrame()
-    for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, skiprows=1, names=header, usecols=["random_index","#lane","tile","x","y","gene",key], dtype=adt):
-        chunk = chunk[chunk.gene.isin(feature_kept)]
+    for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',dtype=adt,\
+                             chunksize=500000, skiprows=1, names=header, \
+                             usecols=unit_header+["gene",key]+args.clps_key):
+        chunk = chunk.loc[chunk.gene.isin(feature_kept), :]
         if args.epoch_id_length > 0:
             v = chunk.random_index.map(lambda x: x[:args.epoch_id_length]).values
             v = set(v)
             epoch_id.update(v)
+        if len(args.clps_key) > 0:
+            clps = pd.DataFrame()
+            for v in args.clps_key:
+                sub = chunk.groupby(by='random_index',as_index=False).agg({v:sum})
+                sub = sub.loc[sub[v] > 0]
+                if sub.shape[0] > 0:
+                    sub.rename(columns={v:key},inplace=True)
+                    sub['gene'] = '_'+v
+                    clps = pd.concat([clps, sub])
+            clps = clps.merge(right = chunk[unit_header].drop_duplicates(subset='random_index'), on='random_index', how='left')
+            chunk = pd.concat([clps, chunk[unit_header+['gene',key]]])
         chunk['j'] = chunk.random_index.values + '_' + chunk.x.values + '_' + chunk.y.values
         chunk['tile'] = chunk["#lane"].values + ':' + chunk.tile.values
         chunk = chunk.astype(adthat)
@@ -280,7 +289,9 @@ logging.info(f"Result file {res_f}")
 post_count = np.zeros((K, M))
 epoch_id = ''
 df = pd.DataFrame()
-for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, skiprows=1, names=header, usecols=["random_index","#lane","tile","x","y","gene",key], dtype=adt):
+for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',dtype=adt,\
+                         chunksize=500000, skiprows=1, names=header, \
+                         usecols=unit_header+["gene",key]+args.clps_key):
     chunk = chunk[chunk.gene.isin(feature_kept)]
     end_of_epoch = False
     if not args.transform_full and args.epoch_id_length > 0:
@@ -296,6 +307,17 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, 
                 chunk = chunk.loc[v == epoch_id, :]
         if chunk.shape[0] == 0:
             continue
+    if len(args.clps_key) > 0:
+        clps = pd.DataFrame()
+        for v in args.clps_key:
+            sub = chunk.groupby(by='random_index',as_index=False).agg({v:sum})
+            sub = sub.loc[sub[v] > 0]
+            if sub.shape[0] > 0:
+                sub.rename(columns={v:key},inplace=True)
+                sub['gene'] = '_'+v
+                clps = pd.concat([clps, sub])
+        clps = clps.merge(right = chunk[unit_header].drop_duplicates(subset='random_index'), on='random_index', how='left')
+        chunk = pd.concat([clps, chunk[unit_header+['gene',key]]])
     chunk['j'] = chunk.random_index.values + '_' + chunk.x.values + '_' + chunk.y.values
     chunk['tile'] = chunk["#lane"].values + ':' + chunk.tile.values
     chunk = chunk.astype(adthat)

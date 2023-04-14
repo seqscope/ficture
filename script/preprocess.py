@@ -21,14 +21,14 @@ parser.add_argument("--meta_data", type=str, help="Per tile meta data menifest.t
 parser.add_argument("--layout", type=str, help="Layout file of tiles to draw [lane] [tile] [row] [col] format in each line")
 
 parser.add_argument('--lanes', nargs='*', type=str, help='One or multiple lanes to work on', default=[])
-parser.add_argument('--region', nargs='*', type=str, help="In the form of \"lane1:st1-ed1 lane2:st2-ed2 ... \"", default=[])
+parser.add_argument('--region', nargs='*', type=str, help="In the form of \"lane1:tile_st1-tile_ed1 lane2:tile_st2-tile_ed2 ... \"", default=[])
 
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
 parser.add_argument('--species', type=str, default='', help='')
 parser.add_argument('--feature_prefix', type=str, default='', help='e.g. mouse:mm10___,human:GRCh38_ (only for multi-species scenario)')
 parser.add_argument('--filter_by_box_nrow', type=int, default=1, help='')
 parser.add_argument('--filter_by_box_ncol', type=int, default=1, help='')
-parser.add_argument('--filter_based_on', type=str, default='gn', help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced')
+parser.add_argument('--filter_based_on', type=str, default='gt', help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced, velo: velo spl+unspl+ambig')
 parser.add_argument('--precision_um', type=int, default=1, help='')
 parser.add_argument('--log', default = '', type=str, help='files to write log to')
 
@@ -38,6 +38,7 @@ parser.add_argument('--rm_gene_type_keyword', type=str, help='Key words (separat
 parser.add_argument('--rm_gene_keyword', type=str, help='Key words (separated by ,) of gene names to remove, only used is gene_type_info is provided.', default="")
 
 parser.add_argument('--min_abs_mol_density_squm', type=float, default=0.02, help='A safe lowerbound to remove very sparse technical noise')
+parser.add_argument('--max_npts_to_fit_model', type=float, default=1e5, help='')
 parser.add_argument('--hard_threshold', type=float, default=-1, help='If provided, filter by hard threshold (number of molecules per squared um)')
 parser.add_argument('--hex_diam', type=int, default=12, help='')
 parser.add_argument('--hex_n_move', type=int, default=6, help='')
@@ -57,8 +58,20 @@ if args.log != '':
 else:
     logging.basicConfig(level= getattr(logging, "INFO", None))
 
+# Basic parameters
+key = args.filter_based_on
+ct_header = ['gn', 'gt', 'spl', 'unspl', 'ambig']
+if key not in ct_header + ['velo', 'max']:
+    sys.exit("Invalid filter key")
 path = args.input_path
 outpath = args.output_path
+if not os.path.exists(path):
+    sys.exit("Input path does not exist")
+mu_scale = 1./args.mu_scale
+diam = args.hex_diam
+n_move = args.hex_n_move
+radius = diam / np.sqrt(3)
+hex_area = diam*radius*3/2
 
 ### Parse input region
 lane_list = args.lanes
@@ -76,7 +89,6 @@ for v in args.region:
     if len(u) == 2:
         u = [str(x) for x in range(int(u[0]), int(u[1])+1)]
     kept_list[w[0]] += u
-
 lane_list = list(set(lane_list))
 
 ### Extract list of tiles to process
@@ -91,17 +103,7 @@ if len(lane_list) > 0:
 
 for k,v in kept_list.items():
     kept_list[k] = sorted(list(set(kept_list[k])))
-
-
 print(kept_list)
-
-mu_scale = 1./args.mu_scale
-diam = args.hex_diam
-n_move = args.hex_n_move
-radius = diam / np.sqrt(3)
-hex_area = diam*radius*3/2
-key = args.filter_based_on
-ct_header = ['gn', 'gt', 'spl', 'unspl', 'ambig']
 
 
 ### Output
@@ -182,15 +184,21 @@ else:
             sub = pd.read_csv(gzip.open(f, 'rb'),\
                 sep='\t|,', names=["barcode","j","v2",\
                     "lane","tile","X","Y"]+ct_header,\
-                usecols=["Y","X",key], engine='python')
-            sub = sub[sub[key] > 0]
+                usecols=["Y","X"]+ct_header, engine='python')
+            if key == 'velo' or key == 'max':
+                sub['velo'] = sub['spl'] + sub['unspl'] + sub['ambig']
+                if key == 'max':
+                    sub[key] = sub.loc[:, ['gn', 'gt', 'velo']].max(axis = 1)
             sub['X'] = (nrows - itr_r - 1) * xr + sub.X.values - xmin
             sub['Y'] = itr_c * yr + sub.Y.values - ymin
             sub['X'] = sub.X.values * mu_scale
             sub['Y'] = sub.Y.values * mu_scale
             if args.precision_um > 0:
-                sub['X'] = np.around(sub.X.values/args.precision_um,0).astype(int)*args.precision_um
-                sub['Y'] = np.around(sub.Y.values/args.precision_um,0).astype(int)*args.precision_um
+                sub['X'] = np.around(sub.X.values/args.precision_um,0).astype(int)
+                sub['Y'] = np.around(sub.Y.values/args.precision_um,0).astype(int)
+                sub = sub.groupby(by=['X','Y']).agg({x:sum for x in sub.columns if x not in ['X','Y']}).reset_index()
+                sub['X'] *= args.precision_um
+                sub['Y'] *= args.precision_um
             sub['win'] = lane + '_' + str(itr_r//bsize_row) + '_' + str(itr_c//bsize_col)
             df = pd.concat((df, sub))
             logging.info(f"{lane}-{tile}, {sub.shape[0]}, {df.shape[0]}")
@@ -291,7 +299,7 @@ for itr_r in range(len(lanes)):
         logging.info(f"Write data for {lane}_{tile}, {sub.shape}. (total {n_pixel} so far)")
 
 feature_tot_ct = feature_tot_ct.groupby(by = ['gene', 'gene_id']).agg({x:sum for x in ct_header}).reset_index()
-feature_tot_ct.sort_values(by = key, ascending=False, inplace=True)
+feature_tot_ct.sort_values(by = 'gt', ascending=False, inplace=True)
 feature_tot_ct.drop_duplicates(subset="gene", inplace=True)
 f = outpath+"/feature."+args.identifier+".tsv.gz"
 feature_tot_ct.to_csv(f, sep='\t', index=False, header=True)

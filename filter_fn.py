@@ -6,7 +6,7 @@ import sklearn.mixture
 
 # Add parent directory
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from hexagon_fn import *
+from hexagon_fn import pixel_to_hex, hex_to_pixel
 
 
 def filter_by_density_mixture(df, key, radius, n_move, args):
@@ -27,14 +27,23 @@ def filter_by_density_mixture(df, key, radius, n_move, args):
                 cnt['det'] = cnt[key] > hex_area * args.hard_threshold
             else:
                 v = np.log10(cnt[key].values).reshape(-1, 1)
-                gm = sklearn.mixture.GaussianMixture(n_components=2, random_state=0).fit(v)
+                print(f"{len(v)}")
+                if len(v) > args.max_npts_to_fit_model:
+                    indx = np.random.choice(len(v), int(args.max_npts_to_fit_model), replace=False)
+                    gm = sklearn.mixture.GaussianMixture(n_components=2, random_state=0).fit(v[indx])
+                else:
+                    gm = sklearn.mixture.GaussianMixture(n_components=2, random_state=0).fit(v)
                 lab_keep = np.argmax(gm.means_.squeeze())
                 cnt['det'] = gm.predict(v) == lab_keep
                 m0=(10**gm.means_.squeeze()[lab_keep])/hex_area
                 m1=(10**gm.means_.squeeze()[1-lab_keep])/hex_area
                 if m1 > m0 * 0.5 or m0 < args.min_abs_mol_density_squm:
                     v = cnt[key].values.reshape(-1, 1)
-                    gm = sklearn.mixture.GaussianMixture(n_components=2, random_state=0).fit(v)
+                    if len(v) > args.max_npts_to_fit_model:
+                        indx = np.random.choice(len(v), int(args.max_npts_to_fit_model), replace=False)
+                        gm = sklearn.mixture.GaussianMixture(n_components=2, random_state=0).fit(v[indx])
+                    else:
+                        gm = sklearn.mixture.GaussianMixture(n_components=2, random_state=0).fit(v)
                     lab_keep = np.argmax(gm.means_.squeeze())
                     cnt['det'] = gm.predict(v) == lab_keep
                     m0=gm.means_.squeeze()[lab_keep]/hex_area

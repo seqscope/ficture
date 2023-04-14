@@ -7,7 +7,7 @@ import random as rng
 
 # Add parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from hexagon_fn import *
+from hexagon_fn import pixel_to_hex, hex_to_pixel
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
@@ -104,7 +104,6 @@ with open(args.output,'w') as wf:
 df_full = pd.DataFrame()
 for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
                 names=input_header, dtype=dty):
-    chunk = chunk[chunk[key] > 0]
     if chunk.shape[0] == 0:
         logging.info(f"Empty? Left over size {df_full.shape[0]}.")
         continue

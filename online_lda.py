@@ -5,7 +5,7 @@
 import sys, io, os, re, time, copy, warnings
 import numpy as np
 from scipy.special import gammaln, psi, logsumexp, expit, logit
-from scipy.sparse import *
+from scipy.sparse import issparse
 from sklearn.preprocessing import normalize
 from joblib.parallel import Parallel, delayed
 

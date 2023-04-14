@@ -59,6 +59,8 @@ K = len(factor_header)
 # Colormap
 if os.path.exists(args.color_table):
     color_info = pd.read_csv(args.color_table, sep='\t', header=0)
+    color_info.Name = color_info.Name.astype(int)
+    color_info.sort_values(by=['Name'], inplace=True)
     cmtx = np.array(color_info.loc[:, ["R","G","B"]])
 else:
     cmap_name = args.cmap_name
