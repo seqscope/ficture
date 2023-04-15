@@ -1,14 +1,13 @@
 import sys, os, copy, re, gzip, pickle, argparse, logging, warnings
 import numpy as np
 import pandas as pd
-import sklearn.neighbors
 from random import shuffle
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import png
 
-from scipy.sparse import *
+from scipy.sparse import coo_matrix
 
 # Add parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -82,7 +81,7 @@ else:
     cdict = {k:cmtx[k,:] for k in range(K)}
     # Plot color bar separately
     fig = plot_colortable(cdict, "Factor label", sort_colors=False, ncols=4)
-    f = args.output + ".cbar"
+    f = args.output + ".cbar.png"
     fig.savefig(f, format="png")
     logging.info(f"Set up color map for {K} factors")
 

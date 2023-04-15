@@ -14,7 +14,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
-parser.add_argument('--feature', type=str, help='')
+parser.add_argument('--feature', type=str, default='', help='')
 parser.add_argument('--output_path', type=str, default='', help='')
 parser.add_argument('--output_pref', type=str, default='', help='')
 parser.add_argument('--identifier', type=str, default='', help='')
@@ -126,36 +126,9 @@ if n_region < 1:
 print(xmin, xmax, args.x_range_um, args.x_range)
 print(ymin, ymax, args.y_range_um, args.y_range)
 
-
-### Use only the provided list of features
-feature=pd.read_csv(args.feature, sep='\t', header=0)
-feature.columns = [x.lower() for x in feature.columns]
-feature[key] = feature[key].astype(int)
-feature = feature[feature[key] >= args.min_count_per_feature]
-feature.sort_values(by=key,ascending=False,inplace=True)
-feature.drop_duplicates(subset='gene',keep='first',inplace=True)
-if os.path.exists(args.hvg):
-    hvg = pd.read_csv(args.hvg, sep='\t', header=0, usecols=['gene',key],dtype={'gene':str,key:int})
-    hvg.sort_values(by=key,ascending=False,inplace=True)
-    hvg.drop_duplicates(subset='gene',keep='first',inplace=True)
-    nhvg = hvg.shape[0]
-    logging.info(f"Read {nhvg} highly variable genes from " + args.hvg)
-    if args.nFeature > nhvg:
-        feature = feature[~feature.gene.isin(hvg.gene.values)]
-        feature.sort_values(by = key, ascending=False, inplace=True)
-        feature = pd.concat( (hvg, feature.iloc[:(args.nFactor-hvg.shape[0])] ) )
-
-feature_kept = list(feature.gene.values)
-ft_dict = {x:i for i,x in enumerate( feature_kept ) }
-M = len(feature_kept)
-logging.info(f"{M} genes will be used")
-
-
-
-### Stochastic model fitting
 model_f = output_pref+".model.p"
-adt = {'random_index':str, '#lane':str, 'tile':str, 'x': str, 'y':str, 'gene':str, key:int}
-adthat = {'x':float, 'y':float}
+read_model = False
+# If use existing model
 if os.path.exists(args.use_model):
     model_f = args.use_model
 if not args.overwrite and os.path.exists(model_f):
@@ -165,11 +138,38 @@ if not args.overwrite and os.path.exists(model_f):
     lda.feature_names_in_ = None
     ft_dict = {x:i for i,x in enumerate( feature_kept ) }
     M = len(feature_kept)
+    read_model = True
 else:
-    logging.info(f"Start fitting model ... model will be stored in\n{model_f}")
-    lda = LDA(n_components=K, learning_method='online', batch_size=b_size, n_jobs = args.thread, verbose = 0, random_state=seed)
+    ### Use only the provided list of features
+    feature=pd.read_csv(args.feature, sep='\t', header=0)
+    feature.columns = [x.lower() for x in feature.columns]
+    feature[key] = feature[key].astype(int)
+    feature = feature[feature[key] >= args.min_count_per_feature]
+    feature.sort_values(by=key,ascending=False,inplace=True)
+    feature.drop_duplicates(subset='gene',keep='first',inplace=True)
+    if os.path.exists(args.hvg):
+        hvg = pd.read_csv(args.hvg, sep='\t', header=0, usecols=['gene',key],dtype={'gene':str,key:int})
+        hvg.sort_values(by=key,ascending=False,inplace=True)
+        hvg.drop_duplicates(subset='gene',keep='first',inplace=True)
+        nhvg = hvg.shape[0]
+        logging.info(f"Read {nhvg} highly variable genes from " + args.hvg)
+        if args.nFeature > nhvg:
+            feature = feature[~feature.gene.isin(hvg.gene.values)]
+            feature.sort_values(by = key, ascending=False, inplace=True)
+            feature = pd.concat( (hvg, feature.iloc[:(args.nFactor-hvg.shape[0])] ) )
     feature_mf = np.array(feature[key].values).astype(float)
     feature_mf/= feature_mf.sum()
+    feature_kept = list(feature.gene.values)
+    ft_dict = {x:i for i,x in enumerate( feature_kept ) }
+    M = len(feature_kept)
+    logging.info(f"{M} genes will be used")
+
+### Stochastic model fitting
+adt = {'random_index':str, '#lane':str, 'tile':str, 'x': str, 'y':str, 'gene':str, key:int}
+adthat = {'x':float, 'y':float}
+if not read_model:
+    logging.info(f"Start fitting model ... model will be stored in\n{model_f}")
+    lda = LDA(n_components=K, learning_method='online', batch_size=b_size, n_jobs = args.thread, verbose = 0, random_state=seed)
     epoch_id = set()
     df = pd.DataFrame()
     for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, skiprows=1, names=header, usecols=["random_index","#lane","tile","x","y","gene",key], dtype=adt):
@@ -237,6 +237,7 @@ else:
                 topic_pmi.append(pmi)
             logging.info("Coherence: "+", ".join([str(x) for x in topic_pmi]))
         df = copy.copy(chunk[chunk.j.eq(last_indx)] )
+        logging.info(f"Leftover size {len(df)}")
         if args.epoch > 0 and len(epoch_id) > args.epoch:
             break
 
@@ -291,7 +292,7 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, 
         else:
             if epoch_id == '':
                 epoch_id = v[0]
-            if len([x for x in v if x != epoch_id]) > 0:
+            if v[-1] != v[0]:
                 end_of_epoch = True
                 chunk = chunk.loc[v == epoch_id, :]
         if chunk.shape[0] == 0:

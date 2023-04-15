@@ -73,7 +73,7 @@ if plot_individual_factor:
                         dtype=adt)
     h = args.ymax - args.ymin
     w = args.xmax - args.xmin
-    outf = args.output + "." + args.plot_individual_factor + ".png"
+    outf = args.output + ".F_" + args.plot_individual_factor + ".png"
     obj  = RowIterator_single(reader, w, h, key=args.plot_individual_factor,\
            cmap=args.binary_cmap_name, xmin = args.xmin, ymin = args.ymin,\
            pixel_size = args.plot_um_per_pixel, verbose=1000, dtype=np.uint8)
