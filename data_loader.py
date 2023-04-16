@@ -216,7 +216,7 @@ class StreamUnit:
                 self.df = pd.concat([self.df, left])
                 continue
 
-            # Total mulecule count per unit
+            # Total molecule count per unit
             brc = self.df.groupby(by = ['j']).agg({self._key: sum}).reset_index()
             brc = brc[brc[self._key] > self._min_c]
             brc.index = range(brc.shape[0])

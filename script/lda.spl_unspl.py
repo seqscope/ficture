@@ -177,7 +177,7 @@ if not read_model:
     pickle.dump( lda, open( model_f, "wb" ) )
     out_f = model_f.replace("model.p", "model_matrix.tsv.gz")
     pd.concat([pd.DataFrame({gene: lda.feature_names_in_}),\
-                pd.DataFrame(normalize(lda.components_, axis = 1, norm='l1').T,\
+                pd.DataFrame(lda.components_.T,\
                 columns = factor_header, dtype='float64')],\
                 axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.4e', compression={"method":"gzip"})
 

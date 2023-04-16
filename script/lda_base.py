@@ -35,7 +35,7 @@ parser.add_argument('--nFactor', type=int, default=10, help='')
 parser.add_argument('--minibatch_size', type=int, default=256, help='')
 parser.add_argument('--min_count_per_feature', type=int, default=1, help='')
 parser.add_argument('--min_ct_per_unit', type=int, default=20, help='')
-parser.add_argument('--verbose', type=int, default=1, help='')
+parser.add_argument('--verbose', type=int, default=0, help='')
 parser.add_argument('--thread', type=int, default=1, help='')
 parser.add_argument('--epoch', type=int, default=-1, help='How many times to loop through the full data')
 parser.add_argument('--epoch_id_length', type=int, default=-1, help='')
@@ -63,7 +63,7 @@ key = args.key.lower()
 ### Basic parameterse
 b_size = args.minibatch_size
 K = args.nFactor
-factor_header = ['Topic_'+str(x) for x in range(K)]
+factor_header = [str(x) for x in range(K)]
 seed = args.seed
 if seed <= 0:
     rng.seed()
@@ -81,8 +81,6 @@ else:
 ### Input
 if not os.path.exists(args.input):
     sys.exit("ERROR: cannot find input file.")
-if not os.path.exists(args.feature):
-    sys.exit("ERROR: cannot find input feature file.")
 with gzip.open(args.input, 'rt') as rf:
     header = rf.readline().strip().split('\t')
 header = [x.lower() for x in header]
@@ -141,6 +139,8 @@ if not args.overwrite and os.path.exists(model_f):
     read_model = True
 else:
     ### Use only the provided list of features
+    if not os.path.exists(args.feature):
+        sys.exit("ERROR: cannot find input feature file.")
     feature=pd.read_csv(args.feature, sep='\t', header=0)
     feature.columns = [x.lower() for x in feature.columns]
     feature[key] = feature[key].astype(int)
@@ -263,8 +263,8 @@ if not read_model:
     pickle.dump( lda, open( model_f, "wb" ) )
     out_f = model_f.replace("model.p", "model_matrix.tsv.gz")
     pd.concat([pd.DataFrame({'gene': lda.feature_names_in_}),\
-                pd.DataFrame(sklearn.preprocessing.normalize(lda.components_, axis = 1, norm='l1').T,\
-                columns = ["Factor_"+str(k) for k in range(K)], dtype='float64')],\
+                pd.DataFrame(lda.components_.T,\
+                columns = [str(k) for k in range(K)], dtype='float64')],\
                 axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.4e', compression={"method":"gzip"})
 
 

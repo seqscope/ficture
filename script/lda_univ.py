@@ -79,7 +79,7 @@ if not args.overwrite and os.path.exists(model_f):
     use_existing_model = True
     logging.warning(f"Read existing model from\n{model_f}\n use --overwrite to allow the model files to be overwritten\n{M} genes will be used")
 
-factor_header = ['Factor_'+str(x) for x in range(K)]
+factor_header = [str(x) for x in range(K)]
 if not use_existing_model:
     if not os.path.exists(args.feature):
         sys.exit("Unable to read feature list")
@@ -156,8 +156,8 @@ if not use_existing_model:
     pickle.dump( lda, open( model_f, "wb" ) )
     out_f = model_f.replace("model.p", "model_matrix.tsv.gz")
     pd.concat([pd.DataFrame({gene_key: lda.feature_names_in_}),\
-                pd.DataFrame(sklearn.preprocessing.normalize(lda.components_, axis = 1, norm='l1').T,\
-                columns = ["Factor_"+str(k) for k in range(K)], dtype='float64')],\
+                pd.DataFrame(lda.components_.T,\
+                columns = [str(k) for k in range(K)], dtype='float64')],\
                 axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.4e', compression={"method":"gzip"})
 
 

@@ -296,12 +296,9 @@ for it_epoch in range(args.epoch):
                 tmp = copy.copy(brc.loc[b_indx, ['j','X','Y']] )
                 tmp.index = range(tmp.shape[0])
                 tmp = pd.concat([tmp, pd.DataFrame(batch.phi, columns =\
-                                ['Topic_'+str(x) for x in range(slda._K)])], axis = 1)
-                # tmp["topK_org"] = np.argmax(phi_org, axis = 1)
-                # tmp["topP_org"] = np.max(phi_org, axis = 1)
+                                factor_header)], axis = 1)
                 tmp = tmp[(tmp.X > x_min+out_buff) & (tmp.X < x_max-out_buff)]
                 tmp = tmp[(tmp.Y > y_min+out_buff) & (tmp.Y < y_max-out_buff)]
-                # tmp.topP_org = tmp.topP_org.map('{:.6f}'.format)
                 tmp.X = tmp.X.map('{:.2f}'.format)
                 tmp.Y = tmp.Y.map('{:.2f}'.format)
 
@@ -315,12 +312,9 @@ for it_epoch in range(args.epoch):
                 tmp = pd.DataFrame({'X':grid_pt[:,0],'Y':grid_pt[:,1]})
                 tmp['avg_size'] = np.array(batch.psi.sum(axis = 0)).reshape(-1)
                 for v in range(slda._K):
-                    tmp['Topic_'+str(v)] = expElog_theta[:, v]
-                # tmp["topK_org"] = theta.argmax(axis = 1)
-                # tmp["topP_org"] = theta.max(axis = 1)
+                    tmp[str(v)] = expElog_theta[:, v]
                 tmp = tmp[(tmp.X > x_min+out_buff) & (tmp.X < x_max-out_buff)]
                 tmp = tmp[(tmp.Y > y_min+out_buff) & (tmp.Y < y_max-out_buff)]
-                # tmp.topP_org = tmp.topP_org.map('{:.6f}'.format)
                 tmp.X = tmp.X.map('{:.2f}'.format)
                 tmp.Y = tmp.Y.map('{:.2f}'.format)
                 if n_batch == 0:
@@ -344,12 +338,12 @@ for it_epoch in range(args.epoch):
 out_f = args.output + ".posterior.count.tsv.gz"
 pd.concat([pd.DataFrame({'gene': gene_kept}),\
            pd.DataFrame(post_count.T, dtype='float64',\
-            columns = ["Factor_"+str(k) for k in range(K)])],\
+                        columns = factor_header)],\
         axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.2f', compression={"method":"gzip"})
 
 if not args.decode_only:
     out_f = args.output + ".updated.model.tsv.gz"
     pd.concat([pd.DataFrame({'gene': gene_kept}),\
-            pd.DataFrame(slda._lambda.T, dtype='float64',\
-                columns = ["Factor_"+str(k) for k in range(K)])],\
+            pd.DataFrame(slda._lambda.T, dtype='float64', \
+                         columns = factor_header)],\
             axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.4e', compression={"method":"gzip"})

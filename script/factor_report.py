@@ -6,15 +6,24 @@ from jinja2 import Environment, FileSystemLoader
 
 # Add parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from visualize_factors import visual_hc, image_to_base64
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--path', type=str, help='')
 parser.add_argument('--pref', type=str, help='')
+parser.add_argument('--model_id', type=str, default='', help='')
 parser.add_argument('--color_table', type=str, default='', help='')
 parser.add_argument('--n_top_gene', type=int, default=20, help='')
 parser.add_argument('--min_top_gene', type=int, default=10, help='')
 parser.add_argument('--max_pval', type=float, default=0.001, help='')
 parser.add_argument('--min_fc', type=float, default=1.5, help='')
+
+parser.add_argument('--hc_tree', action='store_true')
+parser.add_argument('--n_top_gene_on_tree', type=int, default=10, help='')
+parser.add_argument('--tree_figure', type=str, default='', help='')
+parser.add_argument('--cprob_cut', type=str, default='.99', help='Only visualize top factors with cumulative probability > cprob_cut')
+parser.add_argument('--model', type=str, default='', help='')
+parser.add_argument('--remake_tree', action='store_true')
 args = parser.parse_args()
 
 path=args.path
@@ -25,17 +34,22 @@ pval_max = args.max_pval
 fc_min = args.min_fc
 ejs = os.path.dirname(os.path.abspath(__file__))+"/factor_report.template.html"
 
+model_id = args.model_id
+if model_id == '':
+    model_id = args.pref
 
 # Color code
+color_f = args.color_table
 if os.path.isfile(args.color_table):
     color_table = pd.read_csv(args.color_table, sep='\t')
 else:
-    f=path+"/figure/"+pref+".rgb.tsv"
-    color_table = pd.read_csv(f, sep='\t')
-
-# DE genes
-f=path+"/DE/"+pref+".bulk_chisq.tsv"
-de = pd.read_csv(f, sep='\t')
+    color_f = path+"/figure/"+model_id+".rgb.tsv"
+    color_table = pd.read_csv(color_f, sep='\t')
+K = color_table.shape[0]
+factor_header = np.arange(K).astype(str)
+color_table.Name = color_table.Name.astype(int)
+color_table.sort_values(by = 'Name', inplace=True)
+color_table['RGB'] = [','.join(x) for x in np.clip((color_table.loc[:, ['R','G','B']].values * 255).astype(int), 0, 255).astype(str) ]
 
 # Posterior count
 f=path+"/"+pref+".posterior.count.tsv.gz"
@@ -46,24 +60,22 @@ for u in post.columns:
     if v:
         recol[v.group(0)] = v.group(1)
 post.rename(columns=recol, inplace=True)
-
-de.factor = de.factor.astype(int)
-color_table.Name = color_table.Name.astype(int)
-color_table.sort_values(by = 'Name', inplace=True)
-color_table['RGB'] = [','.join(x) for x in np.clip((color_table.loc[:, ['R','G','B']].values * 255).astype(int), 0, 255).astype(str) ]
-
-K = color_table.shape[0]
-factor_header = np.arange(K).astype(str)
-
 post_umi = post.loc[:, factor_header].sum(axis = 0).astype(int).values
 post_weight = post.loc[:, factor_header].sum(axis = 0).values
 post_weight /= post_weight.sum()
 
+# DE genes
+f=path+"/DE/"+pref+".bulk_chisq.tsv"
+de = pd.read_csv(f, sep='\t')
+de.factor = de.factor.astype(int)
 top_gene = []
+top_gene_anno = []
 de['Rank'] = 0
 # Top genes by Chi2
 de.sort_values(by=['factor','Chi2'],ascending=False,inplace=True)
 for k in range(K):
+    v = de.loc[de.factor.eq(k), 'gene'].iloc[:args.n_top_gene_on_tree].values
+    top_gene_anno.append(', '.join(v))
     de.loc[de.factor.eq(k), 'Rank'] = np.arange(de.factor.eq(k).sum())
     v = de.loc[de.factor.eq(k) & ( (de.Rank < mtop) | \
                ((de.pval <= pval_max) & (de.FoldChange >= fc_min)) ), \
@@ -83,11 +95,12 @@ for k in range(K):
         top_gene[k].append('.')
     else:
         top_gene[k].append(', '.join(v))
-# Top genes by basolute weight
+# Top genes by absolute weight
 for k in range(K):
     v = post.gene.iloc[np.argsort(post.loc[:, str(k)].values)[::-1][:ntop] ].values
     top_gene[k].append(', '.join(v))
 
+# Summary
 table = pd.DataFrame({'Factor':np.arange(K), 'RGB':color_table.RGB.values,
                       'Weight':post_weight, 'PostUMI':post_umi,
                       'TopGene_pval':[x[1] for x in top_gene],
@@ -104,12 +117,46 @@ with open(f, 'r') as rf:
 header = lines[0].strip().split('\t')
 rows = [ list(enumerate(row.strip().split('\t') )) for row in lines[1:]]
 
-env = Environment(loader=FileSystemLoader(os.path.dirname(ejs)))
 # Load template
+env = Environment(loader=FileSystemLoader(os.path.dirname(ejs)))
 template = env.get_template(os.path.basename(ejs))
+
+image_base64 = None
+tree_alt = None
+tree_caption = None
+
+if args.hc_tree:
+    # Hierarchical clustering
+    m = re.match("^[0\.]*(\d+)$", args.cprob_cut)
+    if m is None:
+        sys.exit(f"Invalid --cprob_cut, please use a number between 0 and 1 (e.g. 0.99)")
+    cprob_label = m.group(1)
+    cprob_cut  = float(args.cprob_cut)
+
+    tree_f = args.tree_figure
+    if not os.path.exists(args.tree_figure) or args.remake_tree:
+        tree_f = color_f.replace(".rgb.tsv", ".coshc."+cprob_label+".tree.png")
+        if not os.path.exists(tree_f) or args.remake_tree:
+            model_f = args.model
+            if not os.path.exists(args.model):
+                model_f = path + "/" + pref + ".model_matrix.tsv.gz"
+                if not os.path.exists(model_f):
+                    sys.exit("Cannot find model file or the tree figure")
+            model = pd.read_csv(model_f, sep='\t')
+            model_prob = np.array(model.iloc[:, 1:]).T
+            model_prob /= model_prob.sum(axis = 1).reshape((-1, 1))
+            tree = visual_hc(model_prob, post_weight, top_gene_anno, output_f=tree_f, cprob_cut=cprob_cut)
+    print(f"Tree figure path: {tree_f}")
+    image_base64 = image_to_base64(tree_f)
+
+    tree_alt = "Hierarchical clustering of factors based on pairwise coine distance"
+    tree_caption = "Clustering of factors based on pairwise coine distance. Factors with high abundance jointly accounting for " + args.cprob_cut + " of observations are displayed."
+
 # Render the HTML file
-html_output = template.render(header=header, rows=rows)
+html_output = template.render(header=header, rows=rows, image_base64=image_base64, tree_image_alt=tree_alt, tree_image_caption=tree_caption)
 
 f=path+"/"+pref+".factor.info.html"
 with open(f, "w") as html_file:
     html_file.write(html_output)
+
+print(f)
