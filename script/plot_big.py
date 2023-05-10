@@ -20,20 +20,22 @@ parser.add_argument('--input', type=str, help='')
 parser.add_argument('--output', type=str, help='Output prefix')
 parser.add_argument('--fill_range', type=float, default=5, help="um")
 parser.add_argument('--horizontal_axis', type=str, default="x", help="Which coordinate is horizontal, x or y")
-parser.add_argument('--color_table', type=str, default='', help='Pre-defined color map')
+parser.add_argument("--plot_fit", action='store_true', help="")
+parser.add_argument("--skip_mixture_plot", action='store_true', help="")
+parser.add_argument("--plot_top_k", type=int, default=-1, help="")
+parser.add_argument("--plot_prob_cut", type=float, default=.99, help="")
+
+# Parameters shared by all plotting scripts
 parser.add_argument('--cmap_name', type=str, default="turbo", help="Name of Matplotlib colormap to use")
 parser.add_argument('--binary_cmap_name', type=str, default="plasma", help="Name of Matplotlib colormap to use for ploting individual factors")
-parser.add_argument('--plot_um_per_pixel', type=float, default=1, help="Size of the output pixels in um")
+parser.add_argument('--color_table', type=str, default='', help='Pre-defined color map')
 parser.add_argument('--xmin', type=float, default=-1, help="um")
 parser.add_argument('--ymin', type=float, default=-1, help="um")
 parser.add_argument('--xmax', type=float, default=np.inf, help="um")
 parser.add_argument('--ymax', type=float, default=np.inf, help="um")
-parser.add_argument("--plot_fit", action='store_true', help="")
-parser.add_argument("--plot_discretized", action='store_true', help="")
+parser.add_argument('--plot_um_per_pixel', type=float, default=1, help="Size of the output pixels in um")
 parser.add_argument("--plot_individual_factor", action='store_true', help="")
-parser.add_argument("--skip_mixture_plot", action='store_true', help="")
-parser.add_argument("--plot_top_k", type=int, default=-1, help="")
-
+parser.add_argument("--plot_discretized", action='store_true', help="")
 
 args = parser.parse_args()
 logging.basicConfig(level= getattr(logging, "INFO", None))
@@ -52,6 +54,12 @@ recolumn = {'Hex_center_x':'x', 'Hex_center_y':'y', 'X':'x', 'Y':'y'}
 for i,x in enumerate(header):
     if x in recolumn:
         header[i] = recolumn[x]
+if haxis == "y": # Transpose
+    for i,x in enumerate(header):
+        if x == "x":
+            header[i] = "y"
+        if x == "y":
+            header[i] = "x"
 factor_header = []
 for x in header:
     y = re.match('^[A-Za-z]*_*(\d+)$', x)
@@ -106,15 +114,17 @@ logging.info(f"Finish reading file ({nc})")
 df = df.groupby(by = ['x_indx', 'y_indx']).agg({ x:np.mean for x in factor_header }).reset_index()
 x_indx_min = int(args.xmin / args.plot_um_per_pixel )
 y_indx_min = int(args.ymin / args.plot_um_per_pixel )
-if args.plot_fit or args.xmin >= 0:
-    df.x_indx = df.x_indx - np.max([x_indx_min, df.x_indx.min()])
-if args.plot_fit or args.ymin >= 0:
-    df.y_indx = df.y_indx - np.max([y_indx_min, df.y_indx.min()])
+if args.xmin >= 0:
+    df.x_indx -= x_indx_min
+if args.ymin >= 0:
+    df.y_indx -= y_indx_min
+if args.plot_fit:
+    df.x_indx -= df.x_indx.min()
+if args.plot_fit:
+    df.y_indx -= df.y_indx.min()
 
 N0 = df.shape[0]
 df.index = range(N0)
-if haxis != "x":
-    df.rename(columns = {"x_indx":"y_indx", "y_indx":"x_indx"}, inplace=True)
 width, height = df[['x_indx','y_indx']].max(axis = 0) + 1
 logging.info(f"Read region {N0} pixels in region {height} x {width}")
 
@@ -150,10 +160,16 @@ if args.plot_individual_factor or args.plot_top_k > 0:
     if args.binary_cmap_name not in plt.colormaps():
         args.binary_cmap_name = "plasma"
     v = np.array(df.loc[:, factor_header].sum(axis = 0) )
+    v /= v.sum()
     u = np.argsort(-v)
-    if args.plot_top_k > K or args.plot_top_k <= 0:
-        args.plot_top_k = K
-    for k in u[:args.plot_top_k]:
+    indiv_k = u
+    if args.plot_top_k < K and args.plot_top_k > 0:
+        indiv_k = u[:args.plot_top_k]
+    elif args.plot_prob_cut < 1 and args.plot_prob_cut > 0:
+        w = np.cumsum(v[u])
+        k = np.arange(K)[w >= args.plot_prob_cut].min()
+        indiv_k = u[:k]
+    for k in indiv_k:
         v = np.clip(df.loc[:, factor_header[k]].values,0,1)
         mtx = np.clip(mpl.colormaps[args.binary_cmap_name](v)[:,:3]*255,0,255).astype(dt)
         outf = args.output + ".F_"+str(k)+".png"

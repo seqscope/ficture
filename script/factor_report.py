@@ -1,7 +1,7 @@
 import sys, os, copy, gc, re, gzip, pickle, argparse, logging, warnings
 import numpy as np
 import pandas as pd
-
+import matplotlib.colors
 from jinja2 import Environment, FileSystemLoader
 
 # Add parent directory
@@ -17,13 +17,17 @@ parser.add_argument('--n_top_gene', type=int, default=20, help='')
 parser.add_argument('--min_top_gene', type=int, default=10, help='')
 parser.add_argument('--max_pval', type=float, default=0.001, help='')
 parser.add_argument('--min_fc', type=float, default=1.5, help='')
+parser.add_argument('--output_pref', type=str, default='', help='')
 
 parser.add_argument('--hc_tree', action='store_true')
 parser.add_argument('--n_top_gene_on_tree', type=int, default=10, help='')
 parser.add_argument('--tree_figure', type=str, default='', help='')
 parser.add_argument('--cprob_cut', type=str, default='.99', help='Only visualize top factors with cumulative probability > cprob_cut')
 parser.add_argument('--model', type=str, default='', help='')
+parser.add_argument('--circle_if', type=int, default=24, help='')
 parser.add_argument('--remake_tree', action='store_true')
+parser.add_argument('--circle', action='store_true')
+parser.add_argument('--vertical', action='store_true')
 args = parser.parse_args()
 
 path=args.path
@@ -33,10 +37,16 @@ mtop = args.min_top_gene
 pval_max = args.max_pval
 fc_min = args.min_fc
 ejs = os.path.dirname(os.path.abspath(__file__))+"/factor_report.template.html"
+if args.remake_tree or args.circle or args.vertical:
+    args.hc_tree = True
 
 model_id = args.model_id
 if model_id == '':
     model_id = args.pref
+
+output_pref = args.output_pref
+if output_pref == '':
+    output_pref = path+"/"+pref
 
 # Color code
 color_f = args.color_table
@@ -49,7 +59,11 @@ K = color_table.shape[0]
 factor_header = np.arange(K).astype(str)
 color_table.Name = color_table.Name.astype(int)
 color_table.sort_values(by = 'Name', inplace=True)
+color_table.index = color_table.Name.values
 color_table['RGB'] = [','.join(x) for x in np.clip((color_table.loc[:, ['R','G','B']].values * 255).astype(int), 0, 255).astype(str) ]
+color_table['HEX'] = [ matplotlib.colors.to_hex(v) for v in np.array(color_table.loc[:, ['R','G','B']]) ]
+node_color = {str(i):v['HEX'] for i,v in color_table.iterrows() }
+
 
 # Posterior count
 f=path+"/"+pref+".posterior.count.tsv.gz"
@@ -71,6 +85,8 @@ de.factor = de.factor.astype(int)
 top_gene = []
 top_gene_anno = []
 de['Rank'] = 0
+# Temporary: shorten unspliced gene names
+de.gene = de.gene.str.replace('unspl_', 'u_')
 # Top genes by Chi2
 de.sort_values(by=['factor','Chi2'],ascending=False,inplace=True)
 for k in range(K):
@@ -108,10 +124,10 @@ table = pd.DataFrame({'Factor':np.arange(K), 'RGB':color_table.RGB.values,
                       'TopGene_weight':[x[3] for x in top_gene] })
 table.sort_values(by = 'Weight', ascending = False, inplace=True)
 
-f = path+"/"+pref+".factor.info.tsv"
+f = output_pref+".factor.info.tsv"
 table.to_csv(f, sep='\t', index=False, header=True, float_format="%.5f")
 
-f = path+"/"+pref+".factor.info.tsv"
+f = output_pref+".factor.info.tsv"
 with open(f, 'r') as rf:
     lines = rf.readlines()
 header = lines[0].strip().split('\t')
@@ -135,17 +151,29 @@ if args.hc_tree:
 
     tree_f = args.tree_figure
     if not os.path.exists(args.tree_figure) or args.remake_tree:
-        tree_f = color_f.replace(".rgb.tsv", ".coshc."+cprob_label+".tree.png")
+        tree_f = os.path.dirname(color_f) + '/' + pref + ".coshc."+cprob_label+".tree.png"
         if not os.path.exists(tree_f) or args.remake_tree:
             model_f = args.model
             if not os.path.exists(args.model):
-                model_f = path + "/" + pref + ".model_matrix.tsv.gz"
-                if not os.path.exists(model_f):
-                    sys.exit("Cannot find model file or the tree figure")
-            model = pd.read_csv(model_f, sep='\t')
+                model_f = path + "/" + model_id + ".model_matrix.tsv.gz"
+            if not os.path.exists(model_f):
+                print("Cannot find model file, will cluster based on posterior count")
+                model = post
+            else:
+                model = pd.read_csv(model_f, sep='\t')
             model_prob = np.array(model.iloc[:, 1:]).T
             model_prob /= model_prob.sum(axis = 1).reshape((-1, 1))
-            tree = visual_hc(model_prob, post_weight, top_gene_anno, output_f=tree_f, cprob_cut=cprob_cut)
+
+            circle = args.circle
+            if not circle and args.circle_if > 0:
+                v = np.argsort(post_weight)[::-1]
+                w = np.cumsum(post_weight[v] )
+                k = np.arange(K)[w > cprob_cut][0]
+                if k > args.circle_if:
+                    circle = True
+            tree = visual_hc(model_prob, post_weight, top_gene_anno, \
+                             node_color = node_color, circle = circle, \
+                             output_f = tree_f, cprob_cut = cprob_cut)
     print(f"Tree figure path: {tree_f}")
     image_base64 = image_to_base64(tree_f)
 
@@ -155,7 +183,7 @@ if args.hc_tree:
 # Render the HTML file
 html_output = template.render(header=header, rows=rows, image_base64=image_base64, tree_image_alt=tree_alt, tree_image_caption=tree_caption)
 
-f=path+"/"+pref+".factor.info.html"
+f=output_pref+".factor.info.html"
 with open(f, "w") as html_file:
     html_file.write(html_output)
 

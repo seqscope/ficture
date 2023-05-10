@@ -22,6 +22,8 @@ parser.add_argument('--hex_radius', type=int, default=-1, help='')
 parser.add_argument('--overlap', type=float, default=-1, help='')
 parser.add_argument('--n_move', type=int, default=1, help='')
 parser.add_argument('--min_ct_density', type=float, default=0.1, help='Minimum density of output hexagons, in nUMI/um^2')
+parser.add_argument('--min_ct_per_unit', type=float, default=-1, help='Minimum umi count of output hexagons')
+parser.add_argument('--transfer_gene_prefix', action="store_true", help='')
 args = parser.parse_args()
 
 if not os.path.exists(args.input):
@@ -46,7 +48,10 @@ else:
         n_move = 1
 
 hex_area = diam*radius*3/2
-min_ct_per_unit = args.min_ct_density * hex_area
+
+min_ct_per_unit = args.min_ct_per_unit
+if args.min_ct_per_unit < 0:
+    min_ct_per_unit = args.min_ct_density * hex_area
 
 ### Output
 if not os.path.exists(args.output_path):
@@ -59,6 +64,9 @@ with gzip.open(args.input, 'rt') as rf:
 feature=pd.read_csv(args.feature,sep='\t',header=0,usecols=['gene', 'gene_id', args.key])
 feature.sort_values(by=args.key, ascending=False, inplace=True)
 feature.drop_duplicates(subset='gene', inplace=True)
+if args.transfer_gene_prefix:
+    prefix = feature.gene.map(lambda x: x.split('_')[0] + '_' if '_' in x else '').values
+    feature.gene_id = prefix + feature.gene_id.values
 feature['dummy'] = "Gene Expression"
 f = args.output_path + "/features.tsv.gz"
 feature[['gene_id','gene','dummy']].to_csv(f, sep='\t', index=False, header=False)
@@ -91,7 +99,7 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, 
     df_buff = pd.concat([df_buff, chunk])
     df_buff['j'] = df_buff.X.astype(str) + '_' + df_buff.Y.astype(str)
     for l in df_buff.lane.unique():
-        df = df_buff[df_buff.lane.eq(l)]
+        df = df_buff[df_buff.lane.eq(l) & df_buff.gene.isin(ft_dict)]
         print(l, df.shape[0], ed)
 
         brc_full = df.groupby(by = ['j','tile','X','Y']).agg({args.key: sum}).reset_index()
@@ -120,7 +128,7 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, 
                 ct = pd.DataFrame({'hex_id':hex_crd, 'tot':pixel_ct}).groupby(by = 'hex_id').agg({'tot': sum}).reset_index()
                 mid_ct = np.median(ct.loc[ct.tot >= min_ct_per_unit, 'tot'].values)
                 ct = set(ct.loc[ct.tot >= min_ct_per_unit, 'hex_id'].values)
-                if len(ct) < 2:
+                if len(ct) < 1:
                     offs_y += 1
                     continue
                 hex_list = list(ct)
@@ -132,6 +140,7 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, 
                 brc['X'] = [f"{x:.{args.precision}f}" for x in brc.X.values]
                 brc['Y'] = [f"{x:.{args.precision}f}" for x in brc.Y.values]
                 brc.sort_values(by = 'cRow', inplace=True)
+                print(offs_x, offs_y, brc.shape[0])
                 with open(brc_f, 'a') as wf:
                     _ = wf.write('\n'.join((brc.cRow+n_unit+1).astype(str).values + '_' + l + '_' + brc.tile.astype(str) + '_' + brc.X.values + '_' + brc.Y.values + '_' + str(offs_x) + '.' + str(offs_y) )+'\n')
                 n_hex = len(hex_dict)
@@ -151,7 +160,7 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, 
                     r, c = mtx.nonzero()
                     r = np.array(r,dtype=int) + offset + n_unit + 1
                     c = np.array(c,dtype=int) + 1
-                    T += mtx.sum()
+                    T += len(r)
                     mtx = pd.DataFrame({'i':c, 'j':r, 'v':mtx.data})
                     mtx['i'] = mtx.i.astype(int)
                     mtx['j'] = mtx.j.astype(int)

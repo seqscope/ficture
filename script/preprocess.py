@@ -264,7 +264,7 @@ for itr_r in range(len(lanes)):
                 sep='\t', names=["gene_id","gene","i","ct"],\
                 usecols=["i","gene","gene_id"],  engine='python')
         except:
-            warnings.warm(f"Unable to read data for tile {tile}")
+            warnings.warn(f"Unable to read data for tile {tile}")
             continue
         sub = mtx.merge(right = brc, on = 'j', how = 'inner')
         sub = sub.merge(right = feature, on = 'i', how = 'inner')

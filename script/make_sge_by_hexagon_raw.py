@@ -200,7 +200,7 @@ for itr_r in range(len(lanes)):
                     r, c = mtx.nonzero()
                     r = np.array(r,dtype=int) + offset + n_unit + 1
                     c = np.array(c,dtype=int) + 1
-                    T += mtx.sum()
+                    T += len(r)
                     mtx = pd.DataFrame({'i':c, 'j':r, 'v':mtx.data})
                     mtx['i'] = mtx.i.astype(int)
                     mtx['j'] = mtx.j.astype(int)

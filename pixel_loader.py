@@ -159,8 +159,9 @@ class PixelMinibatch:
 
             expElog_theta = np.exp(utilt.dirichlet_expectation(batch.gamma))
             expElog_theta/= expElog_theta.sum(axis = 1).reshape((-1, 1))
-            tmp = pd.DataFrame({'X':grid_pt[:,0],'Y':grid_pt[:,1]})
-            tmp['avg_size'] = np.array(batch.psi.sum(axis = 0)).reshape(-1)
+            tmp = pd.DataFrame({'minibatch':b,'X':grid_pt[:,0],'Y':grid_pt[:,1]})
+            asum = batch.psi.T @ batch.mtx.sum(axis = 1).reshape((-1, 1))
+            tmp['avg_size'] = np.array(asum).reshape(-1)
             for v in range(self.K):
                 tmp[str(v)] = expElog_theta[:, v]
             tmp = tmp.loc[(tmp.X > x_min+self.out_buff) & \

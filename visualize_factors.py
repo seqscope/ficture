@@ -10,10 +10,64 @@ import scipy.stats
 import scipy.spatial
 
 import ete3
-from ete3 import Tree, TreeStyle
+from ete3 import Tree, TreeStyle, NodeStyle
 os.environ['QT_QPA_PLATFORM']='offscreen'
 
-def visual_hc(model_prob, weight, top_gene, output_f=None, cprob_cut=.99):
+def logrank(x):
+    v = scipy.stats.rankdata(x)
+    return - np.log( 1-(v-.5)/len(v) )
+
+def cor_logrank(orgmtx):
+    K, M = orgmtx.shape
+    rankmtx = np.zeros((K, M), dtype=int)
+    for k in range(K):
+        rankmtx[k, :] = scipy.stats.rankdata(orgmtx[k, :])
+    corlogrank = np.corrcoef(-np.log( 1-(rankmtx-.5)/M ) )
+    return corlogrank
+
+def NJ_logrank(orgmtx):
+    K, M = orgmtx.shape
+    rankmtx = np.zeros((K, M), dtype=int)
+    for k in range(K):
+        rankmtx[k, :] = scipy.stats.rankdata(orgmtx[k, :])
+    corlogrank = np.corrcoef(-np.log( 1-(rankmtx-.5)/M ) )
+    node = {} # node id -> [leaves, profile]
+    active_node = []
+    for k in range(K):
+        node[k] = [[k], orgmtx[k, :]]
+        active_node.append(k)
+    pairwise_dict = {} # (id1, id2) -> score
+    for k in range(K-1):
+        for l in range(k+1, K):
+            pairwise_dict[(k, l)] = corlogrank[k, l]
+    Z = []
+    for s in range(K-1):
+        candi = [] # [(id1, id2), score]
+        for i,v1 in enumerate(active_node[:-1]):
+            for j in range(i+1, len(active_node)):
+                v2 = active_node[j]
+                if (v1, v2) not in pairwise_dict:
+                    vec1 = logrank(node[v1][1])
+                    vec2 = logrank(node[v2][1])
+                    score = np.corrcoef(vec1, vec2)[0,1]
+                    candi.append([(v1, v2), score])
+                    pairwise_dict[ (v1, v2) ] = score
+                else:
+                    score = pairwise_dict[(v1, v2)]
+                    candi.append([(v1, v2), score])
+        if len(candi) == 0:
+            break
+        candi.sort(key = lambda x : x[1], reverse=True)
+        v1, v2 = candi[0][0]
+        lvs = node[v1][0]+node[v2][0]
+        node[K+s] = [lvs, orgmtx[lvs, :].mean(axis = 0)]
+        active_node.remove(v1)
+        active_node.remove(v2)
+        active_node.append(K+s)
+        Z.append([ v1, v2, 1-candi[0][1], len(lvs) ])
+    return Z
+
+def visual_hc(model_prob, weight, top_gene, node_color=None, circle=False, vertical=False, output_f=None, cprob_cut=.99):
 
     K = model_prob.shape[0]
     assert len(weight) == K, "model_prob.shape[0] != len(weight)"
@@ -22,20 +76,27 @@ def visual_hc(model_prob, weight, top_gene, output_f=None, cprob_cut=.99):
     model_prob = normalize(np.array(model_prob), norm='l1', axis=1)
     weight = np.array(weight)
     weight /= weight.sum()
-    weight_anno = ["%.2e" % x for x in weight ]
+    weight_anno = ["%.2e" % x if x < 0.1 else "%.3f" % x for x in weight]
     v = np.argsort(weight)[::-1]
     w = np.cumsum(weight[v] )
-    k = np.arange(K)[w > cprob_cut][0]
+    if sum(w > cprob_cut) == 0:
+        k = K - 1
+    else:
+        k = np.arange(K)[w > cprob_cut][0]
     kept_factor = v[:(k+1)].astype(str)
 
-    node_anno = {k: str(k) + ": " + v + " ("+weight_anno[k] + ")"  for k,v in enumerate(top_gene) }
-
-    # Hierarchical clustering
-    cd_cosine = scipy.spatial.distance.pdist(model_prob, metric='cosine')
-    Z_cosine = scipy.cluster.hierarchy.average(cd_cosine)
+    # # Hierarchical clustering
+    # cd_dist = scipy.spatial.distance.pdist(model_prob, metric='cosine')
+    # Z_hc = scipy.cluster.hierarchy.linkage(cd_dist, method="complete")
+    # Z_hc = NJ_logrank(model_prob)
+    corlogrank = cor_logrank(model_prob)
+    cd_dist = 1 - .5 * (corlogrank + corlogrank.T)
+    np.fill_diagonal(cd_dist, 0)
+    cd_dist = scipy.spatial.distance.squareform(cd_dist)
+    Z_hc = scipy.cluster.hierarchy.linkage(cd_dist, method="complete")
 
     # Construct tree object from the clustering
-    R, T = scipy.cluster.hierarchy.to_tree(Z_cosine, rd=True)
+    R, T = scipy.cluster.hierarchy.to_tree(Z_hc, rd=True)
     tr = Tree()
     tr.dist=0
     tr.name='root'
@@ -56,21 +117,47 @@ def visual_hc(model_prob, weight, top_gene, output_f=None, cprob_cut=.99):
     node_list = [x for x in tr.traverse() if x.is_leaf() and x.name in kept_factor]
     subtr = tr.copy()
     subtr.prune( [x.name for x in node_list] )
+
+    if output_f is None:
+        return subtr
+
+    ### Visualize tree
     title=f"Hierarchical clustering of {len(node_list)} factors"
-    if output_f is not None:
-        # Visualize tree
-        def layout(node):
-            if node.is_leaf():
-                ete3.faces.add_face_to_node(ete3.TextFace(node_anno[int(node.name)], fsize=20,tight_text=True), node, column=0)
-        ts = TreeStyle()
-        ts.show_leaf_name = False
-        ts.layout_fn=layout
-        ts.show_branch_length = False
+
+    # Node style
+    istyle = NodeStyle()
+    istyle["size"] = 0
+    for n in subtr.traverse():
+        n.set_style(istyle)
+    if node_color is not None:
+        for n in subtr.traverse():
+            if n.is_leaf():
+                nstyle = NodeStyle()
+                nstyle["fgcolor"] = node_color[n.name]
+                nstyle['size'] = 10
+                n.set_style(nstyle)
+    node_anno = {k: " " + str(k) + " ("+weight_anno[k] + "): " + v  for k,v in enumerate(top_gene) }
+    def layout(node):
+        if node.is_leaf():
+            ete3.faces.add_face_to_node(ete3.TextFace(node_anno[int(node.name)]), node, column=0)
+
+    # Tree style
+    ts = TreeStyle()
+    ts.layout_fn=layout
+    ts.show_leaf_name = False
+    ts.show_branch_length = False
+    ts.show_scale = False
+    if circle:
         ts.mode = "c"
         ts.arc_start = 0
         ts.arc_span = 360
-        ts.title.add_face(ete3.TextFace(title, fsize=50),column=0)
-        subtr.render(output_f, w=2560, units='mm', tree_style=ts)
+    else:
+        if vertical:
+            ts.rotation = 90
+        ts.branch_vertical_margin = 20
+
+    ts.title.add_face(ete3.TextFace(title, fsize=25),column=0)
+    subtr.render(output_f, w=2560, units='mm', tree_style=ts)
 
     return subtr
 

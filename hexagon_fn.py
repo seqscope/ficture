@@ -1,5 +1,9 @@
 import numpy as np
 
+### Transform between cartesian and hexagon coordinates
+### "pointy-top" orientation & axial coordinate
+### (https://www.redblobgames.com/grids/hexagons/)
+
 def pixel_to_hex(pts, size, offset_x = 0, offset_y = 0):
     n,d = pts.shape
     assert d == 2

@@ -21,7 +21,7 @@ parser.add_argument('--filter_batch_ncut', type=int, default=2, help='')
 parser.add_argument('--major_axis', type=str, default="X", help='')
 parser.add_argument('--precision_um', type=float, default=2, help='')
 parser.add_argument('--log', default = '', type=str, help='files to write log to')
-
+parser.add_argument('--max_npts_to_fit_model', type=float, default=1e6, help='')
 parser.add_argument('--min_abs_mol_density_squm', type=float, default=0.02, help='A safe lowerbound to remove very sparse technical noise')
 parser.add_argument('--hard_threshold', type=float, default=-1, help='If provided, filter by hard threshold (number of molecules per squared um)')
 parser.add_argument('--radius', type=float, default=7, help='')

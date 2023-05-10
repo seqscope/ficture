@@ -261,6 +261,9 @@ class ImgRowIterator_stream_singlechannel:
         except StopIteration:
             print(f"Reach the end of file")
             return 0
+        if chunk.y.min() > self.ymax:
+            print(f"Read all pixels in range")
+            return 0
         # Crop
         chunk = chunk[(chunk.x > self.xmin) & (chunk.x < self.xmax) &\
                       (chunk.y > self.ymin) & (chunk.y < self.ymax) &\

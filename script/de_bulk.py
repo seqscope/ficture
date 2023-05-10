@@ -47,7 +47,7 @@ print(f"Read posterior count over {M} genes and {K} factors")
 
 if len(gene_kept) > 0:
     info = info.loc[info.gene.isin(gene_kept), :]
-info["gene_tot"] = info.loc[:, header].sum(axis=1)
+info["gene_tot"] = info.loc[:, header].sum(axis=1).astype(int)
 info = info[info["gene_tot"] > args.min_ct_per_feature]
 info.index = info.gene.values
 total_umi = info.gene_tot.sum()
@@ -109,6 +109,9 @@ for k in range(K):
     chidf.loc[chidf.factor.eq(k), 'Rank'] = np.arange((chidf.factor==k).sum())
 chidf = chidf.loc[((chidf.pval<pcut)&(chidf.FoldChange>fcut)) | (chidf.Rank < args.min_output_per_factor), :]
 chidf.sort_values(by=['factor','Chi2'],ascending=[True,False])
+chidf.Chi2 = chidf.Chi2.map(lambda x : "{:.1f}".format(x) )
+chidf.FoldChange = chidf.FoldChange.map(lambda x : "{:.2f}".format(x) )
+chidf.gene_total = chidf.gene_total.astype(int)
 chidf.drop(columns = 'Rank', inplace=True)
 
 chidf.to_csv(args.output,sep='\t',float_format="%.2e",index=False)

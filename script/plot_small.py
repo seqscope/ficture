@@ -8,8 +8,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 from scipy.sparse import *
-import sklearn.neighbors
-import sklearn.preprocessing
+from sklearn.preprocessing import normalize
 
 # Add parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -19,11 +18,10 @@ from utilt import plot_colortable
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
 parser.add_argument('--output', type=str, help='Output prefix')
-parser.add_argument('--fill_range', type=float, default=5, help="um")
-parser.add_argument('--batch_size', type=float, default=10000, help="")
-parser.add_argument("--tif", action='store_true', help="Store as 16-bit tif instead of png")
 parser.add_argument("--plot_fit", action='store_true', help="")
-parser.add_argument("--skip_mixture_plot", action='store_true', help="")
+parser.add_argument("--plot_top_k", type=int, default=-1, help="")
+parser.add_argument("--plot_prob_cut", type=float, default=.99, help="")
+parser.add_argument("--tif", action='store_true', help="Store as 16-bit tif instead of png")
 
 # Parameters shared by all plotting scripts
 parser.add_argument('--cmap_name', type=str, default="turbo", help="Name of Matplotlib colormap to use")
@@ -36,6 +34,7 @@ parser.add_argument('--ymax', type=float, default=np.inf, help="")
 parser.add_argument('--plot_um_per_pixel', type=float, default=1, help="Size of the output pixels in um")
 parser.add_argument("--plot_individual_factor", action='store_true', help="")
 parser.add_argument("--plot_discretized", action='store_true', help="")
+parser.add_argument('--single_factor_cutoff', type=float, default=.05, help="")
 
 args = parser.parse_args()
 logging.basicConfig(level= getattr(logging, "INFO", None))
@@ -59,27 +58,28 @@ factor_header = [x[0] for x in factor_header]
 K = len(factor_header)
 
 # Colormap
-if os.path.exists(args.color_table):
-    color_info = pd.read_csv(args.color_table, sep='\t', header=0)
-    color_info.Name = color_info.Name.astype(int)
-    color_info.sort_values(by=['Name'], inplace=True)
-    cmtx = np.array(color_info.loc[:, ["R","G","B"]])
-else:
-    cmap_name = args.cmap_name
-    if args.cmap_name not in plt.colormaps():
-        cmap_name = "turbo"
-    cmap = plt.get_cmap(cmap_name, K)
-    cmtx = np.array([cmap(i) for i in range(K)] )
-    indx = np.arange(K)
-    shuffle(indx)
-    cmtx = cmtx[indx, ]
-    cmtx = cmtx[:, :3]
-    cdict = {k:cmtx[k,:] for k in range(K)}
-    # Plot color bar separately
-    fig = plot_colortable(cdict, "Factor label", sort_colors=False, ncols=4)
-    f = args.output + ".cbar"
-    fig.savefig(f, format="png")
-    logging.info(f"Set up color map for {K} factors")
+if args.plot_discretized:
+    if os.path.exists(args.color_table):
+        color_info = pd.read_csv(args.color_table, sep='\t', header=0)
+        color_info.Name = color_info.Name.astype(int)
+        color_info.sort_values(by=['Name'], inplace=True)
+        cmtx = np.array(color_info.loc[:, ["R","G","B"]])
+    else:
+        cmap_name = args.cmap_name
+        if args.cmap_name not in plt.colormaps():
+            cmap_name = "turbo"
+        cmap = plt.get_cmap(cmap_name, K)
+        cmtx = np.array([cmap(i) for i in range(K)] )
+        indx = np.arange(K)
+        shuffle(indx)
+        cmtx = cmtx[indx, ]
+        cmtx = cmtx[:, :3]
+        cdict = {k:cmtx[k,:] for k in range(K)}
+        # Plot color bar separately
+        fig = plot_colortable(cdict, "Factor label", sort_colors=False, ncols=4)
+        f = args.output + ".cbar.png"
+        fig.savefig(f, format="png")
+        logging.info(f"Set up color map for {K} factors")
 
 # Read data
 adt={x:float for x in ["x", "y"]+factor_header}
@@ -92,8 +92,10 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'), sep='\t', \
     chunk['y_indx'] = np.round(chunk.y.values / args.plot_um_per_pixel, 0).astype(int)
     chunk = chunk.groupby(by = ['x_indx', 'y_indx']).agg({ x:np.mean for x in factor_header }).reset_index()
     df = pd.concat([df, chunk])
+    print(df.x_indx.iloc[-1], df.y_indx.iloc[-1])
 
 df = df.groupby(by = ['x_indx', 'y_indx']).agg({ x:np.mean for x in factor_header }).reset_index()
+df.loc[:, factor_header] = normalize(df.loc[:, factor_header].values, axis=1, norm='l1')
 x_indx_min = int(args.xmin / args.plot_um_per_pixel )
 y_indx_min = int(args.ymin / args.plot_um_per_pixel )
 if args.plot_fit or args.xmin < 0:
@@ -110,92 +112,52 @@ df.index = range(N0)
 hsize, wsize = df[['x_indx','y_indx']].max(axis = 0) + 1
 hsize_um = hsize * args.plot_um_per_pixel
 wsize_um = wsize * args.plot_um_per_pixel
-logging.info(f"Read region {N0} pixels in region {hsize_um} x {wsize_um}")
+logging.info(f"Collapse to {N0} pixels in region {hsize_um} x {wsize_um}")
 
 
 # Make images
-wst = df.y_indx.min()
-wed = df.y_indx.max()
-wstep = np.max([10, int(args.batch_size / hsize)])
-radius = args.fill_range/args.plot_um_per_pixel
-
-pts = np.zeros((0, 2), dtype=int)
-pts_indx = []
-st = wst
-while st < wed:
-    ed = min([st + wstep, wed])
-    logging.info(f"Filling pixels {st} - {ed}")
-    if ((df.y_indx > st) & (df.y_indx < ed)).sum() < 10:
-        st = ed
-        continue
-    block = df.index[(df.y_indx > st - 2*radius) & (df.y_indx < ed + 2*radius)]
-    ref = sklearn.neighbors.BallTree(np.array(df.loc[block, ['x_indx', 'y_indx']]))
-    mesh = np.meshgrid(np.arange(hsize), np.arange(st, ed))
-    nodes = np.array(list(zip(*(dim.flat for dim in mesh))), dtype=int)
-    dv, iv = ref.query(nodes, k = 1, dualtree=True)
-    indx = dv[:, 0] < radius
-    iv = block[iv[indx, 0] ]
-    if sum(indx) == 0:
-        st = ed
-        continue
-    pts = np.vstack((pts, nodes[indx, :]) )
-    pts_indx += list(iv)
-    st = ed
-
-pts[:,0] = np.clip(hsize - pts[:, 0], 0, hsize-1) # Origin is lower-left
-pts[:,1] = np.clip(pts[:, 1], 0, wsize-1)
-
-logging.info(f"Start constructing RGB image")
-
-if not args.skip_mixture_plot:
-    rgb_mtx = np.clip(np.around(np.array(df.loc[pts_indx,factor_header]) @\
-                                cmtx * 255),0,255).astype(dt)
-    img = np.zeros( (hsize, wsize, 3), dtype=dt)
-    for r in range(3):
-        img[:, :, r] = coo_array((rgb_mtx[:, r], (pts[:,0], pts[:,1])),\
-            shape=(hsize, wsize), dtype = dt).toarray()
-    if args.tif:
-        img = Image.fromarray(img, mode="I;16")
-    else:
-        img = Image.fromarray(img)
-
-    outf = args.output
-    outf += ".tif" if args.tif else ".png"
-    img.save(outf)
-    logging.info(f"Made fractional image\n{outf}")
-
 if args.plot_discretized:
-    binary_mtx = coo_matrix((np.ones(N0,dtype=bool),\
+    binary_mtx = coo_array((np.ones(N0,dtype=bool),\
             (range(N0), np.array(df[factor_header]).argmax(axis = 1))),\
             shape=(N0, K)).toarray()
-    rgb_mtx = np.clip(np.around(np.array(binary_mtx[pts_indx, :]) @\
-                                cmtx * 255),0,255).astype(dt)
+    rgb_mtx = np.clip(np.around(binary_mtx @ cmtx * 255),0,255).astype(dt)
     img = np.zeros( (hsize, wsize, 3), dtype=dt)
     for r in range(3):
-        img[:, :, r] = coo_array((rgb_mtx[:, r], (pts[:,0], pts[:,1])),\
-            shape=(hsize, wsize), dtype = dt).toarray()
+        img[:, :, r] = coo_array((rgb_mtx[:, r], \
+                                  (df.x_indx.values, df.y_indx.values)),\
+                                 shape=(hsize, wsize), dtype = dt).toarray()
     if args.tif:
         img = Image.fromarray(img, mode="I;16")
     else:
         img = Image.fromarray(img)
-
     outf = args.output + ".top"
     outf += ".tif" if args.tif else ".png"
     img.save(outf)
     logging.info(f"Made hard threshold image\n{outf}")
 
 if args.plot_individual_factor:
+    cutoff = args.single_factor_cutoff
     if args.binary_cmap_name not in plt.colormaps():
         args.binary_cmap_name = "plasma"
-    v = np.array(df.loc[pts_indx, factor_header].sum(axis = 0) )
+    v = np.array(df.loc[:, factor_header].sum(axis = 0) )
     u = np.argsort(-v)
-    for k in u:
-        v = np.clip(df.loc[pts_indx, factor_header[k]].values,0,1)
+    indiv_k = u
+    if args.plot_top_k < K and args.plot_top_k > 0:
+        indiv_k = u[:args.plot_top_k]
+    elif args.plot_prob_cut < 1 and args.plot_prob_cut > 0:
+        w = np.cumsum(v[u])
+        k = np.arange(K)[w >= args.plot_prob_cut].min()
+        indiv_k = u[:k]
+    for k in indiv_k:
+        indx = df[factor_header[k]] > cutoff
+        v = np.clip(df.loc[indx, factor_header[k]].values,0,1)
         rgb_mtx = np.clip(mpl.colormaps[args.binary_cmap_name](v)[:,:3]*255,0,255).astype(dt)
         img = np.zeros( (hsize, wsize, 3), dtype=dt)
         for r in range(3):
-            img[:, :, r] = coo_array((rgb_mtx[:, r], (pts[:,0], pts[:,1])),\
-                shape=(hsize, wsize), dtype = dt).toarray()
+            img[:, :, r] = coo_array((rgb_mtx[:, r],\
+                                      (df.loc[indx, "x_indx"].values,\
+                                       df.loc[indx, "y_indx"].values )),\
+                                    shape=(hsize, wsize), dtype = dt).toarray()
         if args.tif:
             img = Image.fromarray(img, mode="I;16")
         else:
