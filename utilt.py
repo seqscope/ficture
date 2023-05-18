@@ -3,7 +3,7 @@
 ''' helper functions '''
 import numpy as np
 import pandas as pd
-import copy, re
+import copy, re, os, geojson
 from scipy import sparse
 from scipy.special import gammaln, psi, logsumexp, expit, logit
 from sklearn.preprocessing import normalize
@@ -13,6 +13,7 @@ import sklearn.cluster
 from matplotlib.patches import Rectangle
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
+from matplotlib.path import Path
 
 def dirichlet_expectation(alpha):
     """
@@ -99,6 +100,36 @@ def get_integer_suff_from_string(in_array):
         if v:
             out.append(v.group(1))
     return out
+
+def extract_polygons_from_json(gj):
+    if isinstance(gj, str):
+        assert os.path.exists(gj), f"Invalid file\n{gj}"
+        gj = geojson.load(open(gj,'rb'))
+    assert gj['type'] == 'FeatureCollection', "Invalid geojson file"
+    vertices = []
+    for geom in gj['features']:
+        if geom['geometry']['type'] == 'Polygon':
+            poly = geom['geometry']['coordinates']
+            vertices.append(np.array(poly).squeeze())
+        elif geom['geometry']['type'] == 'MultiPolygon':
+            for poly in geom['geometry']['coordinates']:
+                vertices.append(np.array(poly).squeeze())
+    return vertices
+
+def svg_parse_list(path):
+    commands = {'M': (Path.MOVETO,),'L': (Path.LINETO,),
+                'Q': (Path.CURVE3,)*2,'C': (Path.CURVE4,)*3,
+                'Z': (Path.CLOSEPOLY,) }
+    vertices = []
+    codes = []
+    for v in path:
+        cmd = v[0].upper()
+        if len(v) > 1:
+            points = [float(x) for x in v[1:]]
+            points = np.array(points).reshape((len(points)//2,2))
+            vertices.extend(points.tolist())
+            codes.extend(commands[cmd])
+    return codes, vertices
 
 def match_factors(mtx1, mtx2, c1, n, cmap, mode='beta'):
     """
