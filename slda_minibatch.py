@@ -16,8 +16,9 @@ class minibatch:
         self.alpha = None # Prior for gamma
         self.ElogO = None # d_psi E_q[log P(Cij)]
         self.ll = 0       # log likelihood
+        self.anchor_adj = None # Adjacency matrix of anchor points
 
-    def init_from_matrix(self, mtx, doc_pts, w, psi = None, phi = None, m_gamma = None, features = None, barcodes = None):
+    def init_from_matrix(self, mtx, doc_pts, w, psi = None, phi = None, m_gamma = None, anchor_adj = None, features = None, barcodes = None):
         assert sparse.issparse(mtx), "Invalid matrix - must be sparse"
         assert sparse.issparse(w), "Invalid w - must be sparse"
 
@@ -48,6 +49,7 @@ class minibatch:
             self.alpha = m_gamma
             self.gamma = m_gamma
 
+        self.anchor_adj = anchor_adj
         if features is None:
             self.feature = list(range(self.M))
         else:

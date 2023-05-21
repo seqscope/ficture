@@ -15,7 +15,7 @@ from slda_minibatch import minibatch
 
 class PixelMinibatch:
 
-    def __init__(self, reader, ft_dict, batch_id, key, mu_scale, radius, halflife, precision=0.1, thread=1, verbose=0) -> None:
+    def __init__(self, reader, ft_dict, batch_id, key, mu_scale, radius, halflife, adj_penal=-1, precision=0.1, thread=1, verbose=0) -> None:
         self.df_full = pd.DataFrame()
         self.pixel_reader = reader
         self.batch_id = batch_id
@@ -26,6 +26,7 @@ class PixelMinibatch:
         self.key = key
         self.precision = np.clip(precision, 0.1, np.inf)
         self.radius = radius
+        self.adj_penal = adj_penal
         self.nu = np.log(.5) / np.log(halflife)
         self.out_buff = self.radius * halflife
         self.thread = thread
@@ -44,10 +45,18 @@ class PixelMinibatch:
         if not anchor_in_um:
             self.grid_info.x *= self.mu_scale
             self.grid_info.y *= self.mu_scale
+        self.n = self.grid_info.shape[0]
+        self.grid_info.index = range(self.n)
         self.ref = sklearn.neighbors.BallTree(np.array(self.grid_info.loc[:, ['x','y']]))
         self.factor_header.sort()
         self.factor_header = [str(x) for x in self.factor_header]
         self.K = len(self.factor_header)
+        self.adj_mtx = None
+
+    def _anchor_adj(self):
+        if self.adj_penal < 0:
+            self.adj_penal = self.radius * 2
+        self.adj_mtx = sklearn.neighbors.radius_neighbors_graph(self.ref, self.adj_penal, mode='connectivity', include_self=True)
 
     def read_chunk(self, nbatch):
         batch_ids = set()
@@ -77,7 +86,7 @@ class PixelMinibatch:
             chunk = chunk.loc[chunk.j.isin(pts.loc[kept_pixel, 'j'].values), :]
             batch_ids.update(set(chunk[self.batch_id].unique()))
             self.df_full = pd.concat([self.df_full, chunk], axis=0)
-            print(f"Read {len(batch_ids)} minibatches")
+            # print(f"Read {len(batch_ids)} minibatches")
 
         left = pd.DataFrame()
         if self.file_is_open:
@@ -102,48 +111,57 @@ class PixelMinibatch:
         self.df_full = left
         return len(self.batch_index)
 
+    def _prepare_batch(self, b, init_bound):
+
+        indx = self.brc[self.batch_id].eq(b)
+        x_min, x_max = self.brc.loc[indx, 'X'].min(), self.brc.loc[indx, 'X'].max()
+        y_min, y_max = self.brc.loc[indx, 'Y'].min(), self.brc.loc[indx, 'Y'].max()
+        grid_indx = (self.grid_info.x >= x_min - self.radius) &\
+                    (self.grid_info.x <= x_max + self.radius) &\
+                    (self.grid_info.y >= y_min - self.radius) &\
+                    (self.grid_info.y <= y_max + self.radius)
+        grid_pt = self.grid_info.loc[grid_indx, ["x","y"]]
+        if grid_pt.shape[0] < 10:
+            return None, None, None, None
+
+        # Initilize anchor
+        theta = np.array(self.grid_info.loc[grid_indx, self.factor_header])
+        theta = sklearn.preprocessing.normalize(np.clip(theta, init_bound, 1.-init_bound), norm='l1', axis=1)
+        n = theta.shape[0]
+
+        # Pixel to anchor weight
+        indx, dist = self.bt.query_radius(X = np.array(grid_pt), r = self.radius, return_distance = True)
+        r_indx = [i for i,x in enumerate(indx) for y in range(len(x))]
+        c_indx = [x for y in indx for x in y]
+        wij = np.array([x for y in dist for x in y])
+        wij = 1-(wij / self.radius)**self.nu
+        wij = coo_array((wij, (r_indx,c_indx)),shape=(n,self.N0)).tocsc().T
+        wij.eliminate_zeros()
+        nchoice=(wij != 0).sum(axis = 1)
+        b_indx = np.arange(self.N0)[nchoice > 0]
+        wij = wij[b_indx, :]
+        wij.data = np.clip(wij.data, .05, .95)
+        return b_indx, grid_pt, wij, theta
+
     def one_batch(self, batch_index, slda, init_bound):
 
         pixel_result = pd.DataFrame()
         anchor_result = pd.DataFrame()
         post_count = np.zeros((self.K, self.M))
         for b in batch_index:
-            indx = self.brc[self.batch_id].eq(b)
-            x_min, x_max = self.brc.loc[indx, 'X'].min(), self.brc.loc[indx, 'X'].max()
-            y_min, y_max = self.brc.loc[indx, 'Y'].min(), self.brc.loc[indx, 'Y'].max()
-            grid_indx = (self.grid_info.x >= x_min - self.radius) &\
-                        (self.grid_info.x <= x_max + self.radius) &\
-                        (self.grid_info.y >= y_min - self.radius) &\
-                        (self.grid_info.y <= y_max + self.radius)
-            grid_pt = np.array(self.grid_info.loc[grid_indx, ["x","y"]])
-            if grid_pt.shape[0] < 10:
+            b_indx, grid_pt, wij, theta = self._prepare_batch(b, init_bound)
+            if b_indx is None:
                 continue
-
-            # Initilize anchor
-            theta = np.array(self.grid_info.loc[grid_indx, self.factor_header])
-            theta = sklearn.preprocessing.normalize(np.clip(theta, init_bound, 1.-init_bound), norm='l1', axis=1)
-            n = theta.shape[0]
-
-            # Pixel to anchor weight
-            indx, dist = self.bt.query_radius(X = grid_pt, r = self.radius, return_distance = True)
-            r_indx = [i for i,x in enumerate(indx) for y in range(len(x))]
-            c_indx = [x for y in indx for x in y]
-            wij = np.array([x for y in dist for x in y])
-            wij = 1-(wij / self.radius)**self.nu
-            wij = coo_array((wij, (r_indx,c_indx)),shape=(n,self.N0)).tocsc().T
-            wij.eliminate_zeros()
-            nchoice=(wij != 0).sum(axis = 1)
-            b_indx = np.arange(self.N0)[nchoice > 0]
             N = len(b_indx)
-            wij = wij[b_indx, :]
-            wij.data = np.clip(wij.data, .05, .95)
+            grid_pt = np.array(grid_pt)
             psi_org = sklearn.preprocessing.normalize(wij, norm='l1', axis=1)
-
             batch = minibatch()
             batch.init_from_matrix(self.dge_mtx[b_indx, :], grid_pt, wij, psi = psi_org, m_gamma = theta)
             _ = slda.do_e_step(batch)
 
             tmp = self.brc.iloc[b_indx, :]
+            x_min, x_max = tmp.X.min(), tmp.X.max()
+            y_min, y_max = tmp.Y.min(), tmp.Y.max()
             v = np.arange(N)[(tmp.X > x_min+self.out_buff) &\
                              (tmp.X < x_max-self.out_buff) &\
                              (tmp.Y > y_min+self.out_buff) &\
@@ -186,3 +204,55 @@ class PixelMinibatch:
             return post_count, pixel_result, anchor_result
         else:
             return self.one_batch(self.batch_index, slda, init_bound)
+
+
+
+    def run_chunk_penalized(self, slda, init_bound):
+        assert slda._zeta > 0 and slda._zeta < 1, "To run slda with penalized likelihood, please set slda.zeta within (0,1)"
+        if self.adj_mtx is None:
+            self._anchor_adj()
+        pixel_result = pd.DataFrame()
+        anchor_result = pd.DataFrame()
+        post_count = np.zeros((self.K, self.M))
+        for b in self.batch_index:
+            b_indx, grid_pt, wij, theta = self._prepare_batch(b, init_bound)
+            if b_indx is None:
+                continue
+            N = len(b_indx)
+            anchor_index = grid_pt.index.to_list()
+            grid_pt = np.array(grid_pt)
+            psi_org = sklearn.preprocessing.normalize(wij, norm='l1', axis=1)
+            batch = minibatch()
+            batch.init_from_matrix(self.dge_mtx[b_indx, :], grid_pt, wij, psi = psi_org, m_gamma = theta, anchor_adj = self.adj_mtx[anchor_index, :][:, anchor_index])
+
+            _ = slda.update_lambda_penalized(batch)
+
+            tmp = self.brc.iloc[b_indx, :]
+            x_min, x_max = tmp.X.min(), tmp.X.max()
+            y_min, y_max = tmp.Y.min(), tmp.Y.max()
+            v = np.arange(N)[(tmp.X > x_min+self.out_buff) &\
+                             (tmp.X < x_max-self.out_buff) &\
+                             (tmp.Y > y_min+self.out_buff) &\
+                             (tmp.Y < y_max-self.out_buff)]
+            post_count += batch.phi[v, :].T @ batch.mtx[v, :]
+
+            tmp = copy.copy(self.brc.loc[b_indx, ['j','X','Y']] )
+            tmp.index = range(tmp.shape[0])
+            tmp = pd.concat([tmp, pd.DataFrame(batch.phi, \
+                             columns = self.factor_header)], axis = 1)
+            tmp = tmp.iloc[v, :]
+            pixel_result = pd.concat([pixel_result, tmp], axis = 0)
+
+            expElog_theta = np.exp(utilt.dirichlet_expectation(batch.gamma))
+            expElog_theta/= expElog_theta.sum(axis = 1).reshape((-1, 1))
+            tmp = pd.DataFrame({'minibatch':b,'X':grid_pt[:,0],'Y':grid_pt[:,1]})
+            asum = batch.psi.T @ batch.mtx.sum(axis = 1).reshape((-1, 1))
+            tmp['avg_size'] = np.array(asum).reshape(-1)
+            for v in range(self.K):
+                tmp[str(v)] = expElog_theta[:, v]
+            tmp = tmp.loc[(tmp.X > x_min+self.out_buff) & \
+                          (tmp.X < x_max-self.out_buff) & \
+                          (tmp.Y > y_min+self.out_buff) & \
+                          (tmp.Y < y_max-self.out_buff), :]
+            anchor_result = pd.concat([anchor_result, tmp], axis = 0)
+        return post_count, pixel_result, anchor_result

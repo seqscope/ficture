@@ -39,7 +39,10 @@ if args.boundary.endswith('.geojson'):
     vertices = extract_polygons_from_json(args.boundary)
     vertices = [(x - np.array([args.offset_x, args.offset_y])) * args.boundary_unit_in_um for x in vertices]
     n_poly = len(vertices)
-    poly = shapely.unary_union([shapely.polygons(x) for x in vertices])
+    poly_list = [shapely.polygons(x) for x in vertices]
+    poly_list = [x if x.is_valid else x.buffer(0) for x in poly_list]
+    poly = shapely.unary_union(poly_list)
+    # poly = shapely.unary_union([shapely.polygons(x) for x in vertices])
 elif args.boundary.endswith('.tsv'):
     poly_df = pd.read_csv(args.boundary, sep='\t')
     paths = poly_df.path.tolist()
@@ -56,6 +59,7 @@ elif args.boundary.endswith('.tsv'):
         poly_list.append(Polygon(mpl_path.to_polygons()[0]))
         print(verts.min(axis=0), verts.max(axis=0))
     n_poly = len(poly_list)
+    poly_list = [x if x.is_valid else x.buffer(0) for x in poly_list]
     poly = shapely.unary_union(poly_list)
 else:
     sys.exit("Unknown boundary format")
@@ -66,6 +70,7 @@ gene_kept = set()
 if os.path.exists(args.feature):
     feature = pd.read_csv(args.feature, sep='\t', header=0)
     gene_kept = set(feature.gene.values)
+    logging.info(f"Read feature info with {len(gene_kept)} genes")
 
 with gzip.open(args.output, 'wt') as wf:
     with gzip.open(args.input, 'rt') as rf:
@@ -74,6 +79,7 @@ with gzip.open(args.output, 'wt') as wf:
 chunk_size = 500000
 for chunk in pd.read_csv(gzip.open(args.input, 'rb'),\
     sep='\t', header=0, chunksize=chunk_size):
+    chunk.rename(columns={'x': 'X', 'y': 'Y'}, inplace=True)
     if len(gene_kept) != 0:
         chunk = chunk.loc[chunk.gene.isin(gene_kept)]
         if chunk.shape[0] == 0:

@@ -104,7 +104,7 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, 
 
         brc_full = df.groupby(by = ['j','tile','X','Y']).agg({args.key: sum}).reset_index()
         brc_full.index = range(brc_full.shape[0])
-        pixel_ct = brc_full[args.key].values
+        brc_full['crd'] = None
         pts = np.asarray(brc_full[['X','Y']]) * mu_scale
         print(f"Read data with {brc_full.shape[0]} pixels and {feature.shape[0]} genes.")
 
@@ -124,28 +124,41 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=500000, 
         while offs_x < n_move:
             while offs_y < n_move:
                 x,y = pixel_to_hex(pts, radius, offs_x/n_move, offs_y/n_move)
-                hex_crd = list(zip(x,y))
-                ct = pd.DataFrame({'hex_id':hex_crd, 'tot':pixel_ct}).groupby(by = 'hex_id').agg({'tot': sum}).reset_index()
-                mid_ct = np.median(ct.loc[ct.tot >= min_ct_per_unit, 'tot'].values)
-                ct = set(ct.loc[ct.tot >= min_ct_per_unit, 'hex_id'].values)
-                if len(ct) < 1:
+                brc_full['crd'] = list(zip(x,y))
+                hex_info = brc_full.groupby(by = 'crd').agg({args.key: sum})
+                hex_info.rename(columns = {args.key:'tot'}, inplace=True)
+                hex_info = hex_info.loc[hex_info.tot > args.min_ct_per_unit, :]
+                hex_id = set(hex_info.index.values)
+                if len(hex_id) < 1:
                     offs_y += 1
                     continue
-                hex_list = list(ct)
+                hex_list = list(hex_id)
                 hex_dict = {x:i for i,x in enumerate(hex_list)}
-                sub = pd.DataFrame({'crd':hex_crd,'cCol':range(N), 'X':pts[:, 0], 'Y':pts[:, 1], 'tile':brc_full.tile.values})
-                sub = sub[sub.crd.isin(ct)]
+
+                # Hexagon and pixel correspondence
+                sub = pd.DataFrame({'crd':brc_full.crd.values,'cCol':range(N)})
+                sub = sub[sub.crd.isin(hex_id)]
                 sub['cRow'] = sub.crd.map(hex_dict).astype(int)
-                brc = sub[['cRow', 'tile', 'X', 'Y']].groupby(by = 'cRow').agg({'X':np.mean, 'Y':np.mean, 'tile':np.max}).reset_index()
+
+                # Hexagon level info (for barcodes.tsv.gz)
+                brc = brc_full[brc_full.crd.isin(hex_id)].groupby(by = 'crd').agg({'X':np.mean, 'Y':np.mean, 'tile':np.max, args.key:sum}).reset_index()
+                brc['cRow'] = brc.crd.map(hex_dict).astype(int)
                 brc['X'] = [f"{x:.{args.precision}f}" for x in brc.X.values]
                 brc['Y'] = [f"{x:.{args.precision}f}" for x in brc.Y.values]
                 brc.sort_values(by = 'cRow', inplace=True)
-                print(offs_x, offs_y, brc.shape[0])
                 with open(brc_f, 'a') as wf:
-                    _ = wf.write('\n'.join((brc.cRow+n_unit+1).astype(str).values + '_' + l + '_' + brc.tile.astype(str) + '_' + brc.X.values + '_' + brc.Y.values + '_' + str(offs_x) + '.' + str(offs_y) )+'\n')
+                    _ = wf.write('\n'.join(\
+                    (brc.cRow+n_unit+1).astype(str).values + '_' + \
+                    l + '_' + brc.tile.astype(str) + '_' + \
+                    str(offs_x) + '.' + str(offs_y) + '_' + \
+                    brc.X.values + '_' + brc.Y.values + '_' + \
+                    brc[args.key].astype(str).values) + '\n')
                 n_hex = len(hex_dict)
                 n_minib = n_hex // b_size + 1
-                print(f"{n_minib}, {n_hex} ({sub.cRow.max()}, {sub.shape[0]}), median count per unit {mid_ct}")
+                mid_ct = np.median(hex_info.tot.values)
+                print(f"{offs_x}, {offs_y}: {n_minib}, {n_hex} ({sub.cRow.max()}, {sub.shape[0]}), median count per unit {mid_ct}")
+
+                # Output sparse matrix
                 grd_minib = list(range(0, n_hex, b_size))
                 grd_minib.append(n_hex)
                 st_minib = 0

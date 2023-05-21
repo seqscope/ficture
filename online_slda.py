@@ -6,7 +6,7 @@ import sys, io, os, re, time, copy, subprocess
 import numpy as np
 from scipy.special import gammaln, psi, logsumexp, expit, logit
 from scipy.sparse import *
-import sklearn.preprocessing
+from sklearn.preprocessing import normalize
 
 # Add directory
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -16,7 +16,7 @@ class OnlineLDA:
     """
     Implements online VB for LDA as described in (Hoffman et al. 2010).
     """
-    def __init__(self, vocab, K, N, alpha = None, eta = None, tau0=9, kappa=.7, iter_inner = 50, tol = 1e-4, verbose = 0):
+    def __init__(self, vocab, K, N, alpha = None, eta = None, tau0=9, kappa=.7, zeta = 0, iter_inner = 50, tol = 1e-4, iter_gamma = 10, verbose = 0):
         """
         Arguments:
         K: Number of topics
@@ -27,6 +27,9 @@ class OnlineLDA:
         tau0:  A (non-negative) learning parameter that downweights earl iterations
         kappa: Learning rate (exponential decay), should be between
                (0.5, 1.0] to guarantee asymptotic convergence.
+        --- Experimental ---
+        zeta:  Weight of the proximal contamination penalty
+        iter_gamma: Maximum number of iterations when maximizing the "penalized ELBO" w.r.t. gamma (there is no analytical solution)
         """
         self._vocab = vocab
         self._K = K
@@ -34,8 +37,10 @@ class OnlineLDA:
         self._N = N
         self._tau0 = tau0 + 1
         self._kappa = kappa
+        self._zeta = zeta
         self._updatect = 0
         self._max_iter_inner = iter_inner
+        self._max_iter_gamma = iter_gamma
         self._tol = tol
         self._verbose = verbose
         self._Elog_beta = None      # K x M
@@ -98,16 +103,16 @@ class OnlineLDA:
             batch.psi += batch.ElogO
             # batch.psi.data = np.exp(batch.psi.data - utilt.logsumexp_csr(batch.psi))
             batch.psi.data = np.exp(batch.psi.data)
-            batch.psi = sklearn.preprocessing.normalize(batch.psi, norm='l1', axis=1)
+            batch.psi = normalize(batch.psi, norm='l1', axis=1)
             batch.gamma = batch.alpha + batch.psi.T @ batch.phi
             Elog_theta = utilt.dirichlet_expectation(batch.gamma)
 
             meanchange = np.abs(batch.gamma - gamma_old).max(axis=1).mean()
             gamma_old = copy.copy(batch.gamma)
             it += 1
-            if self._verbose > 2: # debug
-                print( np.around([batch.psi.sum(axis = 1).min(),\
-                                  batch.phi.sum(axis = 1).min()], 2) )
+            # if self._verbose > 2: # debug
+            #     print( np.around([batch.psi.sum(axis = 1).min(),\
+            #                       batch.phi.sum(axis = 1).min()], 2) )
             if self._verbose > 2 or (self._verbose > 1 and it % 10 == 0):
                 print(f"E-step, update phi, psi, gamma: {it}-th iteration, mean change {meanchange:.4f}")
 
@@ -119,6 +124,44 @@ class OnlineLDA:
             ll_tot += (batch.ll[:, k] - ll_norm).sum()
         batch.ll = ll_tot / batch.n
         return sstats
+
+    def update_lambda_penalized(self, batch):
+        assert self._zeta > 0 and self._zeta < 1, "zeta must be in (0, 1) for penalized update"
+        assert batch.anchor_adj is not None, "batch.anchor_adj must be provided for penalized update"
+        if issparse(batch.anchor_adj):
+            assert (batch.anchor_adj.diagonal() > 0).sum() >= batch.n, "anchor_adj must contain self-loops"
+        else:
+            assert (np.diag(batch.anchor_adj) > 0).sum() >= batch.n, "anchor_adj must contain self-loops"
+        # E step to update gamma, phi | lambda for mini-batch
+        lambda_org = self._eta + self.do_e_step(batch) # K X M
+        theta = normalize(batch.gamma, norm='l1', axis=1) # n x K, E[theta]
+        ckl = theta.T @ normalize(batch.anchor_adj, norm='l1', axis=1) @ theta
+        ckl /= theta.T.sum(axis = 1).reshape((-1, 1)) # K x K, factor spatial proximity
+        lam_sum = lambda_org.sum(axis = 1)
+        it = 0
+        meanchange = self._tol + 1
+        while it < self._max_iter_gamma and meanchange > self._tol:
+            lambda_new = np.zeros((self._K, self._M))
+            for k in range(self._K):
+                avg = ckl[[k], :] @ (normalize(lambda_org, norm='l1', axis=1)*lam_sum[k])
+                adj = np.clip(lambda_org[k, :] - self._zeta * avg, 0, None)
+                lambda_new[k, :] = adj / adj.sum() * lam_sum[k]
+            meanchange = np.abs(lambda_new - lambda_org).max(axis = 1).mean()
+            if self._verbose > 2 or (self._verbose > 1 and it % 10 == 0) or (self._verbose > 1 and it == self._max_iter_gamma - 1):
+                print(f"Penalized M-step, update lambda : {it}-th iteration, mean max change {meanchange:.4f}")
+            lambda_org = copy.copy(lambda_new)
+            it += 1
+
+        if self._verbose > 0:
+            # Estimate likelihood for current values of lambda.
+            scores = self.approx_score(batch)
+            print(f"{self._updatect}-th global update. Scores: " + ", ".join(['%.2e'%x for x in scores]))
+
+        rhot = pow(self._tau0 + self._updatect, -self._kappa)
+        self._lambda = (1-rhot) * self._lambda + \
+                       rhot * ((self._N / batch.N) * lambda_org)
+        self._Elog_beta = utilt.dirichlet_expectation(self._lambda)
+        return 1
 
     def update_lambda(self, batch):
         """

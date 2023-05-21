@@ -8,6 +8,7 @@ from sklearn.preprocessing import normalize
 import scipy.cluster
 import scipy.stats
 import scipy.spatial
+import scipy.linalg
 
 import ete3
 from ete3 import Tree, TreeStyle, NodeStyle
@@ -89,7 +90,9 @@ def visual_hc(model_prob, weight, top_gene, node_color=None, circle=False, verti
     # cd_dist = scipy.spatial.distance.pdist(model_prob, metric='cosine')
     # Z_hc = scipy.cluster.hierarchy.linkage(cd_dist, method="complete")
     # Z_hc = NJ_logrank(model_prob)
+
     corlogrank = cor_logrank(model_prob)
+    corlogrank = np.nan_to_num(corlogrank, copy=False)
     cd_dist = 1 - .5 * (corlogrank + corlogrank.T)
     np.fill_diagonal(cd_dist, 0)
     cd_dist = scipy.spatial.distance.squareform(cd_dist)

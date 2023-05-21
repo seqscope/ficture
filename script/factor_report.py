@@ -161,8 +161,8 @@ if args.hc_tree:
                 model = post
             else:
                 model = pd.read_csv(model_f, sep='\t')
-            model_prob = np.array(model.iloc[:, 1:]).T
-            model_prob /= model_prob.sum(axis = 1).reshape((-1, 1))
+            model_prob = np.array(model.iloc[:, 1:]).T + .1
+            model_prob = model_prob / model_prob.sum(axis = 1).reshape((-1,1))
 
             circle = args.circle
             if not circle and args.circle_if > 0:
