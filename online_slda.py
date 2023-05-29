@@ -1,7 +1,7 @@
 # Functions for fitting augmented Latent Dirichlet Allocation
 # with online variational Bayes (VB).
 
-import sys, io, os, re, time, copy, subprocess
+import sys, io, os, re, time, copy, subprocess, logging
 
 import numpy as np
 from scipy.special import gammaln, psi, logsumexp, expit, logit
@@ -114,7 +114,7 @@ class OnlineLDA:
             #     print( np.around([batch.psi.sum(axis = 1).min(),\
             #                       batch.phi.sum(axis = 1).min()], 2) )
             if self._verbose > 2 or (self._verbose > 1 and it % 10 == 0):
-                print(f"E-step, update phi, psi, gamma: {it}-th iteration, mean change {meanchange:.4f}")
+                logging.info(f"E-step, update phi, psi, gamma: {it}-th iteration, mean change {meanchange:.4f}")
 
         sstats = batch.phi.T @ batch.mtx # K x M
         batch.ll = batch.psi.T @ batch.mtx @ self._Elog_beta.T
@@ -136,7 +136,8 @@ class OnlineLDA:
         lambda_org = self._eta + self.do_e_step(batch) # K X M
         theta = normalize(batch.gamma, norm='l1', axis=1) # n x K, E[theta]
         ckl = theta.T @ normalize(batch.anchor_adj, norm='l1', axis=1) @ theta
-        ckl /= theta.T.sum(axis = 1).reshape((-1, 1)) # K x K, factor spatial proximity
+        ckl /= theta.sum(axis = 0).reshape((-1, 1)) # K x K, factor spatial proximity
+        np.fill_diagonal(ckl, 0)
         lam_sum = lambda_org.sum(axis = 1)
         it = 0
         meanchange = self._tol + 1
@@ -146,21 +147,23 @@ class OnlineLDA:
                 avg = ckl[[k], :] @ (normalize(lambda_org, norm='l1', axis=1)*lam_sum[k])
                 adj = np.clip(lambda_org[k, :] - self._zeta * avg, 0, None)
                 lambda_new[k, :] = adj / adj.sum() * lam_sum[k]
-            meanchange = np.abs(lambda_new - lambda_org).max(axis = 1).mean()
+            v = np.abs(lambda_new - lambda_org).max(axis = 1) / lambda_org.sum(axis = 1)
+            meanchange = v.mean()
             if self._verbose > 2 or (self._verbose > 1 and it % 10 == 0) or (self._verbose > 1 and it == self._max_iter_gamma - 1):
-                print(f"Penalized M-step, update lambda : {it}-th iteration, mean max change {meanchange:.4f}")
+                logging.info(f"Penalized M-step, update lambda : {it}-th iteration, mean max change {meanchange:.4f}")
             lambda_org = copy.copy(lambda_new)
             it += 1
 
         if self._verbose > 0:
             # Estimate likelihood for current values of lambda.
             scores = self.approx_score(batch)
-            print(f"{self._updatect}-th global update. Scores: " + ", ".join(['%.2e'%x for x in scores]))
+            logging.info(f"{self._updatect}-th global update. Scores: " + ", ".join(['%.2e'%x for x in scores]))
 
         rhot = pow(self._tau0 + self._updatect, -self._kappa)
         self._lambda = (1-rhot) * self._lambda + \
                        rhot * ((self._N / batch.N) * lambda_org)
         self._Elog_beta = utilt.dirichlet_expectation(self._lambda)
+        self._updatect += 1
         return 1
 
     def update_lambda(self, batch):
@@ -175,7 +178,7 @@ class OnlineLDA:
         # Estimate likelihood for current values of lambda.
         scores = self.approx_score(batch)
         if self._verbose > 0:
-            print(f"{self._updatect}-th global update. Scores: " + ", ".join(['%.2e'%x for x in scores]))
+            logging.info(f"{self._updatect}-th global update. Scores: " + ", ".join(['%.2e'%x for x in scores]))
 
         rhot = pow(self._tau0 + self._updatect, -self._kappa)
         self._lambda = (1-rhot) * self._lambda + \

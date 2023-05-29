@@ -13,11 +13,11 @@ from joblib.parallel import Parallel, delayed
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import utilt
 
-class OnlineLDA:
+class OnlineLDAPenalized:
     """
     Implements online VB for LDA as described in Hoffman et al. 2010.
     """
-    def __init__(self, vocab, K, N, alpha = None, eta = None, tau0=9, kappa=.7, iter_inner = 50, tol = 1e-4, verbose = 0, thread = 1):
+    def __init__(self, vocab, K, N, alpha = None, eta = None, tau0=9, kappa=.7, zeta = 0, iter_inner = 50, tol = 1e-4, iter_gamma = 10, verbose = 0, thread = 1, rng = None, seed = None):
         """
         Arguments:
         vocab: A list of features
@@ -35,8 +35,10 @@ class OnlineLDA:
         self._N = N
         self._tau0 = tau0 + 1
         self._kappa = kappa
+        self._zeta = zeta
         self._updatect = 0
         self._max_iter_inner = iter_inner
+        self._max_iter_gamma = iter_gamma
         self._tol = tol
         self._eps = 1e-16
         self._verbose = verbose
@@ -45,6 +47,17 @@ class OnlineLDA:
         self._lambda = None         # K x M
         self._expElog_beta = None   # K x M
         self._sstats = None         # K x M
+
+        if self._zeta < 0:
+            warnings.warn("Invalid zeta, fall back to default 0")
+            self._zeta = 0
+
+        self.rng = rng
+        if self.rng is None:
+            if seed is None:
+                self.rng = np.random.default_rng(int(time.time()))
+            else:
+                self.rng = np.random.default_rng(seed)
 
         self._alpha = alpha # Factor weight prior
         if self._alpha is None:
@@ -98,9 +111,9 @@ class OnlineLDA:
                     np.multiply(expElog_theta[j, :], \
                                 (X[[j], :].multiply(1./phi_norm)) @ self._expElog_beta.T) # 1 x K
                 expElog_theta[j, :] = np.exp(utilt.dirichlet_expectation(gamma[j, :]))
-                maxchange = np.abs(old_gamma/old_gamma.sum() - gamma[j, :]/gamma[j, :].sum()).max()
+                maxchange = np.abs(old_gamma - gamma[j, :] ).max()
                 it += 1
-                if self._verbose > 2 or (self._verbose > 1 and it % 10 == 0):
+                if self._verbose > 3 or (self._verbose > 2 and it % 10 == 0):
                     print(f"E-step, {j}-th unit, update gamma: {it}-th iteration, max change {maxchange:.4f}")
             phi_norm = expElog_theta[j, :] @ self._expElog_beta + self._eps
             phi = expElog_theta[j, :].reshape((-1, 1)) * self._expElog_beta / phi_norm.reshape((1, -1)) # K x M
@@ -116,14 +129,17 @@ class OnlineLDA:
         if batch.alpha is None:
             batch.alpha = np.broadcast_to(self._alpha, (batch.n, self._K))
         if batch.gamma is None:
-            batch.gamma = np.random.gamma(100., 1./100., (batch.n, self._K))
+            batch.gamma = self.rng.gamma(100., 1./100., (batch.n, self._K))
+        if hasattr(batch, 'mtx_buffer') and batch.mtx_buffer is not None:
+            if batch.gamma_buffer is None:
+                batch.gamma_buffer = self.rng.gamma(100., 1./100., (batch.n, self._K))
 
         # Run E-step in parallel
         if self._thread <= 1:
             self._sstats, batch.gamma = self._update_gamma(batch.mtx, batch.gamma, batch.alpha)
         else:
             idx_slices = [idx for idx in utilt.gen_even_slices(batch.n, self._thread)]
-            with Parallel(n_jobs=self._thread, verbose=max(0, self._verbose - 1)) as parallel:
+            with Parallel(n_jobs=self._thread, verbose=max(0, self._verbose - 2)) as parallel:
                 result = parallel(delayed(self._update_gamma)(batch.mtx[idx, :], batch.gamma[idx, :], batch.alpha[idx, :])
                 for idx in idx_slices)
             # Collect sufficient statistics
@@ -133,6 +149,17 @@ class OnlineLDA:
                 batch.gamma[idx_slices[i], :] = v[1]
 
         batch.ll = np.multiply(normalize(batch.gamma, norm='l1', axis=1), batch.mtx @ self._Elog_beta.T).sum() / batch.n
+
+        # E-step on surrounding buffer region
+        if hasattr(batch, 'mtx_buffer') and batch.mtx_buffer is not None:
+            if self._thread <= 1:
+                _, batch.gamma_buffer = self._update_gamma(batch.mtx_buffer, batch.gamma_buffer, batch.alpha)
+            else:
+                with Parallel(n_jobs=self._thread, verbose=max(0, self._verbose - 2)) as parallel:
+                    result = parallel(delayed(self._update_gamma)(batch.mtx_buffer[idx, :], batch.gamma_buffer[idx, :], batch.alpha[idx, :])
+                    for idx in idx_slices)
+                for i, v in enumerate(result):
+                    batch.gamma_buffer[idx_slices[i], :] = v[1]
         return
 
 
@@ -147,18 +174,50 @@ class OnlineLDA:
         self.do_e_step(batch)
 
         # Estimate likelihood for current values of lambda.
-        scores = self.approx_score(batch)
+        scores = 0
         if self._verbose > 0:
+            scores = self.approx_score(batch)
             print(f"{self._updatect}-th global update. Scores: " + ", ".join(['%.2e'%x for x in scores]))
+
+        lam_hat = self._eta + self._sstats # K x M
+        if self._verbose > 1:
+            ldelta = np.abs(normalize(lam_hat, norm='l1', axis=1) - normalize(self._lambda, norm='l1', axis=1)).max(axis = 1)
+            print(f"Max relative change: {ldelta.max():.4f}, median change: {np.median(ldelta):.4f}")
+        if self._zeta > 0 and hasattr(batch, 'gamma_buffer') and batch.gamma_buffer is not None:
+            # Spatial proximity weight
+            theta = normalize(batch.gamma, norm='l1', axis=1) # n x K, E[theta]
+            theta_buffer = normalize(batch.gamma_buffer, norm='l1', axis=1) # n x K
+            ckl = (theta * batch.buffer_weight.reshape((-1, 1))).T @ theta_buffer +\
+                  (theta * (1-batch.buffer_weight).reshape((-1, 1))).T @ theta # K x K
+            ckl /= theta.sum(axis = 0).reshape((-1, 1)) # row stochastic
+            np.fill_diagonal(ckl, 0) # remove self-loop
+            lam_sum = lam_hat.sum(axis=1).reshape((-1, 1))
+            lam_delta = ckl @ (normalize(self._lambda, norm='l1', axis=1) * lam_sum)
+            lam_hat = np.clip(lam_hat - self._zeta * lam_delta, 0, None)
+            lam_hat = normalize(lam_hat, norm='l1', axis=1) * lam_sum
+            if self._verbose > 1:
+                ldelta = np.abs(lam_hat - self._eta - self._sstats).max(axis = 1)
+                ldelta /= lam_sum.reshape(-1)
+                print(f"Max relative change due to penalty: {ldelta.max():.4f}, median change: {np.median(ldelta):.4f}")
+            if self._verbose > 2:
+                print("Ckl row sum:")
+                print(np.around(ckl.sum(axis = 1), 3))
 
         # Update global parameters
         rhot = pow(self._tau0 + self._updatect, -self._kappa)
         doc_ratio = float(self._N) / batch.n
-        self._lambda = (1-rhot) * self._lambda + \
-                       rhot * (doc_ratio * (self._eta + self._sstats) )
+        self._lambda = (1-rhot) * self._lambda + rhot * (doc_ratio * lam_hat)
         self._Elog_beta = utilt.dirichlet_expectation(self._lambda)
         self._expElog_beta = np.exp(self._Elog_beta)
         self._updatect += 1
+        if self._verbose > 0:
+            post_weight = self._lambda.sum(axis=1)
+            post_weight /= post_weight.sum()
+            post_weight.sort()
+            k = min(10, self._K)
+            print(f"(Top) {k} topic weight {post_weight[-k:].sum():.4f}")
+            print(np.around(post_weight[-k:], 3))
+
         return scores
 
 
@@ -168,7 +227,7 @@ class OnlineLDA:
             X = X.tocsr()
         n = X.shape[0]
         if gamma is None:
-            gamma = np.random.gamma(100., 1./100., (n, self._K))
+            gamma = self.rng.gamma(100., 1./100., (n, self._K))
         if alpha is None:
             alpha = np.broadcast_to(self._alpha, (n, self._K))
         else:

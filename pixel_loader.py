@@ -1,4 +1,4 @@
-### Read a batched pixel file, construct matrices for slda minibatch
+### Read a batched pixel file, construct slda minibatch
 
 import sys, os, gzip, copy, re
 import numpy as np
@@ -56,7 +56,7 @@ class PixelMinibatch:
     def _anchor_adj(self):
         if self.adj_penal < 0:
             self.adj_penal = self.radius * 2
-        self.adj_mtx = sklearn.neighbors.radius_neighbors_graph(self.ref, self.adj_penal, mode='connectivity', include_self=True)
+        self.adj_mtx = sklearn.neighbors.radius_neighbors_graph(self.ref, self.adj_penal, mode='connectivity', include_self=True) # Do we want to include diagonal?
 
     def read_chunk(self, nbatch):
         batch_ids = set()

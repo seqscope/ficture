@@ -23,10 +23,14 @@ parser.add_argument('--batch_id', type=str, default = 'random_index', help='Inpu
 parser.add_argument('--precision', type=float, default=.25, help='If positive, collapse pixels within X um.')
 
 # Learning related parameters
-parser.add_argument('--zeta', type=float, default=.2, help='')
 parser.add_argument('--anchor_penal_radius', type=float, default=-1, help='')
 parser.add_argument('--neighbor_radius', type=float, default=25, help='The radius (um) of each anchor point\'s territory')
 parser.add_argument('--halflife', type=float, default=0.7, help='Control the decay of distance-based weight')
+parser.add_argument('--total_pixel', type=float, default=1e7, help='(An estimate of) total number of pixels just for calculating the learning rate')
+parser.add_argument('--lambda_init_scale', type=float, default=1e7, help='')
+parser.add_argument('--zeta', type=float, default=.2, help='')
+parser.add_argument('--kappa', type=float, default=.7, help='')
+parser.add_argument('--tau0', type=int, default=-1, help='')
 parser.add_argument('--theta_init_bound_multiplier', type=float, default=.2, help='')
 parser.add_argument('--inner_max_iter', type=int, default=30, help='')
 parser.add_argument('--gamma_max_iter', type=int, default=15, help='')
@@ -99,11 +103,20 @@ pixel_obj = PixelMinibatch(pixel_reader, ft_dict, \
 pixel_obj.load_anchor(args.anchor, args.anchor_in_um)
 logging.info(f"Read {pixel_obj.grid_info.shape[0]} grid points")
 
-slda = OnlineLDA(vocab=gene_kept, K=K, N=1e6, zeta=args.zeta, \
+### Setup model
+_tau0 = args.tau0
+_lambda = model.components_.copy()
+if _tau0 < 0:
+    _tau0 = model.n_batch_iter_
+if args.lambda_init_scale > 1:
+    _lambda *= args.lambda_init_scale / model.components_.sum()
+slda = OnlineLDA(vocab=gene_kept, K=K, N=args.total_pixel, \
+                 zeta=args.zeta, tau0=_tau0, kappa=args.kappa,\
                  iter_gamma = args.gamma_max_iter,\
                  iter_inner=args.inner_max_iter, verbose = args.verbose)
-slda.init_global_parameter(model.components_)
+slda.init_global_parameter(_lambda)
 
+### Run minibatches
 post_count = np.zeros((K, M))
 n_batch = 0
 while True:
@@ -133,4 +146,10 @@ out_f = args.output + ".posterior.count.tsv.gz"
 pd.concat([pd.DataFrame({'gene': gene_kept}),\
            pd.DataFrame(post_count.T, dtype='float64',\
                         columns = factor_header)],\
-        axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.2f', compression={"method":"gzip"})
+           axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.2f', compression={"method":"gzip"})
+
+out_f = args.output + ".updated.model.tsv.gz"
+pd.concat([pd.DataFrame({'gene': gene_kept}),\
+           pd.DataFrame(slda._lambda.T, dtype='float64', \
+                        columns = factor_header)],\
+           axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.4e', compression={"method":"gzip"})

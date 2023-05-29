@@ -11,7 +11,7 @@ from utilt import extract_polygons_from_json, svg_parse_list
 from matplotlib.path import Path
 from geopandas import GeoSeries
 import shapely, geojson
-from shapely.geometry import Point, Polygon, LineString
+from shapely.geometry import Point, Polygon
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
@@ -92,7 +92,7 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rb'),\
     else:
         pts = GeoSeries(map(Point, zip(chunk.X.values / args.mu_scale,\
                                        chunk.Y.values / args.mu_scale)))
-    chunk = chunk.loc[poly.contains(pts).values, :]
+    chunk = chunk.loc[pts.within(poly).values, :]
     logging.info(f"Output {chunk.shape[0]} rows ...")
     if chunk.shape[0] == 0:
         continue

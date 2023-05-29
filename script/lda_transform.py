@@ -159,8 +159,8 @@ for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=chunk_size,\
 
                 # Output
                 result = pd.DataFrame({"j":kept_unit, key:np.array(mtx.sum(axis = 1)).squeeze()})
-                result["x"] = result.j.map(lambda x : "{:.2f}".format(hex_pos[x][0]) )
-                result["y"] = result.j.map(lambda x : "{:.2f}".format(hex_pos[x][1]) )
+                result["x"] = result.j.map(lambda x : f"{hex_pos[x][0]:.{args.precision}f}")
+                result["y"] = result.j.map(lambda x : f"{hex_pos[x][1]:.{args.precision}f}")
                 result = pd.concat((result, pd.DataFrame(theta, columns = factor_header)), axis = 1)
                 result['topK'] = np.argmax(theta, axis = 1).astype(int)
                 result['topP'] = np.max(theta, axis = 1)

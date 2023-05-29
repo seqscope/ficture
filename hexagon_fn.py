@@ -24,8 +24,11 @@ def pixel_to_hex(pts, size, offset_x = 0, offset_y = 0):
     return x.astype(int), y.astype(int)
 
 def hex_to_pixel(x,y,size,offset_x=0,offset_y=0):
-    n = len(x)
-    assert len(y) == n
+    if hasattr(x, "__len__"):
+        assert hasattr(y, "__len__")
+        x = np.array(x)
+        y = np.array(y)
+        assert len(y) == len(x)
     ptx = size * (np.sqrt(3) * (x-offset_x) + np.sqrt(3)/2 * (y-offset_y))
     pty = size * 3/2 * (y-offset_y)
     return ptx, pty

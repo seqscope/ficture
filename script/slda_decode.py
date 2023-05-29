@@ -1,6 +1,7 @@
 import sys, os, argparse, logging, gzip, copy, re, time, warnings, pickle
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import normalize
 
 # Add parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -11,7 +12,7 @@ parser = argparse.ArgumentParser()
 
 # Innput and output info
 parser.add_argument('--input', type=str, help='')
-parser.add_argument('--model', type=str, help='')
+parser.add_argument('--model', type=str, default='', help='')
 parser.add_argument('--output', type=str, help='')
 parser.add_argument('--anchor', type=str, help='')
 parser.add_argument('--anchor_in_um', action='store_true')
@@ -28,6 +29,7 @@ parser.add_argument('--neighbor_radius', type=float, default=25, help='The radiu
 parser.add_argument('--halflife', type=float, default=0.7, help='Control the decay of distance-based weight')
 parser.add_argument('--theta_init_bound_multiplier', type=float, default=.2, help='')
 parser.add_argument('--inner_max_iter', type=int, default=30, help='')
+parser.add_argument('--model_scale', type=float, default=-1, help='')
 
 # Other
 parser.add_argument('--log', type=str, default = '', help='files to write log to')
@@ -59,16 +61,26 @@ batch_id = args.batch_id.lower()
 chunk_size = 500000
 
 ### Load model
-model = pickle.load(open( args.model, "rb" ))
-gene_kept = model.feature_names_in_
+if args.model.endswith(".tsv.gz") or args.model.endswith(".tsv"):
+    # If input is a gzip tsv file
+    model = pd.read_csv(args.model, sep='\t')
+    gene_kept = list(model_mtx.gene)
+    model = np.array(model.iloc[:,1:]).T
+else:
+    # If input is a pickled model object
+    model = pickle.load(open( args.model, "rb" ))
+    gene_kept = model.feature_names_in_
+    model = model.components_
+K, M = model.shape
 ft_dict = {x:i for i,x in enumerate( gene_kept ) }
-K, M = model.components_.shape
 factor_header = [str(x) for x in range(K)]
-init_bound = 1./K * args.theta_init_bound_multiplier
+if args.model_scale > 0:
+    model = normalize(model, norm='l1', axis=1) * args.model_scale
 logging.info(f"{M} genes and {K} factors are read from input model")
 
 slda = OnlineLDA(vocab=gene_kept, K=K, N=1e6, iter_inner=args.inner_max_iter, verbose = 1)
-slda.init_global_parameter(model.components_)
+slda.init_global_parameter(model)
+init_bound = 1./K * args.theta_init_bound_multiplier
 
 ### Input pixel info (input has to contain certain columns with correct header)
 with gzip.open(args.input, 'rt') as rf:
