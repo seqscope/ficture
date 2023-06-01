@@ -17,7 +17,7 @@ class OnlineLDAPenalized:
     """
     Implements online VB for LDA as described in Hoffman et al. 2010.
     """
-    def __init__(self, vocab, K, N, alpha = None, eta = None, tau0=9, kappa=.7, zeta = 0, iter_inner = 50, tol = 1e-4, iter_gamma = 10, verbose = 0, thread = 1, rng = None, seed = None):
+    def __init__(self, vocab, K, N, alpha = None, eta = None, tau0=9, kappa=.7, zeta = 0, iter_inner = 50, tol = 1e-4, iter_gamma = 10, verbose = 0, thread = 1, rng = None, seed = None, proximal = True):
         """
         Arguments:
         vocab: A list of features
@@ -43,6 +43,7 @@ class OnlineLDAPenalized:
         self._eps = 1e-16
         self._verbose = verbose
         self._thread = thread
+        self._proximal = proximal
         self._Elog_beta = None      # K x M
         self._lambda = None         # K x M
         self._expElog_beta = None   # K x M
@@ -130,7 +131,7 @@ class OnlineLDAPenalized:
             batch.alpha = np.broadcast_to(self._alpha, (batch.n, self._K))
         if batch.gamma is None:
             batch.gamma = self.rng.gamma(100., 1./100., (batch.n, self._K))
-        if hasattr(batch, 'mtx_buffer') and batch.mtx_buffer is not None:
+        if self._proximal and hasattr(batch, 'mtx_buffer') and batch.mtx_buffer is not None:
             if batch.gamma_buffer is None:
                 batch.gamma_buffer = self.rng.gamma(100., 1./100., (batch.n, self._K))
 
@@ -151,7 +152,7 @@ class OnlineLDAPenalized:
         batch.ll = np.multiply(normalize(batch.gamma, norm='l1', axis=1), batch.mtx @ self._Elog_beta.T).sum() / batch.n
 
         # E-step on surrounding buffer region
-        if hasattr(batch, 'mtx_buffer') and batch.mtx_buffer is not None:
+        if self._proximal and hasattr(batch, 'mtx_buffer') and batch.mtx_buffer is not None:
             if self._thread <= 1:
                 _, batch.gamma_buffer = self._update_gamma(batch.mtx_buffer, batch.gamma_buffer, batch.alpha)
             else:
@@ -170,6 +171,8 @@ class OnlineLDAPenalized:
         # rhot will be between 0 and 1, and says how much to weight
         # the information we got from this mini-batch.
 
+        if not hasattr(batch, 'gamma_buffer') or batch.gamma_buffer is None:
+            self._proximal = False
         # E step to update gamma | lambda for mini-batch
         self.do_e_step(batch)
 
@@ -183,25 +186,30 @@ class OnlineLDAPenalized:
         if self._verbose > 1:
             ldelta = np.abs(normalize(lam_hat, norm='l1', axis=1) - normalize(self._lambda, norm='l1', axis=1)).max(axis = 1)
             print(f"Max relative change: {ldelta.max():.4f}, median change: {np.median(ldelta):.4f}")
-        if self._zeta > 0 and hasattr(batch, 'gamma_buffer') and batch.gamma_buffer is not None:
-            # Spatial proximity weight
-            theta = normalize(batch.gamma, norm='l1', axis=1) # n x K, E[theta]
-            theta_buffer = normalize(batch.gamma_buffer, norm='l1', axis=1) # n x K
-            ckl = (theta * batch.buffer_weight.reshape((-1, 1))).T @ theta_buffer +\
-                  (theta * (1-batch.buffer_weight).reshape((-1, 1))).T @ theta # K x K
-            ckl /= theta.sum(axis = 0).reshape((-1, 1)) # row stochastic
-            np.fill_diagonal(ckl, 0) # remove self-loop
+        if self._zeta > 0:
             lam_sum = lam_hat.sum(axis=1).reshape((-1, 1))
-            lam_delta = ckl @ (normalize(self._lambda, norm='l1', axis=1) * lam_sum)
+            if self._proximal:
+                # Penalty weighted by spatial proximity
+                theta = normalize(batch.gamma, norm='l1', axis=1) # n x K, E[theta]
+                theta_buffer = normalize(batch.gamma_buffer, norm='l1', axis=1) # n x K
+                ckl = (theta * batch.buffer_weight.reshape((-1, 1))).T @ theta_buffer +\
+                    (theta * (1-batch.buffer_weight).reshape((-1, 1))).T @ theta # K x K
+                ckl /= theta.sum(axis = 0).reshape((-1, 1)) # row stochastic
+                np.fill_diagonal(ckl, 0) # remove self-loop
+                lam_delta = ckl @ (normalize(self._lambda, norm='l1', axis=1) * lam_sum)
+                if self._verbose > 2:
+                    print("Ckl row sum:")
+                    print(np.around(ckl.sum(axis = 1), 3))
+            else:
+                # Uniformly penalize all pairwise topic similarity
+                lam_delta = normalize(self._lambda, norm='l1', axis=1) * lam_sum
             lam_hat = np.clip(lam_hat - self._zeta * lam_delta, 0, None)
             lam_hat = normalize(lam_hat, norm='l1', axis=1) * lam_sum
             if self._verbose > 1:
                 ldelta = np.abs(lam_hat - self._eta - self._sstats).max(axis = 1)
                 ldelta /= lam_sum.reshape(-1)
                 print(f"Max relative change due to penalty: {ldelta.max():.4f}, median change: {np.median(ldelta):.4f}")
-            if self._verbose > 2:
-                print("Ckl row sum:")
-                print(np.around(ckl.sum(axis = 1), 3))
+
 
         # Update global parameters
         rhot = pow(self._tau0 + self._updatect, -self._kappa)

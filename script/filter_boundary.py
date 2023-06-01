@@ -37,7 +37,7 @@ logging.basicConfig(level= getattr(logging, "INFO", None))
 
 if args.boundary.endswith('.geojson'):
     vertices = extract_polygons_from_json(args.boundary)
-    vertices = [(x - np.array([args.offset_x, args.offset_y])) * args.boundary_unit_in_um for x in vertices]
+    vertices = [(x * args.boundary_unit_in_um + np.array([args.offset_x, args.offset_y])) for x in vertices]
     n_poly = len(vertices)
     poly_list = [shapely.polygons(x) for x in vertices]
     poly_list = [x if x.is_valid else x.buffer(0) for x in poly_list]
@@ -52,7 +52,7 @@ elif args.boundary.endswith('.tsv'):
         codes, verts = svg_parse_list(path)
         verts = np.array(verts)
         # Translate into pixel coordinate
-        verts /= args.boundary_unit_in_um
+        verts *= args.boundary_unit_in_um
         verts[:, 0] += args.offset_x
         verts[:, 1] += args.offset_y
         mpl_path = Path(verts, codes)

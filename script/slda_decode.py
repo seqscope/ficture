@@ -12,7 +12,7 @@ parser = argparse.ArgumentParser()
 
 # Innput and output info
 parser.add_argument('--input', type=str, help='')
-parser.add_argument('--model', type=str, default='', help='')
+parser.add_argument('--model', type=str, help='')
 parser.add_argument('--output', type=str, help='')
 parser.add_argument('--anchor', type=str, help='')
 parser.add_argument('--anchor_in_um', action='store_true')
@@ -64,13 +64,18 @@ chunk_size = 500000
 if args.model.endswith(".tsv.gz") or args.model.endswith(".tsv"):
     # If input is a gzip tsv file
     model = pd.read_csv(args.model, sep='\t')
-    gene_kept = list(model_mtx.gene)
+    gene_kept = list(model.gene)
     model = np.array(model.iloc[:,1:]).T
+    model = np.clip(model, 0.5, None)
 else:
     # If input is a pickled model object
-    model = pickle.load(open( args.model, "rb" ))
-    gene_kept = model.feature_names_in_
-    model = model.components_
+    try:
+        model = pickle.load(open( args.model, "rb" ))
+        gene_kept = model.feature_names_in_
+        model = model.components_
+    except:
+        sys.exit("ERROR: --model input should be either a tsv file containing gene names and factor profiles, or a pickled model object with at least two attributes, feature_names_in_ and components_, like those defined in scikit-learn LDA model")
+
 K, M = model.shape
 ft_dict = {x:i for i,x in enumerate( gene_kept ) }
 factor_header = [str(x) for x in range(K)]
@@ -114,16 +119,12 @@ while True:
     print(f"Output {pixel.shape[0]} pixels and {anchor.shape[0]} anchors")
     pixel.X = pixel.X.map('{:.2f}'.format)
     pixel.Y = pixel.Y.map('{:.2f}'.format)
-    if n_batch == 0:
-        pixel.to_csv(args.output+".pixel.tsv.gz", sep='\t', index=False, header=True, mode='w', float_format="%.2e", compression={"method":"gzip"})
-    else:
-        pixel.to_csv(args.output+".pixel.tsv.gz", sep='\t', index=False, header=False, mode='a', float_format="%.2e", compression={"method":"gzip"})
+    write_mode = 'w' if n_batch == 0 else 'a'
+    header_include = True if n_batch == 0 else False
+    pixel.to_csv(args.output+".pixel.tsv.gz", sep='\t', index=False, header=header_include, mode=write_mode, float_format="%.2e", compression={"method":"gzip"})
     anchor.X = anchor.X.map('{:.2f}'.format)
     anchor.Y = anchor.Y.map('{:.2f}'.format)
-    if n_batch == 0:
-        anchor.to_csv(args.output+".anchor.tsv.gz", sep='\t', index=False, header=True, mode='w', float_format="%.2e", compression={"method":"gzip"})
-    else:
-        anchor.to_csv(args.output+".anchor.tsv.gz", sep='\t', index=False, header=False, mode='a', float_format="%.2e", compression={"method":"gzip"})
+    anchor.to_csv(args.output+".anchor.tsv.gz", sep='\t', index=False, header=header_include, mode=write_mode, float_format="%.2e", compression={"method":"gzip"})
     n_batch += read_n_batch
     post_count += pcount
     if not pixel_obj.file_is_open:

@@ -1,4 +1,4 @@
-# Factor analysis with spatial proximity contamination penalty
+# Factor analysis with pairwise factor similarity penalty
 import sys, os, copy, gzip, time, logging
 import pickle, argparse
 import numpy as np
@@ -6,7 +6,8 @@ import pandas as pd
 import random as rng
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from unit_loader import UnitLoaderAugmented, UnitLoader
+from lda_minibatch import Minibatch
+from unit_loader import UnitLoader
 from online_penalized_lda import OnlineLDAPenalized
 
 parser = argparse.ArgumentParser()
@@ -26,15 +27,17 @@ parser.add_argument('--seed', type=int, default=-1, help='')
 parser.add_argument('--verbose', type=int, default=0, help='')
 parser.add_argument('--thread', type=int, default=1, help='')
 parser.add_argument('--epoch', type=int, default=-1, help='How many times to loop through the full data')
-parser.add_argument('--minibatch_size', type=int, default=256, help='')
+parser.add_argument('--minibatch_size', type=int, default=516, help='')
 parser.add_argument('--total_n_unit', type=int, default=int(1e5), help='')
 parser.add_argument('--zeta', type=float, default=.1, help='')
 parser.add_argument('--kappa', type=float, default=.7, help='')
 parser.add_argument('--tau', type=int, default=9, help='')
 
+parser.add_argument('--chunksize', type=int, default=500000, help='')
 parser.add_argument('--log', default = '', type=str, help='files to write log to')
 parser.add_argument('--transform_full', action='store_true')
 parser.add_argument('--skip_transform', action='store_true')
+parser.add_argument('--debug', action='store_true')
 
 args = parser.parse_args()
 if not os.path.exists(args.input):
@@ -59,7 +62,6 @@ rng = np.random.default_rng(seed)
 
 key = args.key.lower()
 unit_id = args.unit_id.lower()
-bkey = key + "_buffer"
 ### Basic parameterse
 b_size = args.minibatch_size
 K = args.nFactor
@@ -68,7 +70,7 @@ factor_header = [str(x) for x in range(K)]
 with gzip.open(args.input, 'rt') as rf:
     header = rf.readline().strip().split('\t')
 header = [x.lower() for x in header]
-if unit_id not in header or key not in header or bkey not in header:
+if unit_id not in header or key not in header:
     sys.exit("ERROR: --unit_id or --key is not in the input file")
 header[header.index(unit_id)] = "unit"
 
@@ -84,29 +86,29 @@ ft_dict = {x:i for i,x in enumerate( feature_kept ) }
 M = len(feature_kept)
 logging.info(f"{M} genes will be used")
 
-adt = {'unit':str, 'x': float, 'y':float, 'gene':str, key:int, bkey:int}
-chunksize=500000
-reader = pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=chunksize,\
+adt = {'unit':str, 'x': float, 'y':float, 'gene':str, key:int}
+reader = pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=args.chunksize,\
             skiprows=1, names=header, usecols=list(adt.keys()), dtype=adt)
 # Minibatch reader
-batch_obj = UnitLoaderAugmented(reader, ft_dict, key, bkey,\
-                                batch_id_prefix = args.epoch_id_length,\
-                                min_ct_per_unit = args.min_ct_per_unit)
+batch_obj = UnitLoader(reader, ft_dict, key, \
+                       batch_id_prefix = args.epoch_id_length, \
+                       min_ct_per_unit = args.min_ct_per_unit)
 # Set up model
 model = OnlineLDAPenalized(vocab=feature_kept, K = K, N = args.total_n_unit,\
                            alpha = None, eta = feature.freq.values * K,\
                            tau0=args.tau, kappa=args.kappa, zeta=args.zeta,
                            iter_inner = 50, tol = 1e-4, rng=rng,\
-                           verbose = args.verbose, thread = args.thread)
+                           verbose = args.verbose, thread = args.thread, proximal=False)
 model.init_global_parameter()
 # Stochastic model fitting
 t0 = time.time()
 n_batch = 0
 while batch_obj.update_batch(b_size):
-    scores = model.update_lambda(batch_obj.batch)
+    batch = Minibatch(batch_obj.mtx)
+    scores = model.update_lambda(batch)
     n_batch += 1
     t1 = time.time() - t0
-    if n_batch % 10 == 0:
+    if args.debug or n_batch % 10 == 0:
         print(f"Model fitting {len(batch_obj.batch_id_list)}-{n_batch}, {t1/60:2f}min")
         post_weight = model._lambda.sum(axis=1)
         post_weight /= post_weight.sum()
@@ -116,6 +118,11 @@ while batch_obj.update_batch(b_size):
         print(np.around(post_weight[-k:], 3))
     if args.epoch_id_length > 0 and len(batch_obj.batch_id_list) > args.epoch:
         break
+    if args.debug and n_batch > 2:
+        break
+
+if args.debug:
+    sys.exit()
 
 # Output model
 out_f = args.output_pref + ".model_matrix.tsv.gz"
@@ -129,7 +136,7 @@ if args.skip_transform:
 # Transform
 post_count = np.zeros((K, M))
 epoch_id = set()
-reader = pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=chunksize,\
+reader = pd.read_csv(gzip.open(args.input, 'rt'),sep='\t',chunksize=args.chunksize,\
             skiprows=1, names=header, usecols=list(adt.keys()), dtype=adt)
 batch_obj = UnitLoader(reader, ft_dict, key, \
                        batch_id_prefix = args.epoch_id_length, \

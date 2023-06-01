@@ -71,12 +71,29 @@ if adj_penal < 0:
     adj_penal = radius
 
 ### Load model
-model = pickle.load(open( args.model, "rb" ))
-gene_kept = model.feature_names_in_
+_tau0 = args.tau0
+if args.model.endswith(".tsv.gz") or args.model.endswith(".tsv"):
+    model = pd.read_csv(args.model, sep='\t')
+    gene_kept = list(model.gene)
+    model = np.array(model.iloc[:,1:]).T
+    if _tau0 < 0:
+        _tau0 = 300 # Not ideal, it is better to know the number of minibatches before hand and estimate how many minibatch's worth of data has been processed to reach to input model
+else:
+    try:
+        model = pickle.load(open( args.model, "rb" ))
+        if _tau0 < 0:
+            _tau0 = model.n_batch_iter_ # This is wrong..
+        gene_kept = model.feature_names_in_
+        model = model.components_
+    except:
+        sys.exit("ERROR: unrecognized model file")
+
 ft_dict = {x:i for i,x in enumerate( gene_kept ) }
-K, M = model.components_.shape
+K, M = model.shape
 factor_header = [str(x) for x in range(K)]
 init_bound = 1./K * args.theta_init_bound_multiplier
+if args.lambda_init_scale > 1:
+    model *= args.lambda_init_scale / model.sum()
 logging.info(f"{M} genes and {K} factors are read from input model")
 
 ### Input pixel info (input has to contain certain columns with correct header)
@@ -104,17 +121,11 @@ pixel_obj.load_anchor(args.anchor, args.anchor_in_um)
 logging.info(f"Read {pixel_obj.grid_info.shape[0]} grid points")
 
 ### Setup model
-_tau0 = args.tau0
-_lambda = model.components_.copy()
-if _tau0 < 0:
-    _tau0 = model.n_batch_iter_
-if args.lambda_init_scale > 1:
-    _lambda *= args.lambda_init_scale / model.components_.sum()
 slda = OnlineLDA(vocab=gene_kept, K=K, N=args.total_pixel, \
                  zeta=args.zeta, tau0=_tau0, kappa=args.kappa,\
                  iter_gamma = args.gamma_max_iter,\
                  iter_inner=args.inner_max_iter, verbose = args.verbose)
-slda.init_global_parameter(_lambda)
+slda.init_global_parameter(model)
 
 ### Run minibatches
 post_count = np.zeros((K, M))
@@ -126,16 +137,12 @@ while True:
     print(f"Output {pixel.shape[0]} pixels and {anchor.shape[0]} anchors")
     pixel.X = pixel.X.map('{:.2f}'.format)
     pixel.Y = pixel.Y.map('{:.2f}'.format)
-    if n_batch == 0:
-        pixel.to_csv(args.output+".pixel.tsv.gz", sep='\t', index=False, header=True, mode='w', float_format="%.2e", compression={"method":"gzip"})
-    else:
-        pixel.to_csv(args.output+".pixel.tsv.gz", sep='\t', index=False, header=False, mode='a', float_format="%.2e", compression={"method":"gzip"})
+    write_mode = 'w' if n_batch == 0 else 'a'
+    header_include = True if n_batch == 0 else False
+    pixel.to_csv(args.output+".pixel.tsv.gz", sep='\t', index=False, header=header_include, mode=write_mode, float_format="%.2e", compression={"method":"gzip"})
     anchor.X = anchor.X.map('{:.2f}'.format)
     anchor.Y = anchor.Y.map('{:.2f}'.format)
-    if n_batch == 0:
-        anchor.to_csv(args.output+".anchor.tsv.gz", sep='\t', index=False, header=True, mode='w', float_format="%.2e", compression={"method":"gzip"})
-    else:
-        anchor.to_csv(args.output+".anchor.tsv.gz", sep='\t', index=False, header=False, mode='a', float_format="%.2e", compression={"method":"gzip"})
+    anchor.to_csv(args.output+".anchor.tsv.gz", sep='\t', index=False, header=header_include, mode=write_mode, float_format="%.2e", compression={"method":"gzip"})
     n_batch += read_n_batch
     post_count += pcount
     if not pixel_obj.file_is_open:
