@@ -99,7 +99,8 @@ class OnlineLDAPenalized:
         self._expElog_beta = np.exp(self._Elog_beta)
 
 
-    def _update_gamma(self, X, gamma, alpha):
+    def _update_gamma(self, X, _gamma, alpha):
+        gamma = copy.copy(_gamma)
         sstats = np.zeros((self._K, self._M))
         expElog_theta = np.exp(utilt.dirichlet_expectation(gamma))
         for j in range(X.shape[0]):
@@ -196,13 +197,14 @@ class OnlineLDAPenalized:
                     (theta * (1-batch.buffer_weight).reshape((-1, 1))).T @ theta # K x K
                 ckl /= theta.sum(axis = 0).reshape((-1, 1)) # row stochastic
                 np.fill_diagonal(ckl, 0) # remove self-loop
-                lam_delta = ckl @ (normalize(self._lambda, norm='l1', axis=1) * lam_sum)
                 if self._verbose > 2:
                     print("Ckl row sum:")
                     print(np.around(ckl.sum(axis = 1), 3))
             else:
+                ckl = np.ones((self._K, self._K)) - np.eye(self._K)
+                ckl /= self._K - 1
                 # Uniformly penalize all pairwise topic similarity
-                lam_delta = normalize(self._lambda, norm='l1', axis=1) * lam_sum
+            lam_delta = ckl @ (normalize(self._lambda, norm='l1', axis=1) * lam_sum)
             lam_hat = np.clip(lam_hat - self._zeta * lam_delta, 0, None)
             lam_hat = normalize(lam_hat, norm='l1', axis=1) * lam_sum
             if self._verbose > 1:

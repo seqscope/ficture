@@ -92,7 +92,8 @@ with gzip.open(args.input, 'rt') as rf:
     oheader = rf.readline().strip().split('\t')
 oheader = [x.lower() if len(x) > 1 else x.upper() for x in oheader]
 input_header = [batch_id,"X","Y","gene",key]
-dty = {x:int for x in ['X','Y',key]}
+dty = {x:float for x in ['X','Y']}
+dty[key] = int
 dty.update({x:str for x in [batch_id, 'gene']})
 mheader = [x for x in input_header if x not in oheader]
 if len(mheader) > 0:

@@ -174,6 +174,8 @@ class ImgRowIterator_stream:
         chunk = chunk.groupby(by = ["x", "y"]).agg({\
                       x:np.mean for x in self.feature_header }).reset_index()
         self.pts = chunk.loc[:, ["x", "y"]]
+        self.pts.x = np.clip(self.pts.x, 0, self.width-1)
+        self.pts.y = np.clip(self.pts.y, 0, self.height-1)
         self.buffer_y = self.pts.y.max()
         if self.plot_top:
             N = self.pts.shape[0]
@@ -288,6 +290,8 @@ class ImgRowIterator_stream_singlechannel:
         chunk = chunk.groupby(by = ["x", "y"]).agg({\
                               self.key : np.mean }).reset_index()
         self.pts = chunk.loc[:, ["x", "y"]]
+        self.pts.x = np.clip(self.pts.x, 0, self.width-1)
+        self.pts.y = np.clip(self.pts.y, 0, self.height-1)
         self.buffer_y = self.pts.y.max()
         v = np.clip(chunk[self.key].values,0,1)
         self.mtx = np.clip(mpl.colormaps[self.cmap](v)[:,:3] * 255,\

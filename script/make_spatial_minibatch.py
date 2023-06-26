@@ -19,7 +19,7 @@ parser.add_argument('--major_axis', type=str, default="Y", help='X or Y')
 parser.add_argument('--batch_size', type=float, default=500, help='Length of the side (um) of square minibatches')
 parser.add_argument('--batch_buff', type=float, default=50, help='Overlap between minibatches')
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
-parser.add_argument('--min_pixel', type=int, default=10, help='Just to avoid non-tissue regions with isolated pixels')
+parser.add_argument('--min_pixel', type=int, default=100, help='Just to avoid non-tissue regions with isolated pixels')
 parser.add_argument('--seed', type=float, default=-1, help='')
 
 # Specify a region to work on
@@ -51,7 +51,7 @@ with gzip.open(args.input, 'rt') as rf:
 for i,x in enumerate(input_header):
     if x in ["x", "y"]:
         input_header[i] = input_header[i].upper()
-dty = {x:int for x in ['X', 'Y']}
+dty = {x:float for x in ['X', 'Y']}
 
 ### Streaming input (Is this safe?)
 cmd = []
@@ -80,15 +80,29 @@ else:
 output_header = copy.copy(input_header)
 output_header.insert(1, "random_index")
 print(output_header)
+if args.output.endswith(".gz"):
+    with gzip.open(args.output, 'wt') as wf:
+        _=wf.write('\t'.join(output_header) + '\n')
+else:
+    with open(args.output, 'w') as wf:
+        _=wf.write('\t'.join(output_header) + '\n')
 
 df = pd.DataFrame()
 nbatch=0
-for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
-                names=input_header, dtype=dty):
-    chunk["random_index"] = -1
-    chunk.random_index = chunk.random_index.astype(int)
-    df = pd.concat([df, chunk])
-    df["random_index"] = -1
+reader = pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
+    names=input_header, dtype=dty)
+end_of_file = False
+
+while not end_of_file:
+    chunk = next(reader, None)
+    if chunk is None:
+        end_of_file = True
+        if len(df) == 0:
+            break
+    else:
+        chunk["random_index"] = -1
+        chunk.random_index = chunk.random_index.astype(int)
+        df = pd.concat([df, chunk])
     x_min = df["X"].min()
     x_max = df["X"].max()
     y_min = df["Y"].min()
@@ -123,59 +137,17 @@ for chunk in pd.read_csv(process.stdout,sep='\t',chunksize=1000000,\
             yst /= args.mu_scale
             yed /= args.mu_scale
             logging.info(f"Output region ({xed-xst:.2f}, {yed-yst:.2f}) ({xst:.1f}, {xed:.1f}) x ({yst:.1f}, {yed:.1f})")
-            if nbatch == 0:
-                df.loc[indx, output_header].to_csv(args.output, mode='w', sep='\t', index=False, header=True)
-            else:
-                df.loc[indx, output_header].to_csv(args.output, mode='a', sep='\t', index=False, header=False)
+            df.loc[indx, output_header].to_csv(args.output, mode='a', sep='\t', index=False, header=False, float_format='%.2f')
             nbatch += 1
 
     ### Leftover
+    if end_of_file:
+        break
     mj_max = df.loc[:, args.major_axis].max()
     left_indx = (df.random_index < 0) |\
                 (df[args.major_axis] > mj_max-batch_buff)
     df = df.loc[left_indx, :]
+    df["random_index"] = -1
     w  = df[args.major_axis].max() - df[args.major_axis].min()
     w0 = (df.random_index < 0).sum()
     logging.info(f"Left over size {df.shape[0]} ({w0}, {w:.2f})")
-
-
-
-
-if df.shape[0] > 0:
-    df["random_index"] = -1
-    x_min = df["X"].min()
-    x_max = df["X"].max()
-    y_min = df["Y"].min()
-    y_max = df["Y"].max()
-    x_range = x_max - x_min
-    y_range = y_max - y_min
-    logging.info(f"Read blocks of pixels: {x_range/args.mu_scale:.2f} x {y_range/args.mu_scale:.2f}")
-    x_grd_st = np.arange(x_min, x_max+1, batch_step)
-    x_grd_ed = [x + batch_size for x in x_grd_st]
-    y_grd_st = np.arange(y_min, y_max+1, batch_step)
-    y_grd_ed = [x + batch_size for x in y_grd_st]
-    x_grd_st[0]  = x_min - 1
-    y_grd_st[0]  = y_min - 1
-    x_grd_ed[-1] = x_max
-    y_grd_ed[-1] = y_max
-
-    for it_x in range(len(x_grd_st)):
-        for it_y in range(len(y_grd_st)):
-            xst = x_grd_st[it_x]
-            xed = x_grd_ed[it_x]
-            yst = y_grd_st[it_y]
-            yed = y_grd_ed[it_y]
-            indx = (df.X > xst) & (df.X <= xed) & (df.Y > yst) & (df.Y <= yed)
-            if sum(indx) < args.min_pixel:
-                continue
-            df.loc[indx, "random_index"] = rng.randint(1, sys.maxsize//100)
-            ### Output
-            xst /= args.mu_scale
-            xed /= args.mu_scale
-            yst /= args.mu_scale
-            yed /= args.mu_scale
-            logging.info(f"Output region ({xed-xst:.2f}, {yed-yst:.2f}) ({xst:.1f}, {xed:.1f}) x ({yst:.1f}, {yed:.1f})")
-            if nbatch == 0:
-                df.loc[indx, output_header].to_csv(args.output, mode='w', sep='\t', index=False, header=True)
-            else:
-                df.loc[indx, output_header].to_csv(args.output, mode='a', sep='\t', index=False, header=False)

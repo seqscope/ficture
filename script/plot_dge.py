@@ -21,6 +21,7 @@ parser.add_argument("--tif", action='store_true', help="Store as 16-bit tif inst
 parser.add_argument("--transpose", action='store_true', help="If X is the vertical axis")
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
 parser.add_argument('--usecols', nargs='*', type=int, help="Specify which columns correspond to X, Y, comma delimited counts (in order) in the input file", default=[])
+# parser.add_argument("--gray", action='store_true', help="")
 parser.add_argument('-r', nargs='*', type=int, help="Specify which count column is used for R in RGB channel", default=[])
 parser.add_argument('-g', nargs='*', type=int, help="Specify which count column is used for G in RGB channel", default=[])
 parser.add_argument('-b', nargs='*', type=int, help="Specify which count column is used for B in RGB channel", default=[])

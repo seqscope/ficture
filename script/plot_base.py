@@ -19,18 +19,21 @@ from utilt import plot_colortable
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
 parser.add_argument('--output', type=str, help='Output prefix')
-parser.add_argument('--fill_range', type=float, default=5, help="um")
-parser.add_argument('--batch_size', type=float, default=10000, help="")
+parser.add_argument('--fill_range', type=float, default=0, help="um")
+parser.add_argument('--batch_size', type=float, default=100000, help="")
 parser.add_argument("--tif", action='store_true', help="Store as 16-bit tif instead of png")
 parser.add_argument("--plot_fit", action='store_true', help="")
 parser.add_argument("--skip_mixture_plot", action='store_true', help="")
+parser.add_argument('--category_column', type=str, default='', help='')
+parser.add_argument('--color_table_category_name', type=str, default='Name', help='When --category_column is provided, which column to use as the category name')
+parser.add_argument('--scale', type=float, default=-1, help="")
 
 # Parameters shared by all plotting scripts
 parser.add_argument('--cmap_name', type=str, default="turbo", help="Name of Matplotlib colormap to use")
 parser.add_argument('--binary_cmap_name', type=str, default="plasma", help="Name of Matplotlib colormap to use for ploting individual factors")
 parser.add_argument('--color_table', type=str, default='', help='Pre-defined color map')
-parser.add_argument('--xmin', type=float, default=-1, help="")
-parser.add_argument('--ymin', type=float, default=-1, help="")
+parser.add_argument('--xmin', type=float, default=-np.inf, help="")
+parser.add_argument('--ymin', type=float, default=-np.inf, help="")
 parser.add_argument('--xmax', type=float, default=np.inf, help="")
 parser.add_argument('--ymax', type=float, default=np.inf, help="")
 parser.add_argument('--plot_um_per_pixel', type=float, default=1, help="Size of the output pixels in um")
@@ -40,6 +43,8 @@ parser.add_argument("--plot_discretized", action='store_true', help="")
 args = parser.parse_args()
 logging.basicConfig(level= getattr(logging, "INFO", None))
 dt = np.uint16 if args.tif else np.uint8
+kcol = args.category_column
+ccol = args.color_table_category_name
 
 # Dangerous way to detect which columns to use as factor loadings
 with gzip.open(args.input, "rt") as rf:
@@ -50,57 +55,76 @@ for i,x in enumerate(header):
     if x in recolumn:
         header[i] = recolumn[x]
 factor_header = []
-for x in header:
-    y = re.match('^[A-Za-z]*_*(\d+)$', x)
-    if y:
-        factor_header.append([y.group(0), int(y.group(1)) ])
-factor_header.sort(key = lambda x : x[1] )
-factor_header = [x[0] for x in factor_header]
-K = len(factor_header)
-
-# Colormap
-if os.path.exists(args.color_table):
+categorical = False
+if args.category_column != '':
+    if args.category_column not in header:
+        sys.exit(f"ERROR: {args.category_column} not found in header")
+    categorical = True
+    if not os.path.exists(args.color_table):
+        sys.exit(f"ERROR: --color_table is required for categorical input")
     color_info = pd.read_csv(args.color_table, sep='\t', header=0)
-    color_info.Name = color_info.Name.astype(int)
-    color_info.sort_values(by=['Name'], inplace=True)
+    color_info[ccol] = color_info[ccol].astype(str)
+    color_idx = {x:i for i,x in enumerate(color_info[ccol])}
     cmtx = np.array(color_info.loc[:, ["R","G","B"]])
+    K = len(color_idx)
+    factor_header = [str(k) for k in range(K)]
+    print("Use categorical input")
 else:
-    cmap_name = args.cmap_name
-    if args.cmap_name not in plt.colormaps():
-        cmap_name = "turbo"
-    cmap = plt.get_cmap(cmap_name, K)
-    cmtx = np.array([cmap(i) for i in range(K)] )
-    indx = np.arange(K)
-    shuffle(indx)
-    cmtx = cmtx[indx, ]
-    cmtx = cmtx[:, :3]
-    cdict = {k:cmtx[k,:] for k in range(K)}
-    # Plot color bar separately
-    fig = plot_colortable(cdict, "Factor label", sort_colors=False, ncols=4)
-    f = args.output + ".cbar"
-    fig.savefig(f, format="png")
-    logging.info(f"Set up color map for {K} factors")
+    for x in header:
+        y = re.match('^[A-Za-z]*_*(\d+)$', x)
+        if y:
+            factor_header.append([y.group(0), int(y.group(1)) ])
+    factor_header.sort(key = lambda x : x[1] )
+    factor_header = [x[0] for x in factor_header]
+    K = len(factor_header)
+    if os.path.exists(args.color_table):
+        color_info = pd.read_csv(args.color_table, sep='\t', header=0)
+        cmtx = np.array(color_info.loc[:, ["R","G","B"]])
+    else:
+        cmap_name = args.cmap_name
+        if args.cmap_name not in plt.colormaps():
+            cmap_name = "turbo"
+        cmap = plt.get_cmap(cmap_name, K)
+        cmtx = np.array([cmap(i) for i in range(K)] )
+        indx = np.arange(K)
+        shuffle(indx)
+        cmtx = cmtx[indx, ]
+        cmtx = cmtx[:, :3]
+        cdict = {k:cmtx[k,:] for k in range(K)}
+        # Plot color bar separately
+        fig = plot_colortable(cdict, "Factor label", sort_colors=False, ncols=4)
+        f = args.output + ".cbar"
+        fig.savefig(f, format="png")
+        logging.info(f"Set up color map for {K} factors")
 
 # Read data
 adt={x:float for x in ["x", "y"]+factor_header}
+adt[kcol] = str
 df = pd.DataFrame()
 for chunk in pd.read_csv(gzip.open(args.input, 'rt'), sep='\t', \
     chunksize=1000000, skiprows=1, names=header, dtype=adt):
+    if args.scale > 0:
+        chunk.x = chunk.x / args.scale
+        chunk.y = chunk.y / args.scale
     chunk = chunk[(chunk.y > args.ymin) & (chunk.y < args.ymax)]
     chunk = chunk[(chunk.x > args.xmin) & (chunk.x < args.xmax)]
     chunk['x_indx'] = np.round(chunk.x.values / args.plot_um_per_pixel, 0).astype(int)
     chunk['y_indx'] = np.round(chunk.y.values / args.plot_um_per_pixel, 0).astype(int)
+    if categorical: # Add dummy columns
+        chunk[kcol] = chunk[kcol].map(color_idx).astype(int)
+        for k in range(K):
+            chunk[str(k)] = chunk[kcol].eq(k).astype(int)
     chunk = chunk.groupby(by = ['x_indx', 'y_indx']).agg({ x:np.mean for x in factor_header }).reset_index()
     df = pd.concat([df, chunk])
 
 df = df.groupby(by = ['x_indx', 'y_indx']).agg({ x:np.mean for x in factor_header }).reset_index()
 x_indx_min = int(args.xmin / args.plot_um_per_pixel )
 y_indx_min = int(args.ymin / args.plot_um_per_pixel )
-if args.plot_fit or args.xmin < 0:
+if args.plot_fit or np.isinf(args.xmin):
     df.x_indx = df.x_indx - np.max([x_indx_min, df.x_indx.min()])
 else:
     df.x_indx -= x_indx_min
-if args.plot_fit or args.ymin < 0:
+if args.plot_fit or np.isinf(args.ymin):
     df.y_indx = df.y_indx - np.max([y_indx_min, df.y_indx.min()])
 else:
     df.y_indx -= y_indx_min
@@ -119,29 +143,32 @@ wed = df.y_indx.max()
 wstep = np.max([10, int(args.batch_size / hsize)])
 radius = args.fill_range/args.plot_um_per_pixel
 
-pts = np.zeros((0, 2), dtype=int)
-pts_indx = []
-st = wst
-while st < wed:
-    ed = min([st + wstep, wed])
-    logging.info(f"Filling pixels {st} - {ed}")
-    if ((df.y_indx > st) & (df.y_indx < ed)).sum() < 10:
+if radius <= 0:
+    pts = df[['x_indx', 'y_indx']].values
+    pts_indx = df.index.values
+else:
+    pts = np.zeros((0, 2), dtype=int)
+    pts_indx = []
+    st = wst
+    while st < wed:
+        ed = min([st + wstep, wed])
+        logging.info(f"Filling pixels {st} - {ed} / {wed}")
+        if ((df.y_indx > st) & (df.y_indx < ed)).sum() < 10:
+            st = ed
+            continue
+        block = df.index[(df.y_indx > st - 2*radius) & (df.y_indx < ed + 2*radius)]
+        ref = sklearn.neighbors.BallTree(np.array(df.loc[block, ['x_indx', 'y_indx']]))
+        mesh = np.meshgrid(np.arange(hsize), np.arange(st, ed))
+        nodes = np.array(list(zip(*(dim.flat for dim in mesh))), dtype=int)
+        dv, iv = ref.query(nodes, k = 1, dualtree=True)
+        indx = dv[:, 0] < radius
+        iv = block[iv[indx, 0] ]
+        if sum(indx) == 0:
+            st = ed
+            continue
+        pts = np.vstack((pts, nodes[indx, :]) )
+        pts_indx += list(iv)
         st = ed
-        continue
-    block = df.index[(df.y_indx > st - 2*radius) & (df.y_indx < ed + 2*radius)]
-    ref = sklearn.neighbors.BallTree(np.array(df.loc[block, ['x_indx', 'y_indx']]))
-    mesh = np.meshgrid(np.arange(hsize), np.arange(st, ed))
-    nodes = np.array(list(zip(*(dim.flat for dim in mesh))), dtype=int)
-    dv, iv = ref.query(nodes, k = 1, dualtree=True)
-    indx = dv[:, 0] < radius
-    iv = block[iv[indx, 0] ]
-    if sum(indx) == 0:
-        st = ed
-        continue
-    pts = np.vstack((pts, nodes[indx, :]) )
-    pts_indx += list(iv)
-    st = ed
-
 pts[:,0] = np.clip(hsize - pts[:, 0], 0, hsize-1) # Origin is lower-left
 pts[:,1] = np.clip(pts[:, 1], 0, wsize-1)
 

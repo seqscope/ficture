@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
 parser.add_argument('--output', type=str, help='')
 parser.add_argument('--unit_label', default = 'random_index', type=str, help='Which column to use as unit identifier')
+parser.add_argument('--unit_attr', type=str, nargs='+', default=[], help='')
 parser.add_argument('--feature', type=str, default='', help='')
 parser.add_argument('--feature_label', default = "gene", type=str, help='Which column to use as feature identifier')
 parser.add_argument('--key', default = 'count', type=str, help='')
@@ -22,11 +23,12 @@ parser.add_argument('--train_on', default = '', type=str, help='')
 parser.add_argument('--log', default = '', type=str, help='files to write log to')
 
 parser.add_argument('--nFactor', type=int, default=10, help='')
-parser.add_argument('--minibatch_size', type=int, default=256, help='')
+parser.add_argument('--minibatch_size', type=int, default=512, help='')
 parser.add_argument('--min_ct_per_feature', type=int, default=1, help='')
 parser.add_argument('--min_ct_per_unit', type=int, default=20, help='')
 parser.add_argument('--thread', type=int, default=1, help='')
 parser.add_argument('--epoch', type=int, default=1, help='How many times to loop through the full data')
+parser.add_argument('--epoch_id_length', type=int, default=-1, help='')
 parser.add_argument('--use_model', type=str, default='', help="Use provided model to transform input data")
 parser.add_argument('--overwrite', action='store_true')
 
@@ -42,6 +44,7 @@ else:
 if args.use_model != '' and not os.path.exists(args.use_model):
     sys.exit("Invalid model file")
 
+unit_attr = [x.lower() for x in args.unit_attr]
 key = args.key.lower()
 unit_key = args.unit_label.lower()
 gene_key = args.feature_label.lower()
@@ -49,6 +52,8 @@ train_on = args.train_on.lower()
 if train_on == '':
     train_on = key
 adt = {unit_key:str, gene_key:str, key:int}
+adt.update({x:str for x in unit_attr})
+print(unit_attr)
 
 ### Basic parameterse
 b_size = args.minibatch_size
@@ -84,7 +89,10 @@ if not use_existing_model:
     if not os.path.exists(args.feature):
         sys.exit("Unable to read feature list")
     ### Use only the provided list of features
-    feature=pd.read_csv(args.feature, sep='\t', names=[gene_key, key], dtype={gene_key:str, key:int})
+    with gzip.open(args.feature, 'rt') as rf:
+        fheader = rf.readline().strip().split('\t')
+    fheader = [x.lower() for x in fheader]
+    feature=pd.read_csv(args.feature, sep='\t', skiprows=1, names=fheader, dtype={gene_key:str, key:int})
     feature = feature[feature[key] >= args.min_ct_per_feature]
     feature.sort_values(by=key,ascending=False,inplace=True)
     feature.drop_duplicates(subset=gene_key,keep='first',inplace=True)
@@ -97,13 +105,18 @@ if not use_existing_model:
     feature_mf = np.array(feature[key].values).astype(float)
     feature_mf/= feature_mf.sum()
     epoch = 0
-    df = pd.DataFrame()
+    n_unit = 0
+    epoch_id = set()
     while epoch < args.epoch:
         df = pd.DataFrame()
         for chunk in pd.read_csv(gzip.open(args.input, 'rt'), \
                 sep='\t',chunksize=1000000, skiprows=1, names=header, \
                 usecols=[unit_key,gene_key,train_on], dtype=adt):
             chunk = chunk[chunk[gene_key].isin(feature_kept)]
+            if args.epoch_id_length > 0:
+                v = set(chunk[unit_key].map(lambda x: x[:args.epoch_id_length]).unique())
+                epoch_id.update(v)
+                epoch = len(epoch_id) - 1
             chunk.rename(columns = {train_on:key}, inplace=True)
             if chunk.shape[0] == 0:
                 continue
@@ -131,26 +144,32 @@ if not use_existing_model:
 
             df = copy.copy(chunk[chunk[unit_key].eq(last_indx)] )
             logl = lda.score(mtx) / mtx.shape[0]
-            logging.info(f"logl: {logl:.4f}")
-        epoch += 1
+            n_unit += N
+            logging.info(f"Epoch {epoch}, finished {n_unit} units. batch logl: {logl:.4f}")
+            if epoch >= args.epoch:
+                break
 
-    if len(df[unit_key].unique()) > b_size:
-        brc = df.groupby(by = [unit_key]).agg({key: sum}).reset_index()
-        brc = brc[brc[key] > args.min_ct_per_unit]
-        brc.index = range(brc.shape[0])
-        df = df[df[unit_key].isin(brc[unit_key].values)]
-        barcode_kept = list(brc[unit_key].values)
-        bc_dict  = {x:i for i,x in enumerate( barcode_kept ) }
-        indx_row = [ bc_dict[x] for x in df[unit_key]]
-        indx_col = [ ft_dict[x] for x in df[gene_key]]
-        N = len(barcode_kept)
-        mtx = coo_matrix((df[key].values, (indx_row, indx_col)), shape=(N, M)).tocsr()
-        x1 = np.median(brc[key].values)
-        x2 = np.mean(brc[key].values)
-        logging.info(f"Made DGE {mtx.shape}, median/mean count: {x1:.1f}/{x2:.1f}")
-        _ = lda.partial_fit(mtx)
-        logl = lda.score(mtx) / mtx.shape[0]
-        logging.info(f"logl: {logl:.4f}")
+        # Leftover
+        if len(df[unit_key].unique()) > b_size:
+            brc = df.groupby(by = [unit_key]).agg({key: sum}).reset_index()
+            brc = brc[brc[key] > args.min_ct_per_unit]
+            brc.index = range(brc.shape[0])
+            df = df[df[unit_key].isin(brc[unit_key].values)]
+            barcode_kept = list(brc[unit_key].values)
+            bc_dict  = {x:i for i,x in enumerate( barcode_kept ) }
+            indx_row = [ bc_dict[x] for x in df[unit_key]]
+            indx_col = [ ft_dict[x] for x in df[gene_key]]
+            N = len(barcode_kept)
+            mtx = coo_matrix((df[key].values, (indx_row, indx_col)), shape=(N, M)).tocsr()
+            x1 = np.median(brc[key].values)
+            x2 = np.mean(brc[key].values)
+            logging.info(f"Made DGE {mtx.shape}, median/mean count: {x1:.1f}/{x2:.1f}")
+            _ = lda.partial_fit(mtx)
+            logl = lda.score(mtx) / mtx.shape[0]
+            logging.info(f"logl: {logl:.4f}")
+
+        if args.epoch_id_length <= 0:
+            epoch += 1
 
     lda.feature_names_in_ = feature_kept
     pickle.dump( lda, open( model_f, "wb" ) )
@@ -159,7 +178,6 @@ if not use_existing_model:
                 pd.DataFrame(lda.components_.T,\
                 columns = [str(k) for k in range(K)], dtype='float64')],\
                 axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.4e', compression={"method":"gzip"})
-
 
 
 ###
@@ -173,13 +191,24 @@ logging.info(f"Result file {res_f}")
 
 if train_on != key:
     post_count = np.zeros((K, M))
+    epoch_id = ''
+    end_of_epoch = False
     df = pd.DataFrame()
     for chunk in pd.read_csv(gzip.open(args.input, 'rt'), \
             sep='\t',chunksize=1000000, skiprows=1, names=header, \
-            usecols=[unit_key,gene_key,key,train_on], dtype=adt):
+            usecols=[unit_key,gene_key,key,train_on]+unit_attr, dtype=adt):
         chunk = chunk[chunk[gene_key].isin(feature_kept)]
         if chunk.shape[0] == 0:
             continue
+        if args.epoch_id_length > 0:
+            v = chunk[unit_key].map(lambda x: x[:args.epoch_id_length]).values
+            if epoch_id == '':
+                epoch_id = v[0]
+            if v[-1] != v[0]:
+                end_of_epoch = True
+                chunk = chunk.loc[v == epoch_id, :]
+            if chunk.shape[0] == 0:
+                continue
         last_indx = chunk[unit_key].iloc[-1]
         df = pd.concat([df, chunk[~chunk[unit_key].eq(last_indx)]])
         if len(df[unit_key].unique()) < b_size * 1.5: # Left to next chunk
@@ -187,6 +216,7 @@ if train_on != key:
             continue
         # Total mulecule count per unit
         brc = df.groupby(by = [unit_key]).agg({key: sum}).reset_index()
+        brc = brc.merge(right=df[[unit_key]+unit_attr].drop_duplicates(subset=unit_key),on=unit_key,how='inner')
         brc = brc[brc[key] > args.min_ct_per_unit]
         brc.index = range(brc.shape[0])
         df = df[df[unit_key].isin(brc[unit_key].values)]
@@ -215,16 +245,19 @@ if train_on != key:
         brc['topK'] = np.argmax(theta, axis = 1).astype(int)
         brc['topP'] = np.max(theta, axis = 1)
         brc = brc.astype(dtp)
-        print(brc.shape[0])
+        logging.info(f"{nbatch}-th batch with {brc.shape[0]} units")
         if nbatch == 0:
             brc.to_csv(res_f, sep='\t', mode='w', float_format="%.4e", index=False, header=True, compression={"method":"gzip"})
         else:
             brc.to_csv(res_f, sep='\t', mode='a', float_format="%.4e", index=False, header=False, compression={"method":"gzip"})
         nbatch += 1
         df = copy.copy(chunk[chunk[unit_key].eq(last_indx)] )
+        if end_of_epoch:
+            break
 
     # Leftover
     brc = df.groupby(by = [unit_key]).agg({key: sum}).reset_index()
+    brc = brc.merge(right=df[[unit_key]+unit_attr].drop_duplicates(subset=unit_key),on=unit_key,how='inner')
     brc = brc[brc[key] > args.min_ct_per_unit]
     brc.index = range(brc.shape[0])
     print(brc.shape)
@@ -254,7 +287,7 @@ if train_on != key:
         brc['topK'] = np.argmax(theta, axis = 1).astype(int)
         brc['topP'] = np.max(theta, axis = 1)
         brc = brc.astype(dtp)
-        print(brc.shape[0])
+        logging.info(f"{nbatch}-th batch with {brc.shape[0]} units")
         if nbatch == 0:
             brc.to_csv(res_f, sep='\t', mode='w', float_format="%.4e", index=False, header=True, compression={"method":"gzip"})
         else:
@@ -275,13 +308,24 @@ if train_on != key:
 
 
 post_count = np.zeros((K, M))
+epoch_id = ''
 df = pd.DataFrame()
+end_of_epoch = False
 for chunk in pd.read_csv(gzip.open(args.input, 'rt'), \
         sep='\t',chunksize=1000000, skiprows=1, names=header, \
-        usecols=[unit_key,gene_key,key], dtype=adt):
+        usecols=[unit_key,gene_key,key]+unit_attr, dtype=adt):
     chunk = chunk[chunk[gene_key].isin(feature_kept)]
     if chunk.shape[0] == 0:
         continue
+    if args.epoch_id_length > 0:
+        v = chunk[unit_key].map(lambda x: x[:args.epoch_id_length]).values
+        if epoch_id == '':
+            epoch_id = v[0]
+        if v[-1] != v[0]:
+            end_of_epoch = True
+            chunk = chunk.loc[v == epoch_id, :]
+        if chunk.shape[0] == 0:
+            continue
     last_indx = chunk[unit_key].iloc[-1]
     df = pd.concat([df, chunk[~chunk[unit_key].eq(last_indx)]])
     if len(df[unit_key].unique()) < b_size * 1.5: # Left to next chunk
@@ -289,6 +333,7 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'), \
         continue
     # Total mulecule count per unit
     brc = df.groupby(by = [unit_key]).agg({key: sum}).reset_index()
+    brc = brc.merge(right=df[[unit_key]+unit_attr].drop_duplicates(subset=unit_key),on=unit_key,how='inner')
     brc = brc[brc[key] > args.min_ct_per_unit]
     brc.index = range(brc.shape[0])
     df = df[df[unit_key].isin(brc[unit_key].values)]
@@ -311,19 +356,21 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'), \
     brc['topK'] = np.argmax(theta, axis = 1).astype(int)
     brc['topP'] = np.max(theta, axis = 1)
     brc = brc.astype(dtp)
-    print(brc.shape[0])
+    logging.info(f"{nbatch}-th batch with {brc.shape[0]} units")
     if nbatch == 0:
         brc.to_csv(res_f, sep='\t', mode='w', float_format="%.4e", index=False, header=True, compression={"method":"gzip"})
     else:
         brc.to_csv(res_f, sep='\t', mode='a', float_format="%.4e", index=False, header=False, compression={"method":"gzip"})
     nbatch += 1
     df = copy.copy(chunk[chunk[unit_key].eq(last_indx)] )
+    if end_of_epoch:
+        break
 
 # Leftover
 brc = df.groupby(by = [unit_key]).agg({key: sum}).reset_index()
+brc = brc.merge(right=df[[unit_key]+unit_attr].drop_duplicates(subset=unit_key),on=unit_key,how='inner')
 brc = brc[brc[key] > args.min_ct_per_unit]
 brc.index = range(brc.shape[0])
-print(brc.shape)
 if brc.shape[0] > 0:
     df = df[df[unit_key].isin(brc[unit_key].values)]
     # Make DGE
@@ -344,7 +391,6 @@ if brc.shape[0] > 0:
     brc['topK'] = np.argmax(theta, axis = 1).astype(int)
     brc['topP'] = np.max(theta, axis = 1)
     brc = brc.astype(dtp)
-    print(brc.shape[0])
     if nbatch == 0:
         brc.to_csv(res_f, sep='\t', mode='w', float_format="%.4e", index=False, header=True, compression={"method":"gzip"})
     else:

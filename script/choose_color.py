@@ -15,6 +15,7 @@ parser.add_argument('--input', type=str, help='')
 parser.add_argument('--output', type=str, help='')
 parser.add_argument('--cmap_name', type=str, default="turbo", help="Name of Matplotlib colormap to use (better close to a circular colormap)")
 parser.add_argument('--top_color', type=str, default="#fcd217", help="HEX color code for the top factor")
+parser.add_argument('--even_space', action='store_true', help="Evenly space the factors on the circle")
 args = parser.parse_args()
 
 cmap_name = args.cmap_name
@@ -33,9 +34,12 @@ K = len(factor_header)
 N = df.shape[0]
 
 # Factor abundance (want top factors to have more distinct colors)
-weight = df.loc[:, factor_header].sum(axis = 0).values
-weight = weight**(1/2)
-weight /= weight.sum()
+if args.even_space:
+    weight=None
+else:
+    weight = df.loc[:, factor_header].sum(axis = 0).values
+    weight = weight**(1/2)
+    weight /= weight.sum()
 
 # Find neearest neighbors
 bt = sklearn.neighbors.BallTree(df.loc[:, ["x", "y"]])

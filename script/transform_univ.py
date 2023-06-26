@@ -3,8 +3,7 @@ Transform into factor space based on input model
 Model contains gene names and either Dirichlet parameters (or probabilities for more general use?)
 Input pixel level data will be grouped into (overlapping) hexagons
 '''
-import sys, os, copy, gzip, time, logging
-import pickle, argparse
+import sys, os, copy, gzip, time, logging, pickle, argparse
 import numpy as np
 import pandas as pd
 import random as rng
@@ -23,12 +22,11 @@ parser.add_argument('--major_axis', type=str, default=None, help='X or Y')
 parser.add_argument('--region_id', type=str, default=None, help='')
 parser.add_argument('--min_ct_per_unit', type=int, default=20, help='')
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
-parser.add_argument('--precision', type=int, default=1, help='Number of digits to store spatial location (in um), 0 for integer.')
-
 parser.add_argument('--thread', type=int, default=-1, help='')
 parser.add_argument('--n_move', type=int, default=3, help='')
 parser.add_argument('--hex_width', type=int, default=24, help='')
 parser.add_argument('--hex_radius', type=int, default=-1, help='')
+parser.add_argument('--precision', type=int, default=1, help='Number of digits to store spatial location (in um), 0 for integer.')
 parser.add_argument('--chunksize', type=int, default=100000, help='Number of lines to read at a time')
 
 args = parser.parse_args()
@@ -60,11 +58,23 @@ reader = pd.read_csv(gzip.open(args.input, 'rt'), sep='\t',\
                     usecols=usecol, dtype=adt)
 
 ### Model
-model_mtx = pd.read_csv(args.model, sep='\t')
-feature_kept=list(model_mtx.gene)
-ft_dict = {x:i for i,x in enumerate( feature_kept ) }
-model_mtx = np.array(model_mtx.iloc[:, 1:])
-M, K = model_mtx.shape
+if args.model.endswith('.tsv.gz') or args.model.endswith('tsv'):
+    model_mtx = pd.read_csv(args.model, sep='\t')
+    feature_kept=list(model_mtx.gene)
+    model_mtx = np.array(model_mtx.iloc[:, 1:])
+    M, K = model_mtx.shape
+    model = OnlineLDA(vocab=feature_kept,K=K,N=1e4,thread=args.thread,tol=1e-3)
+    model.init_global_parameter(model_mtx.T)
+else:
+    try:
+        model = pickle.load(open(args.model, 'rb'))
+        model.n_jobs = args.thread
+        feature_kept = model.feature_names_in_
+        K, M = model.components_.shape
+        model.feature_names_in_ = None
+    except:
+        sys.exit("ERROR: --model must be either a tsv file containing gene name and factor-gene loadings or a pickle model object from sklearn LDA")
+ft_dict = {x:i for i,x in enumerate(feature_kept)}
 logging.info(f"Model loaded with {M} features and {K} factors")
 
 ### Basic parameterse
@@ -78,9 +88,6 @@ b_size = radius * 10
 batch_obj = PixelToUnit(reader, ft_dict, key, radius,\
             scale=1./args.mu_scale, min_ct_per_unit=args.min_ct_per_unit,\
             sliding_step=args.n_move, major_axis=args.major_axis)
-# Set up model
-model = OnlineLDA(vocab=feature_kept,K=K,N=1e4,thread=args.thread,tol=1e-3)
-model.init_global_parameter(model_mtx.T)
 
 # Transform
 post_count = np.zeros((K, M))
@@ -104,7 +111,7 @@ while batch_obj.read_chunk(min_size=b_size):
     batch_obj.brc['y'] = batch_obj.brc.y.map(lambda x : f"{x:.{args.precision}f}")
     batch_obj.brc.rename(columns = {'hex_id':'unit'}, inplace=True)
     batch_obj.brc[oheader].to_csv(out_f, sep='\t', index=False, header=False, float_format='%.3e', mode='a', compression={"method":"gzip"})
-    print(f"Transformed {n_batch} batches with total {n_unit} units, {t1/60:2f}min")
+    logging.info(f"Transformed {n_batch} batches with total {n_unit} units, {t1/60:2f}min")
 
 out_f = args.output_pref + ".posterior.count.tsv.gz"
 pd.concat([pd.DataFrame({'gene': feature_kept}),\

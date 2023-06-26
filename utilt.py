@@ -234,6 +234,7 @@ def match_factors(mtx1, mtx2, c1, n, cmap, mode='beta'):
 
 def plot_colortable(colors, title, sort_colors=True, ncols=4, dpi = 80,\
                     cell_width = 212, cell_height = 22,\
+                    title_fontsize=24, text_fontsize=24,\
                     swatch_width = 48, margin = 12, topmargin = 40):
     # Sort colors by hue, saturation, value and name.
     if sort_colors is True:
@@ -247,19 +248,19 @@ def plot_colortable(colors, title, sort_colors=True, ncols=4, dpi = 80,\
     n = len(names)
     nrows = n // ncols + int(n % ncols > 0)
 
-    width = cell_width * 4 + 2 * margin
+    width = cell_width * ncols + 2 * margin
     height = cell_height * nrows + margin + topmargin
 
 
     fig, ax = plt.subplots(figsize=(width / dpi, height / dpi), dpi=dpi)
     fig.subplots_adjust(margin/width, margin/height,
                         (width-margin)/width, (height-topmargin)/height)
-    ax.set_xlim(0, cell_width * 4)
+    ax.set_xlim(0, cell_width * ncols)
     ax.set_ylim(cell_height * (nrows-0.5), -cell_height/2.)
     ax.yaxis.set_visible(False)
     ax.xaxis.set_visible(False)
     ax.set_axis_off()
-    ax.set_title(title, fontsize=24, loc="left", pad=10)
+    ax.set_title(title, fontsize=title_fontsize, loc="left", pad=10)
 
     for i, name in enumerate(names):
         row = i % nrows
@@ -269,7 +270,7 @@ def plot_colortable(colors, title, sort_colors=True, ncols=4, dpi = 80,\
         swatch_start_x = cell_width * col
         text_pos_x = cell_width * col + swatch_width + 7
 
-        ax.text(text_pos_x, y, name, fontsize=24,
+        ax.text(text_pos_x, y, name, fontsize=text_fontsize,
                 horizontalalignment='left',
                 verticalalignment='center')
 

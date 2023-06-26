@@ -79,13 +79,15 @@ class OnlineLDA:
             self._lambda = _lambda
             assert self._lambda.shape == (self._K, self._M), "Invalid lambda"
         if self._lambda.min() <= 0 :
-            warnings.warn("Parameters must be positive, will clip to epsilon")
-            self._lambda = np.clip(self._lambda, self._eps, np.inf)
+            warnings.warn("Parameters must be positive, will clip to 1/10 the min nonzero value")
+            pseudo = self._lambda[self._lambda > 0].min()/10
+            self._lambda = np.clip(self._lambda, pseudo, None)
         self._Elog_beta = utilt.dirichlet_expectation(self._lambda)
         self._expElog_beta = np.exp(self._Elog_beta)
 
 
-    def _update_gamma(self, X, gamma, alpha):
+    def _update_gamma(self, X, _gamma, alpha):
+        gamma = copy.copy(_gamma)
         sstats = np.zeros((self._K, self._M))
         expElog_theta = np.exp(utilt.dirichlet_expectation(gamma))
         for j in range(X.shape[0]):

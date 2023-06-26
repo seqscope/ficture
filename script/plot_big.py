@@ -29,8 +29,8 @@ parser.add_argument("--plot_prob_cut", type=float, default=.99, help="")
 parser.add_argument('--cmap_name', type=str, default="turbo", help="Name of Matplotlib colormap to use")
 parser.add_argument('--binary_cmap_name', type=str, default="plasma", help="Name of Matplotlib colormap to use for ploting individual factors")
 parser.add_argument('--color_table', type=str, default='', help='Pre-defined color map')
-parser.add_argument('--xmin', type=float, default=-1, help="um")
-parser.add_argument('--ymin', type=float, default=-1, help="um")
+parser.add_argument('--xmin', type=float, default=-np.inf, help="um")
+parser.add_argument('--ymin', type=float, default=-np.inf, help="um")
 parser.add_argument('--xmax', type=float, default=np.inf, help="um")
 parser.add_argument('--ymax', type=float, default=np.inf, help="um")
 parser.add_argument('--plot_um_per_pixel', type=float, default=1, help="Size of the output pixels in um")
@@ -114,13 +114,12 @@ logging.info(f"Finish reading file ({nc})")
 df = df.groupby(by = ['x_indx', 'y_indx']).agg({ x:np.mean for x in factor_header }).reset_index()
 x_indx_min = int(args.xmin / args.plot_um_per_pixel )
 y_indx_min = int(args.ymin / args.plot_um_per_pixel )
-if args.xmin >= 0:
+if not np.isinf(args.xmin):
     df.x_indx -= x_indx_min
-if args.ymin >= 0:
+if not np.isinf(args.ymin):
     df.y_indx -= y_indx_min
 if args.plot_fit:
     df.x_indx -= df.x_indx.min()
-if args.plot_fit:
     df.y_indx -= df.y_indx.min()
 
 N0 = df.shape[0]
