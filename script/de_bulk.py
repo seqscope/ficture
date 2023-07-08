@@ -114,4 +114,7 @@ chidf.FoldChange = chidf.FoldChange.map(lambda x : "{:.2f}".format(x) )
 chidf.gene_total = chidf.gene_total.astype(int)
 chidf.drop(columns = 'Rank', inplace=True)
 
+outpath=os.path.dirname(args.output)
+if not os.path.exists(outpath):
+    os.makedirs(outpath)
 chidf.to_csv(args.output,sep='\t',float_format="%.2e",index=False)

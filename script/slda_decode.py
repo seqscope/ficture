@@ -34,6 +34,8 @@ parser.add_argument('--model_scale', type=float, default=-1, help='')
 # Other
 parser.add_argument('--log', type=str, default = '', help='files to write log to')
 parser.add_argument('--debug', action='store_true')
+parser.add_argument('--slim_topk_output_pixel', type=int, default=-1)
+parser.add_argument('--slim_topk_output_anchor', type=int, default=-1)
 
 args = parser.parse_args()
 
@@ -78,7 +80,6 @@ else:
 
 K, M = model.shape
 ft_dict = {x:i for i,x in enumerate( gene_kept ) }
-factor_header = [str(x) for x in range(K)]
 if args.model_scale > 0:
     model = normalize(model, norm='l1', axis=1) * args.model_scale
 logging.info(f"{M} genes and {K} factors are read from input model")
@@ -110,21 +111,38 @@ pixel_obj = PixelMinibatch(pixel_reader, ft_dict, \
 ### anchor info
 pixel_obj.load_anchor(args.anchor, args.anchor_in_um)
 logging.info(f"Read {pixel_obj.grid_info.shape[0]} grid points")
+factor_header = pixel_obj.factor_header
 
 post_count = np.zeros((K, M))
 n_batch = 0
 while True:
     read_n_batch = pixel_obj.read_chunk(args.thread)
-    print(f"Read {read_n_batch} batches ({pixel_obj.dge_mtx.shape})")
+    logging.info(f"Read {read_n_batch} batches ({pixel_obj.dge_mtx.shape})")
     pcount, pixel, anchor  = pixel_obj.run_chunk(slda, init_bound)
-    print(f"Output {pixel.shape[0]} pixels and {anchor.shape[0]} anchors")
+    logging.info(f"Output {pixel.shape[0]} pixels and {anchor.shape[0]} anchors")
     pixel.X = pixel.X.map('{:.2f}'.format)
     pixel.Y = pixel.Y.map('{:.2f}'.format)
+    if args.slim_topk_output_pixel > 0 and args.slim_topk_output_pixel < K:
+        part = np.argpartition(-pixel[factor_header].values, kth=np.arange(args.slim_topk_output_pixel), axis=1)[:, :args.slim_topk_output_pixel]
+        for k in range(args.slim_topk_output_pixel):
+            pixel[f"K{k}"] = part[:,k]
+        part = np.partition(-pixel[factor_header].values, kth=np.arange(args.slim_topk_output_pixel), axis=1)[:, :args.slim_topk_output_pixel]
+        for k in range(args.slim_topk_output_pixel):
+            pixel[f"P{k}"] = np.clip(-part[:,k], 0, 1)
+        pixel.drop(columns = factor_header, inplace=True)
     write_mode = 'w' if n_batch == 0 else 'a'
     header_include = True if n_batch == 0 else False
     pixel.to_csv(args.output+".pixel.tsv.gz", sep='\t', index=False, header=header_include, mode=write_mode, float_format="%.2e", compression={"method":"gzip"})
     anchor.X = anchor.X.map('{:.2f}'.format)
     anchor.Y = anchor.Y.map('{:.2f}'.format)
+    if args.slim_topk_output_anchor > 0 and args.slim_topk_output_anchor < K:
+        part = np.argpartition(-anchor[factor_header].values, kth=np.arange(args.slim_topk_output_anchor), axis=1)[:, :args.slim_topk_output_anchor]
+        for k in range(args.slim_topk_output_anchor):
+            anchor[f"K{k}"] = part[:,k]
+        part = np.partition(-anchor[factor_header].values, kth=np.arange(args.slim_topk_output_anchor), axis=1)[:, :args.slim_topk_output_anchor]
+        for k in range(args.slim_topk_output_anchor):
+            anchor[f"P{k}"] = np.clip(-part[:,k], 0, 1)
+        anchor.drop(columns = factor_header, inplace=True)
     anchor.to_csv(args.output+".anchor.tsv.gz", sep='\t', index=False, header=header_include, mode=write_mode, float_format="%.2e", compression={"method":"gzip"})
     n_batch += read_n_batch
     post_count += pcount

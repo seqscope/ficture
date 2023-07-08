@@ -22,23 +22,25 @@ parser.add_argument('--output', type=str, help='Output prefix')
 parser.add_argument('--fill_range', type=float, default=0, help="um")
 parser.add_argument('--batch_size', type=float, default=100000, help="")
 parser.add_argument("--tif", action='store_true', help="Store as 16-bit tif instead of png")
-parser.add_argument("--plot_fit", action='store_true', help="")
-parser.add_argument("--skip_mixture_plot", action='store_true', help="")
-parser.add_argument('--category_column', type=str, default='', help='')
-parser.add_argument('--color_table_category_name', type=str, default='Name', help='When --category_column is provided, which column to use as the category name')
 parser.add_argument('--scale', type=float, default=-1, help="")
+parser.add_argument('--origin', type=int, default=[0,0], help="{0, 1} x {0, 1}, specify how to orient the image w.r.t. the coordinates. (0, 0) means the lower left corner has the minimum x-value and the minimum y-value; (0, 1) means the lower left corner has the minimum x-value and the maximum y-value;")
+parser.add_argument('--category_column', type=str, default='', help='')
 
-# Parameters shared by all plotting scripts
-parser.add_argument('--cmap_name', type=str, default="turbo", help="Name of Matplotlib colormap to use")
+parser.add_argument('--color_table_category_name', type=str, default='Name', help='When --category_column is provided, which column to use as the category name')
 parser.add_argument('--binary_cmap_name', type=str, default="plasma", help="Name of Matplotlib colormap to use for ploting individual factors")
 parser.add_argument('--color_table', type=str, default='', help='Pre-defined color map')
+parser.add_argument('--cmap_name', type=str, default="turbo", help="Name of Matplotlib colormap, only used when --color_table is not provided")
+
+parser.add_argument("--plot_fit", action='store_true', help="")
 parser.add_argument('--xmin', type=float, default=-np.inf, help="")
 parser.add_argument('--ymin', type=float, default=-np.inf, help="")
 parser.add_argument('--xmax', type=float, default=np.inf, help="")
 parser.add_argument('--ymax', type=float, default=np.inf, help="")
 parser.add_argument('--plot_um_per_pixel', type=float, default=1, help="Size of the output pixels in um")
-parser.add_argument("--plot_individual_factor", action='store_true', help="")
+
+parser.add_argument("--skip_mixture_plot", action='store_true', help="")
 parser.add_argument("--plot_discretized", action='store_true', help="")
+parser.add_argument("--plot_individual_factor", action='store_true', help="")
 
 args = parser.parse_args()
 logging.basicConfig(level= getattr(logging, "INFO", None))
@@ -169,8 +171,14 @@ else:
         pts = np.vstack((pts, nodes[indx, :]) )
         pts_indx += list(iv)
         st = ed
-pts[:,0] = np.clip(hsize - pts[:, 0], 0, hsize-1) # Origin is lower-left
+
+# Note: PIL default origin is upper-left
+pts[:,0] = np.clip(hsize - pts[:, 0], 0, hsize-1)
 pts[:,1] = np.clip(pts[:, 1], 0, wsize-1)
+if args.origin[0] > 0:
+    pts[:,0] = hsize - 1 - pts[:, 0]
+if args.origin[1] > 0:
+    pts[:,1] = wsize - 1 - pts[:, 1]
 
 logging.info(f"Start constructing RGB image")
 
