@@ -111,10 +111,9 @@ for chunk in reader:
         for i in range(1, meta['TOPK']+1):
             indx = chunk['K'+str(i)].eq(k) & chunk['P'+str(i)].gt(args.pcut)
             chunk.loc[indx, k] = chunk.loc[indx, 'P'+str(i)]
-    pmax = chunk.loc[:, id_list].max(axis = 1)
-    chunk = chunk.loc[pmax > args.pcut, ['X','Y']+id_list]
     chunk = chunk.groupby(by=['X','Y']).agg({k:np.mean for k in id_list}).reset_index()
-    df = pd.concat([df, chunk])
+    pmax = chunk.loc[:, id_list].max(axis = 1)
+    df = pd.concat([df, chunk.loc[pmax > args.pcut, :]])
 df.drop_duplicates(subset=['X','Y'], inplace=True)
 logging.info(f"Read {df.shape[0]} pixels")
 

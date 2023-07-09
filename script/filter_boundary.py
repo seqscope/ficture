@@ -72,9 +72,14 @@ if os.path.exists(args.feature):
     gene_kept = set(feature.gene.values)
     logging.info(f"Read feature info with {len(gene_kept)} genes")
 
-with gzip.open(args.output, 'wt') as wf:
-    with gzip.open(args.input, 'rt') as rf:
-        _=wf.write(rf.readline())
+with gzip.open(args.input, 'rt') as rf:
+    header = rf.readline()
+if args.output.endswith('.gz'):
+    with gzip.open(args.output, 'wt') as wf:
+        _=wf.write(header)
+else:
+    with open(args.output, 'w') as wf:
+        _=wf.write(header)
 
 chunk_size = 500000
 for chunk in pd.read_csv(gzip.open(args.input, 'rb'),\

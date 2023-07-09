@@ -85,8 +85,8 @@ else:
             chunk = chunk.loc[chunk.gene.isin(gene_kept)]
         chunk['X'] = chunk.X.values * mu_scale
         chunk['Y'] = chunk.Y.values * mu_scale
-        chunk = chunk.loc[ (chunk.X >= args.xmin) & (chunk.X <= args.xmax) &\
-                        (chunk.Y >= args.ymin) & (chunk.Y <= args.ymax) ]
+        chunk = chunk.loc[(chunk.X >= args.xmin) & (chunk.X <= args.xmax) &\
+                          (chunk.Y >= args.ymin) & (chunk.Y <= args.ymax)]
         if chunk.shape[0] == 0:
             continue
         if args.precision_um > 0:
@@ -132,8 +132,12 @@ if args.anchor_only:
 ref=sklearn.neighbors.BallTree(np.array(pt.loc[:, ['x','y']]))
 with gzip.open(args.input, 'rt') as rf:
     header = rf.readline()
-with gzip.open(args.output, 'wt') as wf:
-    _=wf.write(header)
+if args.output.endswith(".gz"):
+    with gzip.open(args.output, 'wt') as wf:
+        _=wf.write(header)
+else:
+    with open(args.output, 'w') as wf:
+        _=wf.write(header)
 
 for chunk in pd.read_csv(gzip.open(args.input, 'rb'),\
     sep='\t', header=0, chunksize=chunk_size):

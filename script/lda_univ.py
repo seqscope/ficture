@@ -172,6 +172,12 @@ if not use_existing_model:
             epoch += 1
 
     lda.feature_names_in_ = feature_kept
+    # Relabel factors based on (approximate) descending abundance
+    weight = lda.components_.sum(axis=1)
+    ordered_k = np.argsort(weight)[::-1]
+    lda.components_ = lda.components_[ordered_k,:]
+    lda.exp_dirichlet_component_ = lda.exp_dirichlet_component_[ordered_k,:]
+    # Store model
     pickle.dump( lda, open( model_f, "wb" ) )
     out_f = model_f.replace("model.p", "model_matrix.tsv.gz")
     pd.concat([pd.DataFrame({gene_key: lda.feature_names_in_}),\

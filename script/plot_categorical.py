@@ -22,7 +22,7 @@ parser.add_argument('--scale', type=float, default=-1, help="")
 parser.add_argument('--origin', type=int, default=[0,0], help="{0, 1} x {0, 1}, specify how to orient the image w.r.t. the coordinates. (0, 0) means the lower left corner has the minimum x-value and the minimum y-value; (0, 1) means the lower left corner has the minimum x-value and the maximum y-value;")
 parser.add_argument('--category_column', type=str, default='', help='')
 parser.add_argument('--color_table_category_name', type=str, default='Name', help='When --category_column is provided, which column to use as the category name')
-parser.add_argument('--binary_cmap_name', type=str, default="plasma", help="Name of Matplotlib colormap to use for ploting individual factors")
+# parser.add_argument('--binary_cmap_name', type=str, default="plasma", help="Name of Matplotlib colormap to use for ploting individual factors")
 
 parser.add_argument("--plot_fit", action='store_true', help="")
 parser.add_argument('--xmin', type=float, default=-np.inf, help="")
@@ -31,7 +31,8 @@ parser.add_argument('--xmax', type=float, default=np.inf, help="")
 parser.add_argument('--ymax', type=float, default=np.inf, help="")
 parser.add_argument('--plot_um_per_pixel', type=float, default=1, help="Size of the output pixels in um")
 
-parser.add_argument("--tif", action='store_true', help="Store as 16-bit tif instead of png")
+parser.add_argument("--lazy", action='store_true', help="If you expect little or no collision when converting input coordinates to image pixels, set this flag to save time; default is to take the most common category when multiple pixels are mapped to one image pixel")
+parser.add_argument("--tif", action='store_true', help="Store as 16-bit tif instead of png (only applied to the full color plot)")
 parser.add_argument("--skip_full_plot", action='store_true', help="")
 parser.add_argument("--plot_individual_factor", action='store_true', help="")
 parser.add_argument("--debug", action='store_true', help="")
@@ -67,9 +68,8 @@ logging.info(f"Read {K} colors")
 adt={x:float for x in ["x", "y"]}
 adt[kcol] = str
 df = pd.DataFrame()
-chunksize=int(1e5) if args.debug else int(1e6)
 for chunk in pd.read_csv(gzip.open(args.input, 'rt'), sep='\t', \
-    chunksize=chunksize, skiprows=1, names=header, dtype=adt):
+    chunksize=1000000, skiprows=1, names=header, dtype=adt):
     if args.scale > 0:
         chunk.x = chunk.x / args.scale
         chunk.y = chunk.y / args.scale
@@ -77,14 +77,21 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'), sep='\t', \
     chunk = chunk[(chunk.x > args.xmin) & (chunk.x < args.xmax)]
     chunk['x_indx'] = np.round(chunk.x.values / args.plot_um_per_pixel, 0).astype(int)
     chunk['y_indx'] = np.round(chunk.y.values / args.plot_um_per_pixel, 0).astype(int)
-    chunk = chunk.groupby(by = ['x_indx', 'y_indx'])[kcol].agg(lambda x: pd.Series.mode(x)[0]).to_frame().reset_index()
+    if args.lazy:
+        chunk.drop_duplicates(subset=['x_indx', 'y_indx'], inplace=True)
+        chunk = chunk.loc[:, ['x_indx', 'y_indx', kcol]]
+    else:
+        chunk = chunk.groupby(by = ['x_indx', 'y_indx'])[kcol].agg(lambda x: pd.Series.mode(x)[0]).to_frame().reset_index()
     df = pd.concat([df, chunk])
     logging.info(f"Read (and collapsed) {df.shape[0]} pixels")
     if args.debug:
         print(df[:2])
         break
 
-df = df.groupby(by = ['x_indx', 'y_indx'])[kcol].agg(lambda x: pd.Series.mode(x)[0]).to_frame().reset_index()
+if args.lazy:
+    df.drop_duplicates(subset=['x_indx', 'y_indx'], inplace=True)
+else:
+    df = df.groupby(by = ['x_indx', 'y_indx'])[kcol].agg(lambda x: pd.Series.mode(x)[0]).to_frame().reset_index()
 df['K'] = df[kcol].map(color_idx)
 x_indx_min = int(args.xmin / args.plot_um_per_pixel )
 y_indx_min = int(args.ymin / args.plot_um_per_pixel )
@@ -109,7 +116,6 @@ else:
 
 N0 = df.shape[0]
 df.index = range(N0)
-
 hsize = x_indx_max + 1
 wsize = y_indx_max + 1
 logging.info(f"Read region {N0} pixels, image size {hsize} x {wsize}")
@@ -149,21 +155,13 @@ if args.plot_individual_factor:
     out_path = os.path.dirname(pref)
     if not os.path.exists(out_path):
         os.makedirs(out_path)
-    if args.binary_cmap_name not in plt.colormaps():
-        args.binary_cmap_name = "plasma"
-    for k in range(K):
+    weight = df.K.value_counts().sort_values(ascending=False)
+    for k in weight.index:
         indx = df.index[df.K.eq(k)]
-        img = np.zeros( (hsize, wsize, 3), dtype=dt)
-        for r in range(3):
-            img[:, :, r] = coo_array((cmtx[:, r][indx], \
-                (df.loc[indx, 'x_indx'], df.loc[indx, 'y_indx'])),\
-                shape=(hsize, wsize), dtype = dt).toarray()
-        if args.tif:
-            img = Image.fromarray(img, mode="I;16")
-        else:
-            img = Image.fromarray(img)
-        outf = pref + ".F_"+str(k)
-        outf += ".tif" if args.tif else ".png"
+        img = coo_array((np.ones(len(indx), dtype=np.uint8)*255,\
+            (df.loc[indx, 'x_indx'], df.loc[indx, 'y_indx']) ), shape=(hsize, wsize)).toarray()
+        img = Image.fromarray(img)
+        outf = pref + ".F_"+str(k) + ".png"
         img.save(outf)
         logging.info(f"Made factor specific image - {k}\n{outf}")
         if args.debug:
