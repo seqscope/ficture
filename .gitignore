@@ -1,3 +1,7 @@
+# Created by python -m build
+punkst.egg-info/
+build/
+
 # Compiled Object files
 *.slo
 *.lo

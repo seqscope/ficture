@@ -41,6 +41,7 @@ parser.add_argument('--plot_um_per_pixel', type=float, default=1, help="Size of 
 parser.add_argument("--skip_mixture_plot", action='store_true', help="")
 parser.add_argument("--plot_discretized", action='store_true', help="")
 parser.add_argument("--plot_individual_factor", action='store_true', help="")
+parser.add_argument("--debug", action='store_true', help="")
 
 args = parser.parse_args()
 logging.basicConfig(level= getattr(logging, "INFO", None))
@@ -171,6 +172,8 @@ else:
         pts = np.vstack((pts, nodes[indx, :]) )
         pts_indx += list(iv)
         st = ed
+        if args.debug:
+            break
 
 # Note: PIL default origin is upper-left
 pts[:,0] = np.clip(hsize - pts[:, 0], 0, hsize-1)
@@ -200,14 +203,11 @@ if not args.skip_mixture_plot:
     logging.info(f"Made fractional image\n{outf}")
 
 if args.plot_discretized:
-    binary_mtx = coo_matrix((np.ones(N0,dtype=bool),\
-            (range(N0), np.array(df[factor_header]).argmax(axis = 1))),\
-            shape=(N0, K)).toarray()
-    rgb_mtx = np.clip(np.around(np.array(binary_mtx[pts_indx, :]) @\
-                                cmtx * 255),0,255).astype(dt)
+    kvec = np.array(df.loc[pts_indx,factor_header]).argmax(axis = 1)
+    cmtx = np.clip(np.around(cmtx * 255), 0, 255).astype(dt)
     img = np.zeros( (hsize, wsize, 3), dtype=dt)
     for r in range(3):
-        img[:, :, r] = coo_array((rgb_mtx[:, r], (pts[:,0], pts[:,1])),\
+        img[:, :, r] = coo_array((cmtx[kvec, r], (pts[:,0], pts[:,1])),\
             shape=(hsize, wsize), dtype = dt).toarray()
     if args.tif:
         img = Image.fromarray(img, mode="I;16")

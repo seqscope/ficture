@@ -1,0 +1,86 @@
+<!-- Generate a simple table with factor analysis results
+factorID color weight totUMI topGene_byPval topGene_byFC
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSV Table</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .color-box {
+            display: inline-block;
+            width: 75%;
+            height: 30px;
+            line-height: 30px;
+            text-align: center;
+            border: 1px solid #000;
+            margin: 0 auto;
+        }
+        .rgb-column {
+            width: 150px;
+        }
+
+        .figure-image {
+            width: 100%;
+            height: auto;
+            max-width: 100%;
+        }
+
+    </style>
+</head>
+
+<body>
+
+    <table>
+        <thead>
+            <tr>
+                {% for heading in header %}
+                    <th>{{ heading }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+                <tr>
+                    {% for index, cell in row %}
+                        <td>
+                            {% if index == 1 %}
+                                {% set r, g, b = cell.replace('(', '').replace(')', '').split(',') %}
+                                <div class="color-box rgb-column" style="background-color: rgb({{ r }}, {{ g }}, {{ b }});">
+                                    <span style="color: {{ '#000' if (r|int * 0.299 + g|int * 0.587 + b|int * 0.114) > 186 else '#fff' }};">
+                                        ({{ r }}, {{ g }}, {{ b }})
+                                    </span>
+                                </div>
+                            {% else %}
+                                {{ cell }}
+                            {% endif %}
+                        </td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+{% if image_base64 %}
+    <figure>
+        <figcaption>{{ tree_image_caption }}</figcaption>
+        <img src="data:image/png;base64,{{ image_base64 }}" alt="{{ tree_image_alt }}" class="figure-image">
+    </figure>
+{% endif %}
+
+</body>
+</html>
