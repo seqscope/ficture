@@ -15,6 +15,7 @@ def main():
         "de_bulk": "de_bulk", \
         "factor_report": "factor_report", \
         "slda_decode": "slda_decode", \
+        "plot_pixel_multi": "plot_pixel_multi", \
         "plot_pixel_full": "plot_pixel_full", \
         "plot_pixel_single": "plot_pixel_single", \
         }
