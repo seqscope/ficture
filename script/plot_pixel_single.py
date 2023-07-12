@@ -14,6 +14,7 @@ import cv2
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utilt
+from pixel_factor_loader import BlockIndexedLoader
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
@@ -27,6 +28,7 @@ parser.add_argument('--xmin', type=float, default=-np.inf, help="")
 parser.add_argument('--ymin', type=float, default=-np.inf, help="")
 parser.add_argument('--xmax', type=float, default=np.inf, help="")
 parser.add_argument('--ymax', type=float, default=np.inf, help="")
+parser.add_argument('--full', action='store_true', help="Read full input")
 parser.add_argument('--plot_um_per_pixel', type=float, default=1, help="Actual size (um) corresponding to each pixel in the output image")
 parser.add_argument('--all', action="store_true", help="Caution: when set, assume factors are named as 0, 1, ... K-1, where K is defined in the input header. Only use when plotting a small region.")
 
@@ -35,80 +37,26 @@ logging.basicConfig(level= getattr(logging, "INFO", None), format='%(asctime)s %
 if not os.path.exists(os.path.dirname(args.output)):
     os.makedirs(os.path.dirname(args.output))
 
-# Read header
-meta = {}
-nheader = 0
-with gzip.open(args.input, 'rt') as rf:
-    for line in rf:
-        if line[0] != "#":
-            break
-        nheader += 1
-        if line[:2] == "##":
-            wd = line[(line.rfind("#")+1):].strip().split(';')
-            wd = [[y.strip() for y in x.strip().split("=")] for x in wd]
-            for v in wd:
-                if v[1].lstrip('-+').isdigit():
-                    meta[v[0]] = int(v[1])
-                elif v[1].replace('.','',1).lstrip('-+').isdigit():
-                    meta[v[0]] = float(v[1])
-                else:
-                    meta[v[0]] = v[1]
-        else:
-            header = line[(line.rfind("#")+1):].strip().split('\t')
-logging.info("Read header %s", meta)
+loader = BlockIndexedLoader(args.input, args.xmin, args.xmax, args.ymin, args.ymax, args.full)
+width = int((loader.xmax - loader.xmin + 1)/args.plot_um_per_pixel)
+height= int((loader.ymax - loader.ymin + 1)/args.plot_um_per_pixel)
+logging.info(f"Image size {height} x {width}")
 
 id_list = args.id_list
 if args.all:
-    id_list = [str(k) for k in range(meta['K'])]
-
-# Input reader
-dty={'BLOCK':str, 'X':int, 'Y':int}
-dty.update({'K'+str(k+1) : str for k in range(meta['TOPK']) })
-dty.update({'P'+str(k+1) : np.float16 for k in range(meta['TOPK']) })
-if not np.isfinite(args.xmin) or not np.isfinite(args.xmax):
-    reader = pd.read_csv(args.input,sep='\t',skiprows=nheader,chunksize=1000000,names=header, dtype=dty)
-else:
-    # Translate target region to index
-    block = [int(x / meta['BLOCK_SIZE']) for x in [args.xmin, args.xmax - 1] ]
-    pos_range = [int((x - meta['OFFSET_Y'])*meta['SCALE']) for x in [args.ymin, args.ymax]]
-    if meta['BLOCK_AXIS'] == "Y":
-        block = [int(x / meta['BLOCK_SIZE']) for x in [args.ymin, args.ymax - 1] ]
-        pos_range = [int((x - meta['OFFSET_X'])*meta['SCALE']) for x in [args.xmin, args.xmax]]
-    block = np.arange(block[0], block[1]+1) * meta['BLOCK_SIZE']
-    query = []
-    pos_range = '-'.join([str(x) for x in pos_range])
-    for i,b in enumerate(block):
-        query.append( str(b)+':'+pos_range )
-
-    cmd = ["tabix", args.input]+query
-    process = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.STDOUT)
-    reader = pd.read_csv(process.stdout,sep='\t',chunksize=1000000,names=header, dtype=dty)
-    logging.info(" ".join(cmd))
-
-args.xmin = max(args.xmin, meta['OFFSET_X'])
-args.xmax = min(args.xmax, meta['OFFSET_X'] + meta["SIZE_X"])
-args.ymin = max(args.ymin, meta['OFFSET_Y'])
-args.ymax = min(args.ymax, meta['OFFSET_Y'] + meta["SIZE_Y"])
-
-width = int((args.xmax - args.xmin + 1)/args.plot_um_per_pixel)
-height= int((args.ymax - args.ymin + 1)/args.plot_um_per_pixel)
-
-logging.info(f"Image size {height} x {width}")
+    id_list = [str(k) for k in range(loader.meta['K'])]
 
 # Read input file
 df = pd.DataFrame()
-for chunk in reader:
-    chunk['X']=chunk.X/meta['SCALE']+meta['OFFSET_X']
-    chunk['Y']=chunk.Y/meta['SCALE']+meta['OFFSET_Y']
-    drop_index = chunk.index[(chunk.X<args.xmin)|(chunk.X>args.xmax)|\
-                             (chunk.Y<args.ymin)|(chunk.Y>args.ymax)]
-    chunk.drop(index=drop_index, inplace=True)
+for chunk in loader:
+    if chunk.shape[0] == 0:
+        continue
     logging.info(f"Reading pixels... {chunk.X.iloc[-1]}, {chunk.Y.iloc[-1]}, {df.shape[0]}")
-    chunk['X'] = np.clip(((chunk.X - args.xmin) / args.plot_um_per_pixel).astype(int),0,width-1)
-    chunk['Y'] = np.clip(((chunk.Y - args.ymin) / args.plot_um_per_pixel).astype(int),0,height-1)
+    chunk['X'] = np.clip(((chunk.X - loader.xmin) / args.plot_um_per_pixel).astype(int),0,width-1)
+    chunk['Y'] = np.clip(((chunk.Y - loader.ymin) / args.plot_um_per_pixel).astype(int),0,height-1)
     for k in id_list:
         chunk[k] = np.zeros(chunk.shape[0], dtype=np.float16)
-        for i in range(1, meta['TOPK']+1):
+        for i in range(1, loader.meta['TOPK']+1):
             indx = chunk['K'+str(i)].eq(k) & chunk['P'+str(i)].gt(args.pcut)
             chunk.loc[indx, k] = chunk.loc[indx, 'P'+str(i)]
     chunk = chunk.groupby(by=['X','Y']).agg({k:np.mean for k in id_list}).reset_index()
