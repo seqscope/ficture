@@ -39,14 +39,12 @@ class BlockIndexedLoader:
         dty.update({x : str for x in self.kheader})
         dty.update({x : np.float16 for x in self.pheader})
         self.file_is_open = True
-        if not full:
-            if np.isinf(xmin) and np.isinf(xmax) and np.isinf(ymin) and np.isinf(ymax):
-                full = True
-            else:
-                self.xmin = max(xmin, self.meta['OFFSET_X'])
-                self.xmax = min(xmax, self.meta['OFFSET_X'] + self.meta["SIZE_X"])
-                self.ymin = max(ymin, self.meta['OFFSET_Y'])
-                self.ymax = min(ymax, self.meta['OFFSET_Y'] + self.meta["SIZE_Y"])
+        if np.isinf(xmin) and np.isinf(xmax) and np.isinf(ymin) and np.isinf(ymax):
+            full = True
+        self.xmin = max(xmin, self.meta['OFFSET_X'])
+        self.xmax = min(xmax, self.meta['OFFSET_X'] + self.meta["SIZE_X"])
+        self.ymin = max(ymin, self.meta['OFFSET_Y'])
+        self.ymax = min(ymax, self.meta['OFFSET_Y'] + self.meta["SIZE_Y"])
         if full:
             self.reader = pd.read_csv(input,sep='\t',skiprows=nheader,chunksize=1000000,names=header, dtype=dty)
         else:
