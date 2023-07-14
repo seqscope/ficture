@@ -25,8 +25,13 @@ class BlockIndexedLoader:
                             self.meta[v[0]] = v[1]
                 else:
                     header = line[(line.rfind("#")+1):].strip().split('\t')
+        logging.basicConfig(level= getattr(logging, "INFO", None), format='%(asctime)s %(message)s', datefmt='%I:%M:%S %p')
         logging.info("Read header %s", self.meta)
 
+        self.xmin = xmin
+        self.xmax = xmax
+        self.ymin = ymin
+        self.ymax = ymax
         # Input reader
         self.kheader = ['K'+str(k+1) for k in range(self.meta['TOPK'])]
         self.pheader = ['P'+str(k+1) for k in range(self.meta['TOPK'])]
@@ -34,15 +39,23 @@ class BlockIndexedLoader:
         dty.update({x : str for x in self.kheader})
         dty.update({x : np.float16 for x in self.pheader})
         self.file_is_open = True
-        if full or np.isfinite(xmin) or np.isfinite(xmax):
+        if not full:
+            if np.isinf(xmin) and np.isinf(xmax) and np.isinf(ymin) and np.isinf(ymax):
+                full = True
+            else:
+                self.xmin = max(xmin, self.meta['OFFSET_X'])
+                self.xmax = min(xmax, self.meta['OFFSET_X'] + self.meta["SIZE_X"])
+                self.ymin = max(ymin, self.meta['OFFSET_Y'])
+                self.ymax = min(ymax, self.meta['OFFSET_Y'] + self.meta["SIZE_Y"])
+        if full:
             self.reader = pd.read_csv(input,sep='\t',skiprows=nheader,chunksize=1000000,names=header, dtype=dty)
         else:
             # Translate target region to index
-            block = [int(x / self.meta['BLOCK_SIZE']) for x in [xmin, xmax - 1] ]
-            pos_range = [int((x - self.meta['OFFSET_Y'])*self.meta['SCALE']) for x in [ymin, ymax]]
+            block = [int((x - self.meta['OFFSET_X']) / self.meta['BLOCK_SIZE']) for x in [self.xmin, self.xmax - 1] ]
+            pos_range = [int((x - self.meta['OFFSET_Y'])*self.meta['SCALE']) for x in [self.ymin, self.ymax]]
             if self.meta['BLOCK_AXIS'] == "Y":
-                block = [int(x / self.meta['BLOCK_SIZE']) for x in [ymin, ymax - 1] ]
-                pos_range = [int((x - self.meta['OFFSET_X'])*self.meta['SCALE']) for x in [xmin, xmax]]
+                block = [int((x  - self.meta['OFFSET_Y']) / self.meta['BLOCK_SIZE']) for x in [self.ymin, self.ymax - 1] ]
+                pos_range = [int((x - self.meta['OFFSET_X'])*self.meta['SCALE']) for x in [self.xmin, self.xmax]]
             block = np.arange(block[0], block[1]+1) * self.meta['BLOCK_SIZE']
             query = []
             pos_range = '-'.join([str(x) for x in pos_range])
@@ -53,11 +66,6 @@ class BlockIndexedLoader:
             process = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.STDOUT)
             self.reader = pd.read_csv(process.stdout,sep='\t',chunksize=1000000,names=header, dtype=dty)
             logging.info(" ".join(cmd))
-
-        self.xmin = max(xmin, self.meta['OFFSET_X'])
-        self.xmax = min(xmax, self.meta['OFFSET_X'] + self.meta["SIZE_X"])
-        self.ymin = max(ymin, self.meta['OFFSET_Y'])
-        self.ymax = min(ymax, self.meta['OFFSET_Y'] + self.meta["SIZE_Y"])
 
     def __iter__(self):
         return self

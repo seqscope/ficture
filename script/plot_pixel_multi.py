@@ -20,7 +20,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
 parser.add_argument('--output', type=str, help='Output file full path')
 parser.add_argument('--channel_list', type=str, nargs='+', help="Select up to 3 channels/factors to visualize")
-parser.add_argument('--color_list', type=str, nargs='*', default=["#144A74", "#FF9900", "#FFEC11", "#DD65E6"], help='')
+parser.add_argument('--color_list', type=str, nargs='*', default=["144A74", "FF9900", "DD65E6", "FFEC11"], help='') # blue, orange, purple, yellow
 parser.add_argument('--color_table', type=str, default='', help='Pre-defined color map')
 parser.add_argument('--color_table_index_column', type=str, default='Name', help='')
 parser.add_argument('--xmin', type=float, default=-np.inf, help="")
@@ -59,12 +59,13 @@ if os.path.exists(args.color_table):
     color_info = {i: np.array(color_info.loc[i, rgb]) for i in channels}
 else:
     if len(args.color_list) < len(channels):
+        logging.info(f"--color_list {args.color_table}")
         logging.error("Number of input colors and channels do not match")
         sys.exit(1)
     color_list = [[int(x.strip('#')[i:i+2],16)/255 for i in (0,2,4)] for x in args.color_list]
     color_info = {x:np.array(color_list[i]) for i,x in enumerate(channels)}
 
-logging.info(f"Read color map {color_info}")
+logging.info(f"Set up color map {color_info}")
 
 loader = BlockIndexedLoader(args.input, args.xmin, args.xmax, args.ymin, args.ymax, args.full)
 width = int((loader.xmax - loader.xmin + 1)/args.plot_um_per_pixel)
