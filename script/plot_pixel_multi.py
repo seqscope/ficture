@@ -27,6 +27,7 @@ parser.add_argument('--xmin', type=float, default=-np.inf, help="")
 parser.add_argument('--ymin', type=float, default=-np.inf, help="")
 parser.add_argument('--xmax', type=float, default=np.inf, help="")
 parser.add_argument('--ymax', type=float, default=np.inf, help="")
+parser.add_argument('--org_coord', action='store_true', help="If the input coordinates do not include the offset (if your coordinates are from an existing figure, the offset is already factored in)")
 parser.add_argument('--full', action='store_true', help="")
 parser.add_argument('--plot_um_per_pixel', type=float, default=1, help="Actual size (um) corresponding to each pixel in the output image")
 parser.add_argument('--categorical', action='store_true', help="Plot top factor for each pixel categorically, without probability or mixture")
@@ -59,7 +60,6 @@ if os.path.exists(args.color_table):
     color_info = {i: np.array(color_info.loc[i, rgb]) for i in channels}
 else:
     if len(args.color_list) < len(channels):
-        logging.info(f"--color_list {args.color_table}")
         logging.error("Number of input colors and channels do not match")
         sys.exit(1)
     color_list = [[int(x.strip('#')[i:i+2],16)/255 for i in (0,2,4)] for x in args.color_list]
@@ -67,7 +67,7 @@ else:
 
 logging.info(f"Set up color map {color_info}")
 
-loader = BlockIndexedLoader(args.input, args.xmin, args.xmax, args.ymin, args.ymax, args.full)
+loader = BlockIndexedLoader(args.input, args.xmin, args.xmax, args.ymin, args.ymax, args.full, not args.org_coord)
 width = int((loader.xmax - loader.xmin + 1)/args.plot_um_per_pixel)
 height= int((loader.ymax - loader.ymin + 1)/args.plot_um_per_pixel)
 logging.info(f"Image size {height} x {width}")

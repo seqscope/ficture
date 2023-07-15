@@ -28,6 +28,7 @@ parser.add_argument('--xmin', type=float, default=-np.inf, help="")
 parser.add_argument('--ymin', type=float, default=-np.inf, help="")
 parser.add_argument('--xmax', type=float, default=np.inf, help="")
 parser.add_argument('--ymax', type=float, default=np.inf, help="")
+parser.add_argument('--org_coord', action='store_true', help="If the input coordinates do not include the offset (if your coordinates are from an existing figure, the offset is already factored in)")
 parser.add_argument('--full', action='store_true', help="Read full input")
 parser.add_argument('--plot_um_per_pixel', type=float, default=1, help="Actual size (um) corresponding to each pixel in the output image")
 parser.add_argument('--all', action="store_true", help="Caution: when set, assume factors are named as 0, 1, ... K-1, where K is defined in the input header. Only use when plotting a small region.")
@@ -37,7 +38,7 @@ logging.basicConfig(level= getattr(logging, "INFO", None), format='%(asctime)s %
 if not os.path.exists(os.path.dirname(args.output)):
     os.makedirs(os.path.dirname(args.output))
 
-loader = BlockIndexedLoader(args.input, args.xmin, args.xmax, args.ymin, args.ymax, args.full)
+loader = BlockIndexedLoader(args.input, args.xmin, args.xmax, args.ymin, args.ymax, args.full, not args.org_coord)
 width = int((loader.xmax - loader.xmin + 1)/args.plot_um_per_pixel)
 height= int((loader.ymax - loader.ymin + 1)/args.plot_um_per_pixel)
 logging.info(f"Image size {height} x {width}")
