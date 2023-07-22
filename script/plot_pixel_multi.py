@@ -78,7 +78,6 @@ img[:,:,3] = 255
 for df in loader:
     if df.shape[0] == 0:
         continue
-    logging.info(f"Reading pixels... {df.X.iloc[-1]}, {df.Y.iloc[-1]}, {df.shape[0]}")
     indx = np.zeros(df.shape[0], dtype=bool)
     if args.categorical:
         indx = df.K1.isin(channels)
@@ -104,6 +103,7 @@ for df in loader:
     df = df.groupby(by=['X','Y']).agg({c:np.mean for c in bgra}).reset_index()
     df = df.loc[df.A.gt(spcut), :]
     df[bgra] = np.clip(np.around(df[bgra] * 255),0,255).astype(np.uint8)
+    logging.info(f"Reading pixels... {df.X.iloc[-1]}, {df.Y.iloc[-1]}, {df.shape[0]}")
     for i,c in enumerate(bgra):
         img[df.Y.values, df.X.values, [i]*df.shape[0]] = df[c].values
     if args.debug:
@@ -112,4 +112,4 @@ for df in loader:
 if not args.output.endswith(".png"):
     args.output += ".png"
 cv2.imwrite(args.output,img)
-logging.info(f"Finished")
+logging.info(f"Finished\n{args.output}")
