@@ -103,18 +103,23 @@ while not end_of_file:
         chunk["random_index"] = -1
         chunk.random_index = chunk.random_index.astype(int)
         df = pd.concat([df, chunk])
-    x_min = df["X"].min()
-    x_max = df["X"].max()
-    y_min = df["Y"].min()
-    y_max = df["Y"].max()
+    x_min, y_min = df[["X","Y"]].values.min(axis = 0)
+    x_max, y_max = df[["X","Y"]].values.max(axis = 0)
     x_range = x_max - x_min
     y_range = y_max - y_min
     logging.info(f"Read blocks of pixels: {x_range/args.mu_scale:.2f} x {y_range/args.mu_scale:.2f}")
-    if (x_range < batch_size or y_range < batch_size):
+    if not end_of_file and (x_range < batch_size or y_range < batch_size):
         continue
+    else: # end of file, and the last batch is too small potentially caused by the batch size almost divides the axis lenght
+        if (args.major_axis == "X" and x_range <= batch_buff) or (args.major_axis == "Y" and y_range <= batch_buff):
+            break
     x_grd_st = np.arange(x_min, x_max-batch_size/2+1, batch_step)
+    if len(x_grd_st) == 0:
+        x_grd_st = np.array([x_min-1])
     x_grd_ed = [x + batch_size for x in x_grd_st]
     y_grd_st = np.arange(y_min, y_max-batch_size/2+1, batch_step)
+    if len(y_grd_st) == 0:
+        y_grd_st = np.array([y_min-1])
     y_grd_ed = [x + batch_size for x in y_grd_st]
     x_grd_st[0]  = x_min - 1
     y_grd_st[0]  = y_min - 1

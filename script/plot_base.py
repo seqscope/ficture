@@ -65,13 +65,13 @@ if args.category_column != '':
     categorical = True
     if not os.path.exists(args.color_table):
         sys.exit(f"ERROR: --color_table is required for categorical input")
-    color_info = pd.read_csv(args.color_table, sep='\t', header=0)
-    color_info[ccol] = color_info[ccol].astype(str)
-    color_idx = {x:i for i,x in enumerate(color_info[ccol])}
+    color_info = pd.read_csv(args.color_table, sep='\t', header=0, dtype={ccol:str})
+    color_info = color_info[~color_info[ccol].isna()]
+    color_idx = {x:i for i,x in enumerate(color_info[ccol].values)}
     cmtx = np.array(color_info.loc[:, ["R","G","B"]])
     K = len(color_idx)
     factor_header = [str(k) for k in range(K)]
-    print("Use categorical input")
+    logging.info(f"Use categorical input ({K} categories)")
 else:
     for x in header:
         y = re.match('^[A-Za-z]*_*(\d+)$', x)
@@ -121,16 +121,16 @@ for chunk in pd.read_csv(gzip.open(args.input, 'rt'), sep='\t', \
     df = pd.concat([df, chunk])
 
 df = df.groupby(by = ['x_indx', 'y_indx']).agg({ x:np.mean for x in factor_header }).reset_index()
-x_indx_min = int(args.xmin / args.plot_um_per_pixel )
-y_indx_min = int(args.ymin / args.plot_um_per_pixel )
+x_indx_min = args.xmin / args.plot_um_per_pixel
+y_indx_min = args.ymin / args.plot_um_per_pixel
 if args.plot_fit or np.isinf(args.xmin):
-    df.x_indx = df.x_indx - np.max([x_indx_min, df.x_indx.min()])
+    df.x_indx = df.x_indx - int(np.max([x_indx_min, df.x_indx.min()]) )
 else:
-    df.x_indx -= x_indx_min
+    df.x_indx -= int(x_indx_min)
 if args.plot_fit or np.isinf(args.ymin):
-    df.y_indx = df.y_indx - np.max([y_indx_min, df.y_indx.min()])
+    df.y_indx = df.y_indx - int(np.max([y_indx_min, df.y_indx.min()]) )
 else:
-    df.y_indx -= y_indx_min
+    df.y_indx -= int(y_indx_min)
 
 N0 = df.shape[0]
 df.index = range(N0)
