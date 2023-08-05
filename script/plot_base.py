@@ -29,6 +29,7 @@ parser.add_argument('--category_column', type=str, default='', help='')
 parser.add_argument('--color_table_category_name', type=str, default='Name', help='When --category_column is provided, which column to use as the category name')
 parser.add_argument('--binary_cmap_name', type=str, default="plasma", help="Name of Matplotlib colormap to use for ploting individual factors")
 parser.add_argument('--color_table', type=str, default='', help='Pre-defined color map')
+parser.add_argument('--input_rgb_uint8', action="store_true",help="If input rgb is from 0-255 instead of 0-1")
 parser.add_argument('--cmap_name', type=str, default="turbo", help="Name of Matplotlib colormap, only used when --color_table is not provided")
 
 parser.add_argument("--plot_fit", action='store_true', help="")
@@ -66,6 +67,9 @@ if args.category_column != '':
     if not os.path.exists(args.color_table):
         sys.exit(f"ERROR: --color_table is required for categorical input")
     color_info = pd.read_csv(args.color_table, sep='\t', header=0, dtype={ccol:str})
+    if args.input_rgb_uint8 or color_info[["R","G","B"]].max().max() > 2:
+        for c in list("RGB"):
+            color_info[c] = color_info[c] / 255
     color_info = color_info[~color_info[ccol].isna()]
     color_idx = {x:i for i,x in enumerate(color_info[ccol].values)}
     cmtx = np.array(color_info.loc[:, ["R","G","B"]])
@@ -82,6 +86,9 @@ else:
     K = len(factor_header)
     if os.path.exists(args.color_table):
         color_info = pd.read_csv(args.color_table, sep='\t', header=0)
+        if args.input_rgb_uint8 or color_info[["R","G","B"]].max().max() > 2:
+            for c in list("RGB"):
+                color_info[c] = color_info[c] / 255
         cmtx = np.array(color_info.loc[:, ["R","G","B"]])
     else:
         cmap_name = args.cmap_name
@@ -143,8 +150,10 @@ logging.info(f"Read region {N0} pixels in region {hsize_um} x {wsize_um}")
 # Make images
 wst = df.y_indx.min()
 wed = df.y_indx.max()
-wstep = np.max([10, int(hsize/args.batch_size)])
+wstep = np.max([10, int(args.batch_size)])
 radius = args.fill_range/args.plot_um_per_pixel
+print(wsize, wstep)
+
 
 if radius <= 0:
     pts = df[['x_indx', 'y_indx']].values

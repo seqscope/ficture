@@ -44,7 +44,7 @@ cdty = {x:float for x in rgb}
 cdty[args.color_table_index_column] = str
 sep=',' if args.color_table.endswith(".csv") else '\t'
 color_info = pd.read_csv(args.color_table, sep=sep, header=0, index_col=args.color_table_index_column, dtype=cdty)
-if args.input_rgb_uint8:
+if args.input_rgb_uint8 or color_info[rgb].max().max() > 2:
     for c in rgb:
         color_info[c] = color_info[c] / 255
 # color_info.index = color_info.index.astype(str)

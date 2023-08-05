@@ -70,7 +70,7 @@ class UnitLoaderAugmented:
 
 class UnitLoader:
 
-    def __init__(self, reader, ft_dict, key, batch_id_prefix=0, min_ct_per_unit=1, unit_id='unit', unit_attr=['x','y'], debug=False) -> None:
+    def __init__(self, reader, ft_dict, key, batch_id_prefix=0, min_ct_per_unit=1, unit_id='unit', unit_attr=['x','y'], train_key=None, debug=False) -> None:
         self.reader = reader
         self.ft_dict = ft_dict
         self.key = key
@@ -85,6 +85,8 @@ class UnitLoader:
         self.M = max(self.ft_dict.values()) + 1
         self.debug = debug
         self.batch_id_list = set()
+        self.train_key = key if train_key is None else train_key
+        self.test_mtx = None
 
     def update_batch(self, bsize):
         n_unit = 0
@@ -110,7 +112,9 @@ class UnitLoader:
             left = self.df[self.df.unit == last_indx]
             self.df = self.df[self.df.unit != last_indx]
         self.brc = self.df[['unit']+self.unit_attr].drop_duplicates(subset=['unit'])
-        self.brc = self.brc.merge(right = self.df.groupby(by='unit').agg({self.key:sum}).reset_index(), on = 'unit', how = 'inner' )
+        self.brc = self.brc.merge(right = self.df.groupby(by='unit').agg({self.train_key:sum}).reset_index(), on = 'unit', how = 'inner' )
+        if self.key != self.train_key:
+            self.brc = self.brc.merge(right = self.df.groupby(by='unit').agg({self.key:sum}).reset_index(), on = 'unit', how = 'inner' )
         self.brc = self.brc[self.brc[self.key] >= self.min_ct_per_unit]
         barcode_kept=list(self.brc.unit)
         bt_dict={x:i for i,x in enumerate(barcode_kept)}
@@ -118,9 +122,16 @@ class UnitLoader:
         self.df = self.df[self.df.unit.isin(bt_dict)]
         if self.prefix > 0:
             self.batch_id_list.update(set(self.df.unit.map(lambda x : x[:self.prefix]).values))
-        self.mtx = coo_array((self.df[self.key].values, \
+        self.mtx = coo_array((self.df[self.train_key].values, \
                             (self.df.unit.map(bt_dict).values, \
                              self.df.gene.map(self.ft_dict).values) ), \
                             shape=(N, self.M)).tocsr()
+        if self.key != self.train_key:
+            self.test_mtx = coo_array(( \
+                (self.df[self.key] - self.df[self.train_key]).values, \
+                            (self.df.unit.map(bt_dict).values, \
+                             self.df.gene.map(self.ft_dict).values) ), \
+                            shape=(N, self.M)).tocsr()
+            self.test_mtx.eliminate_zeros()
         self.df = copy.copy(left)
         return N

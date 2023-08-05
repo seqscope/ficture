@@ -149,8 +149,8 @@ class OnlineLDA:
         self.do_e_step(batch)
 
         # Estimate likelihood for current values of lambda.
-        scores = self.approx_score(batch)
         if self._verbose > 0:
+            scores = self.approx_score(batch)
             print(f"{self._updatect}-th global update. Scores: " + ", ".join(['%.2e'%x for x in scores]))
 
         # Update global parameters
@@ -161,7 +161,7 @@ class OnlineLDA:
         self._Elog_beta = utilt.dirichlet_expectation(self._lambda)
         self._expElog_beta = np.exp(self._Elog_beta)
         self._updatect += 1
-        return scores
+        return batch.ll
 
 
     def transform(self, X, gamma = None, alpha = None):
