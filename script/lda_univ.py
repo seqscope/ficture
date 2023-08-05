@@ -13,7 +13,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
-parser.add_argument('--output', type=str, help='')
+parser.add_argument('--output', '--output_pref', type=str, help='')
 parser.add_argument('--unit_label', default = 'random_index', type=str, help='Which column to use as unit identifier')
 parser.add_argument('--unit_attr', type=str, nargs='+', default=[], help='')
 parser.add_argument('--feature', type=str, default='', help='')

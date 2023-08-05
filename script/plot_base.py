@@ -20,7 +20,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
 parser.add_argument('--output', type=str, help='Output prefix')
 parser.add_argument('--fill_range', type=float, default=0, help="um")
-parser.add_argument('--batch_size', type=float, default=100000, help="")
+parser.add_argument('--batch_size', type=float, default=500, help="")
 parser.add_argument("--tif", action='store_true', help="Store as 16-bit tif instead of png")
 parser.add_argument('--scale', type=float, default=-1, help="")
 parser.add_argument('--origin', type=int, default=[0,0], help="{0, 1} x {0, 1}, specify how to orient the image w.r.t. the coordinates. (0, 0) means the lower left corner has the minimum x-value and the minimum y-value; (0, 1) means the lower left corner has the minimum x-value and the maximum y-value;")
@@ -143,7 +143,7 @@ logging.info(f"Read region {N0} pixels in region {hsize_um} x {wsize_um}")
 # Make images
 wst = df.y_indx.min()
 wed = df.y_indx.max()
-wstep = np.max([10, int(args.batch_size / hsize)])
+wstep = np.max([10, int(hsize/args.batch_size)])
 radius = args.fill_range/args.plot_um_per_pixel
 
 if radius <= 0:

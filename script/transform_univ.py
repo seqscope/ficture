@@ -14,7 +14,7 @@ from online_lda import OnlineLDA
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
-parser.add_argument('--output_pref', type=str, help='')
+parser.add_argument('--output', '--output_pref', type=str, help='')
 parser.add_argument('--model', type=str, help='')
 
 parser.add_argument('--key', type=str, default = 'gn', help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced')
@@ -36,8 +36,8 @@ if not os.path.exists(args.model):
     sys.exit("ERROR: cannot find model file.")
 if args.hex_width <= 0 and args.hex_radius <= 0:
     sys.exit("ERROR: invalid hex_width or hex_radius")
-if not os.path.exists(os.path.dirname(args.output_pref)):
-    os.makedirs(os.path.dirname(args.output_pref))
+if not os.path.exists(os.path.dirname(args.output)):
+    os.makedirs(os.path.dirname(args.output))
 logging.basicConfig(level= getattr(logging, "INFO", None))
 
 ### Input
@@ -94,7 +94,7 @@ post_count = np.zeros((K, M))
 n_unit = 0
 n_batch= 0
 oheader = ["unit",key,"x","y","topK","topP"]+factor_header
-out_f = args.output_pref + ".fit_result.tsv.gz"
+out_f = args.output + ".fit_result.tsv.gz"
 with gzip.open(out_f, 'wt') as wf:
     wf.write('\t'.join(oheader) + '\n')
 t0 = time.time()
@@ -113,7 +113,7 @@ while batch_obj.read_chunk(min_size=b_size):
     batch_obj.brc[oheader].to_csv(out_f, sep='\t', index=False, header=False, float_format='%.3e', mode='a', compression={"method":"gzip"})
     logging.info(f"Transformed {n_batch} batches with total {n_unit} units, {t1/60:2f}min")
 
-out_f = args.output_pref + ".posterior.count.tsv.gz"
+out_f = args.output + ".posterior.count.tsv.gz"
 pd.concat([pd.DataFrame({'gene': feature_kept}),\
            pd.DataFrame(post_count.T, dtype='float64',\
                         columns = [str(k) for k in range(K)])],\

@@ -101,7 +101,6 @@ class OnlineLDA:
             psi_hat += np.multiply(Xb, batch.phi).sum(axis = 1).reshape(-1)[c_indx] # \sum_k phi_ik log Pik
             batch.psi.data = psi_hat
             batch.psi += batch.ElogO
-            # batch.psi.data = np.exp(batch.psi.data - utilt.logsumexp_csr(batch.psi))
             batch.psi.data = np.exp(batch.psi.data)
             batch.psi = normalize(batch.psi, norm='l1', axis=1)
             batch.gamma = batch.alpha + batch.psi.T @ batch.phi

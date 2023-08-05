@@ -108,7 +108,8 @@ for df in loader:
             df = df.loc[df[args.category_column].isin(color_info.index), :]
         for c in rgb:
             df[c] = color_info.loc[df[args.category_column].values, c].values
-        print(df[args.category_column].value_counts())
+        if args.debug:
+            print(df[args.category_column].value_counts())
     else:
         if args.plot_top:
             for c in rgb:

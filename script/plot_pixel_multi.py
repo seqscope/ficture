@@ -23,10 +23,14 @@ parser.add_argument('--channel_list', type=str, nargs='+', help="Select up to 3 
 parser.add_argument('--color_list', type=str, nargs='*', default=["144A74", "FF9900", "DD65E6", "FFEC11"], help='') # blue, orange, purple, yellow
 parser.add_argument('--color_table', type=str, default='', help='Pre-defined color map')
 parser.add_argument('--color_table_index_column', type=str, default='Name', help='')
+parser.add_argument('--input_rgb_uint8', action="store_true",help="If input rgb is from 0-255 instead of 0-1")
+
 parser.add_argument('--xmin', type=float, default=-np.inf, help="")
 parser.add_argument('--ymin', type=float, default=-np.inf, help="")
 parser.add_argument('--xmax', type=float, default=np.inf, help="")
 parser.add_argument('--ymax', type=float, default=np.inf, help="")
+parser.add_argument('--pcut', type=float, default=0.01, help="")
+parser.add_argument('--spcut', type=float, default=0.1, help="")
 parser.add_argument('--org_coord', action='store_true', help="If the input coordinates do not include the offset (if your coordinates are from an existing figure, the offset is already factored in)")
 parser.add_argument('--full', action='store_true', help="")
 parser.add_argument('--plot_um_per_pixel', type=float, default=1, help="Actual size (um) corresponding to each pixel in the output image")
@@ -42,14 +46,15 @@ bgra=list("BGRA") # opencv bgra
 pcut = 0.01
 spcut = 0.1
 if len(args.channel_list) > 5:
-    logging.error("Be colorblind friendly, visualize <=5 and preferably 3 channels at a time")
-    sys.exit(1)
+    logging.warning("Be colorblind friendly")
 channels = args.channel_list
 # Read color table
 if os.path.exists(args.color_table):
     color_info = pd.read_csv(args.color_table, sep='\t', header=0, index_col=args.color_table_index_column)
-    if color_info[rgb].max().max() > 1:
-        logging.warning("Color table should contain RGB values in 0-1 range, but found values > 1, will interpret as in 0-255 range")
+    if color_info[rgb].max().max() > 1.1 and not args.input_rgb_uint8:
+        logging.warning("Color table should contain RGB values in 0-1 range, but found values > 1, will assume unit8")
+        args.input_rgb_uint8 = True
+    if args.input_rgb_uint8:
         for c in rgb:
             color_info[c] = np.clip(color_info[c]/255,0,1)
     color_info.index = color_info.index.astype(str)
@@ -64,6 +69,13 @@ else:
         sys.exit(1)
     color_list = [[int(x.strip('#')[i:i+2],16)/255 for i in (0,2,4)] for x in args.color_list]
     color_info = {x:np.array(color_list[i]) for i,x in enumerate(channels)}
+    ctab = pd.DataFrame(color_info, index=rgb).T
+    ctab['Name'] = ctab.index
+    if not args.output.endswith(".png"):
+        f = args.output + ".color_table.tsv"
+    else:
+        f = args.output.replace(".png", ".color_table.tsv")
+    ctab.to_csv(f, sep='\t', header=True, index=False)
 
 logging.info(f"Set up color map {color_info}")
 
@@ -75,6 +87,8 @@ logging.info(f"Image size {height} x {width}")
 # Read input file, fill the rgb matrix
 img = np.zeros((height,width,4), dtype=np.uint8)
 img[:,:,3] = 255
+clps = {x:np.mean for x in rgb}
+clps['A'] = np.max
 for df in loader:
     if df.shape[0] == 0:
         continue
@@ -85,6 +99,8 @@ for df in loader:
         for k in range(1, loader.meta['TOPK']):
             indx = indx | (df[f"K{k}"].isin(channels) & df[f"P{k}"].gt(pcut))
     df = df.loc[indx, :]
+    if args.debug:
+        print(df.shape[0])
     if df.shape[0] == 0:
         continue
     df['X'] = np.clip(((df.X - loader.xmin) / args.plot_um_per_pixel).astype(int),0,width-1)
@@ -98,9 +114,11 @@ for df in loader:
             indx = df[f"K{k}"].isin(channels)
             if indx.sum() == 0:
                 continue
-            df.loc[indx, rgb] = np.array(list(df.loc[indx, f"K{k}"].map(color_info))) * df.loc[indx, f"P{k}"].values.reshape((-1,1))
+            df.loc[indx, rgb] += np.array(list(df.loc[indx, f"K{k}"].map(color_info))) * df.loc[indx, f"P{k}"].values.reshape((-1,1))
             df.loc[indx, 'A'] += df.loc[indx, f"P{k}"]
-    df = df.groupby(by=['X','Y']).agg({c:np.mean for c in bgra}).reset_index()
+    if args.debug:
+        print(df.shape[0], np.median(df.A), np.mean(df.A), df.A.gt(spcut).sum())
+    df = df.groupby(by=['X','Y']).agg(clps).reset_index()
     df = df.loc[df.A.gt(spcut), :]
     df[bgra] = np.clip(np.around(df[bgra] * 255),0,255).astype(np.uint8)
     logging.info(f"Reading pixels... {df.X.iloc[-1]}, {df.Y.iloc[-1]}, {df.shape[0]}")
