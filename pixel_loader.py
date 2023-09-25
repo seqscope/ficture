@@ -154,14 +154,14 @@ class PixelMinibatch:
                 continue
             N = len(b_indx)
             grid_pt = np.array(grid_pt)
+            x_min, y_min = grid_pt.min(axis = 0)
+            x_max, y_max = grid_pt.max(axis = 0)
             psi_org = sklearn.preprocessing.normalize(wij, norm='l1', axis=1)
             batch = minibatch()
             batch.init_from_matrix(self.dge_mtx[b_indx, :], grid_pt, wij, psi = psi_org, m_gamma = theta)
             _ = slda.do_e_step(batch)
 
             tmp = self.brc.iloc[b_indx, :]
-            x_min, x_max = tmp.X.min(), tmp.X.max()
-            y_min, y_max = tmp.Y.min(), tmp.Y.max()
             v = np.arange(N)[(tmp.X > x_min+self.out_buff) &\
                              (tmp.X < x_max-self.out_buff) &\
                              (tmp.Y > y_min+self.out_buff) &\

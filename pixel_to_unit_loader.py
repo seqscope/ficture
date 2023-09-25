@@ -15,7 +15,7 @@ from hexagon_fn import *
 
 class PixelToUnit:
 
-    def __init__(self, reader, ft_dict, key, radius, scale=1, region_id=None, min_ct_per_unit=1, sliding_step=1, major_axis=None) -> None:
+    def __init__(self, reader, ft_dict, key, radius, scale=1, region_id=None, min_ct_per_unit=1, sliding_step=1, major_axis=None, xy_lattice=False) -> None:
         self.reader = reader
         self.ft_dict = ft_dict
         self.M = len(self.ft_dict)
@@ -32,6 +32,7 @@ class PixelToUnit:
         self.df = pd.DataFrame()
         self.brc = None
         self.mtx = None
+        self.lattice = xy_lattice
 
     def read_chunk(self, min_size = 200):
         if not self.file_is_open:
@@ -95,15 +96,11 @@ class PixelToUnit:
             indx = self.df[self.region_id].eq(reg)
             for offs_x in range(self.n_move):
                 for offs_y in range(self.n_move):
+                    offs_iden = str(offs_x) + '_' + str(offs_y)
                     x, y = pixel_to_hex(self.df.loc[indx, ['X', 'Y']].values, self.radius, offs_x/self.n_move, offs_y/self.n_move)
                     self.df.loc[indx, "hex_id"] = list(zip(x, y))
                     ct = self.df[indx].groupby('hex_id').agg({self.key: sum}).reset_index()
                     kept_unit = ct.loc[ct[self.key] >= self.min_ct_per_unit, 'hex_id'].values
-
-                    # ct = ct[ct[self.key] >= self.min_ct_per_unit]
-                    # kept_unit = ct.hex_id.values
-                    # ct['hex_id'] = ct.hex_id.map(lambda x : '_'.join([str(u) for u in x]))
-
                     if len(kept_unit) < 1:
                         continue
                     bt_dict = {x:i for i,x in enumerate(kept_unit)}
@@ -111,19 +108,22 @@ class PixelToUnit:
                     sub = self.df[indx & self.df.hex_id.isin(bt_dict)].groupby(by = ['hex_id', 'gene']).agg({self.key: sum}).reset_index()
                     self.mtx = vstack([self.mtx, coo_array((sub[self.key].values, (sub.hex_id.map(bt_dict).values, sub.gene.map(self.ft_dict).values) ), shape = (N, self.M))])
 
-                    brc = self.df[indx & self.df.hex_id.isin(bt_dict)].groupby(by = ['hex_id']).agg({self.key: sum, 'X': np.median, 'Y':np.median}).reset_index()
+                    if self.lattice:
+                        brc = sub.groupby(by = ['hex_id']).agg({self.key: sum}).reset_index()
+                        brc['x'], brc['y'] = \
+                            hex_to_pixel([v[0] for v in brc.hex_id.values],\
+                                         [v[1] for v in brc.hex_id.values],\
+                            self.radius, offs_x/self.n_move, offs_y/self.n_move)
+                    else:
+                        brc = sub.groupby(by = ['hex_id']).agg({self.key: sum,\
+                            'X': np.median, 'Y':np.median}).reset_index()
+                        brc.rename(columns = {'X':'x', 'Y':'y'}, inplace=True)
                     brc.index = brc.hex_id.map(bt_dict)
                     brc.sort_index(inplace=True)
-                    brc.rename(columns = {'X':'x', 'Y':'y'}, inplace=True)
                     brc['hex_id'] = brc.hex_id.map(lambda x : '_'.join([str(u) for u in x]))
+                    brc.hex_id = offs_iden + '_' + brc.hex_id.values
                     brc[self.region_id] = reg
                     self.brc = pd.concat([self.brc, brc])
-
-                    # ct['x'], ct['y'] = hex_to_pixel([v[0] for v in kept_unit],\
-                    #                     [v[1] for v in kept_unit],\
-                    #             self.radius, offs_x/self.n_move, offs_y/self.n_move)
-                    # ct[self.region_id] = reg
-                    # self.brc = pd.concat([self.brc, ct])
         self.mtx = self.mtx.tocsr()
         self.df = left
         self.brc.index = range(self.brc.shape[0])
@@ -163,31 +163,31 @@ class PixelToUnit:
         self.mtx = coo_array(([], ([], [])), shape = (0, self.M))
         for offs_x in range(self.n_move):
             for offs_y in range(self.n_move):
+                offs_iden = str(offs_x) + '_' + str(offs_y)
                 x, y = pixel_to_hex(self.df[['X', 'Y']].values, self.radius, offs_x/self.n_move, offs_y/self.n_move)
                 self.df.hex_id = list(zip(x, y))
                 ct = self.df.groupby('hex_id').agg({self.key: sum}).reset_index()
                 kept_unit = ct.loc[ct[self.key] >= self.min_ct_per_unit, 'hex_id'].values
-                # ct = ct[ct[self.key] >= self.min_ct_per_unit]
-                # kept_unit = ct.hex_id.values
-                # ct['hex_id'] = ct.hex_id.map(lambda x : '_'.join([str(u) for u in x]))
                 if len(kept_unit) < 1:
                     continue
                 bt_dict = {x:i for i,x in enumerate(kept_unit)}
                 N = len(bt_dict)
                 sub = self.df[self.df.hex_id.isin(bt_dict)].groupby(by = ['hex_id', 'gene']).agg({self.key: sum}).reset_index()
                 self.mtx = vstack([self.mtx, coo_array((sub[self.key].values, (sub.hex_id.map(bt_dict).values, sub.gene.map(self.ft_dict).values) ), shape = (N, self.M))])
-
-                brc = self.df[self.df.hex_id.isin(bt_dict)].groupby(by = ['hex_id']).agg({self.key: sum, 'X': np.median, 'Y':np.median}).reset_index()
+                if self.lattice:
+                    brc = sub.groupby(by = ['hex_id']).agg({self.key: sum}).reset_index()
+                    brc['x'], brc['y'] = \
+                        hex_to_pixel([v[0] for v in brc.hex_id.values],\
+                                     [v[1] for v in brc.hex_id.values],\
+                        self.radius, offs_x/self.n_move, offs_y/self.n_move)
+                else:
+                    brc = sub.groupby(by = ['hex_id']).agg({self.key: sum, 'X': np.median, 'Y':np.median}).reset_index()
+                    brc.rename(columns = {'X':'x', 'Y':'y'}, inplace=True)
                 brc.index = brc.hex_id.map(bt_dict)
                 brc.sort_index(inplace=True)
-                brc.rename(columns = {'X':'x', 'Y':'y'}, inplace=True)
                 brc['hex_id'] = brc.hex_id.map(lambda x : '_'.join([str(u) for u in x]))
+                brc.hex_id = offs_iden + '_' + brc.hex_id.values
                 self.brc = pd.concat([self.brc, brc])
-
-                # ct['x'], ct['y'] = hex_to_pixel([v[0] for v in kept_unit],\
-                #                     [v[1] for v in kept_unit],\
-                #             self.radius, offs_x/self.n_move, offs_y/self.n_move)
-                # self.brc = pd.concat([self.brc, ct])
         if self.Y is not None:
             self.df = self.df[self.df[self.mj] >= mj_range[0] - self.radius]
             self.df.drop(columns = ['hex_id'], inplace = True)

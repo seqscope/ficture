@@ -2,6 +2,7 @@ import sys, os, copy, gzip, logging
 import pickle, argparse
 import numpy as np
 import pandas as pd
+from datetime import datetime
 
 from scipy.sparse import *
 import sklearn.neighbors
@@ -36,6 +37,7 @@ parser.add_argument('--prior', type=str, default='', help="Dirichlet parameters 
 parser.add_argument('--tau', type=int, default=9, help='')
 parser.add_argument('--kappa', type=float, default=0.7, help='')
 parser.add_argument('--N', type=float, default=1e4, help='')
+parser.add_argument('--seed', type=int, default=-1, help='')
 parser.add_argument('--debug', action='store_true')
 parser.add_argument('--verbose', action='store_true')
 parser.add_argument('--overwrite', action='store_true')
@@ -51,6 +53,10 @@ else:
 
 if args.use_model != '' and not os.path.exists(args.use_model):
     sys.exit("Invalid model file")
+
+seed = args.seed
+if seed <= 0:
+    seed = int(datetime.now().timestamp() )
 
 unit_attr = [x.lower() for x in args.unit_attr]
 key = args.key.lower()
@@ -128,7 +134,7 @@ if not use_existing_model:
     logging.info(f"Start fitting model ... {M} genes will be used")
 
     if prior is None:
-        lda = LDA(n_components=K, learning_method='online', batch_size=b_size, n_jobs = args.thread, learning_offset = args.tau, learning_decay = args.kappa, verbose = 0)
+        lda = LDA(n_components=K, learning_method='online', batch_size=b_size, n_jobs = args.thread, learning_offset = args.tau, learning_decay = args.kappa, random_state=seed, verbose = 0)
     else:
         prior = prior[prior.index.isin(ft_dict)]
         prior.index = prior.index.map(lambda x: ft_dict[x])

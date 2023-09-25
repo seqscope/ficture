@@ -24,10 +24,11 @@ parser.add_argument('--min_ct_per_unit', type=int, default=20, help='')
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
 parser.add_argument('--thread', type=int, default=-1, help='')
 parser.add_argument('--n_move', type=int, default=3, help='')
-parser.add_argument('--hex_width', type=int, default=24, help='')
-parser.add_argument('--hex_radius', type=int, default=-1, help='')
+parser.add_argument('--hex_width', type=float, default=24, help='')
+parser.add_argument('--hex_radius', type=float, default=-1, help='')
 parser.add_argument('--precision', type=int, default=1, help='Number of digits to store spatial location (in um), 0 for integer.')
 parser.add_argument('--chunksize', type=int, default=100000, help='Number of lines to read at a time')
+parser.add_argument('--xy_median', action='store_true', help='Output the median of pixel cooredinates inside each hexagon, default is to output hexagon centers exactly as lattice points')
 
 args = parser.parse_args()
 if not os.path.exists(args.input):
@@ -87,7 +88,8 @@ b_size = radius * 10
 # Pixel reader
 batch_obj = PixelToUnit(reader, ft_dict, key, radius,\
             scale=1./args.mu_scale, min_ct_per_unit=args.min_ct_per_unit,\
-            sliding_step=args.n_move, major_axis=args.major_axis)
+            sliding_step=args.n_move, major_axis=args.major_axis,\
+            xy_lattice=(not args.xy_median))
 
 # Transform
 post_count = np.zeros((K, M))

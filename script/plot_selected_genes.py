@@ -78,7 +78,7 @@ def translate_regex(regex):
 channel_regex = []
 for v in channels:
     if re.match("^[a-z\d]+$", v, re.IGNORECASE): # pure gene name
-        channel_regex.append(r"\b" + b + r"\b")
+        channel_regex.append(r"\b" + v + r"\b")
     else:
         channel_regex.append(translate_regex(v))
 regex = "|".join(["("+x+")" for x in channel_regex])
@@ -118,7 +118,7 @@ for df in loader:
     else:
         df = df.groupby(by=['X','Y']).agg({c:np.mean for c in rgb}).reset_index()
     df[rgb] = np.clip(np.around(df[rgb] * 255),0,255).astype(np.uint8)
-    for i,c in enumerate(rgb):
+    for i,c in enumerate(bgr):
         img[df.Y.values, df.X.values, [i]*df.shape[0]] = df[c].values
     if args.debug:
         break
