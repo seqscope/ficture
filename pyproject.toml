@@ -1,0 +1,25 @@
+[project]
+name = "ficture"
+description = "Segmentation free factor analysis for sub-micron resolution spatial transcriptomics"
+version = "0.0.1"
+authors = [{name = "Yichen Si", email = "ycsi@umich.edu"}]
+license = {text = "CC BY-NC 4.0"}
+requires-python = ">=3.9"
+dependencies = [
+    "numpy", "pandas", "geopandas",
+    "scipy", "scikit-learn",
+    "joblib",
+    "matplotlib", "Pillow", "Jinja2", "opencv-python",
+    "shapely", "geojson",
+    "torch", "pymde", "ete3", "PyQt5"
+]
+
+[project.scripts]
+ficture = "ficture.cli:main"
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.package-data]
+scripts = ["*.txt", "*.rst", "*.html"]
