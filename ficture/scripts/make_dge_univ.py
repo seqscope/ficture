@@ -50,7 +50,6 @@ def make_dge(_args):
         ct_header = [v for v in input_header if v in ct_header]
         if len(ct_header) == 0:
             sys.exit("Input header does not contain the specified --count_header")
-    print(input_header)
     keep_header=['X','Y','j','Group'] + ct_header
     output_header = ["random_index",'X','Y','gene'] + ct_header + args.group_within
     with open(args.output,'w') as wf:

@@ -46,7 +46,6 @@ def lda(_args):
         train_on = key
     adt = {unit_key:str, gene_key:str, key:int}
     adt.update({x:str for x in unit_attr})
-    print(unit_attr)
 
     ### Basic parameterse
     b_size = args.minibatch_size
@@ -259,7 +258,7 @@ def lda(_args):
         brc = brc.merge(right=df[[unit_key]+unit_attr].drop_duplicates(subset=unit_key),on=unit_key,how='inner')
         brc = brc[brc[key] > args.min_ct_per_unit]
         brc.index = range(brc.shape[0])
-        print(brc.shape)
+        # print(brc.shape)
         if brc.shape[0] > 0:
             df = df[df[unit_key].isin(brc[unit_key].values)]
             # Make training DGE

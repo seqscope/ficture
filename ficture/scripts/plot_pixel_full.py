@@ -11,7 +11,6 @@ from joblib.parallel import Parallel, delayed
 import matplotlib as mpl
 import cv2
 
-from ficture.utils import utilt
 from ficture.loaders.pixel_factor_loader import BlockIndexedLoader
 
 def plot_pixel_full(_args):
