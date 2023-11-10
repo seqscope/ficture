@@ -4,7 +4,7 @@
 
 FICTURE: Scalable segmentation-free analysis of sub-micron resolution spatial transcriptomics
 
-[preprint](https://biorxiv.org/cgi/content/short/2023.11.04.565621v1)
+[preprint](https://biorxiv.org/cgi/content/short/2023.11.04.565621v2)
 
 ## General usage
 ```
