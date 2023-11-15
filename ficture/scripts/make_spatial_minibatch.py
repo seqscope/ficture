@@ -112,11 +112,18 @@ def make_spatial_minibatch(_args):
         x_range = x_max - x_min
         y_range = y_max - y_min
         logger.info(f"Read blocks of pixels: {x_range/args.mu_scale:.2f} x {y_range/args.mu_scale:.2f}")
-        if (x_range < batch_size or y_range < batch_size):
+        if not end_of_file and (x_range < batch_size or y_range < batch_size):
             continue
+        else:
+            if (args.major_axis == "X" and x_range <= batch_buff) or (args.major_axis == "Y" and y_range <= batch_buff):
+                break
         x_grd_st = np.arange(x_min, x_max-batch_size/2+1, batch_step)
+        if len(x_grd_st) == 0:
+            x_grd_st = np.array([x_min-1])
         x_grd_ed = [x + batch_size for x in x_grd_st]
         y_grd_st = np.arange(y_min, y_max-batch_size/2+1, batch_step)
+        if len(y_grd_st) == 0:
+            y_grd_st = np.array([y_min-1])
         y_grd_ed = [x + batch_size for x in y_grd_st]
         x_grd_st[0]  = x_min - 1
         y_grd_st[0]  = y_min - 1

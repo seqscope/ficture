@@ -13,22 +13,19 @@ ficture <command> <args>
 Type `ficture` to see the list of available commands.
 
 ## Installation
-Install after cloning this repository (until we deploy it on pypi):
 
 Create a virtual environment and install dependencies
 ```
 pip install -r requirements.txt
 ```
-
-Under the root directory of this repository, run
-```
-python -m build
-```
-
 Install
 ```
-pip install dist/ficture-0.0.1-py3-none-any.whl
+pip install ficture
 ```
 
 ## Example - Simulated data
-See `./examples/simulation/simulation.md` for a complete example including simulating a high reoluation dataset, running FICTURE, and evaluating the result.
+See `./examples/simulation.md` for a complete example including simulating a high reoluation dataset, running FICTURE, and evaluating the result.
+
+
+## Example - Real data
+See `./examples/realdata.md` for commands of processing an example data in `./examples/data/`. The data a subset from a public [Vizgen MERSCOPE mouse liver dataset](https://info.vizgen.com/mouse-liver-access) (mouse liver 1 slice 1).
