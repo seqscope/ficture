@@ -98,6 +98,7 @@ out_f = args.output + ".fit_result.tsv.gz"
 with gzip.open(out_f, 'wt') as wf:
     wf.write('\t'.join(oheader) + '\n')
 t0 = time.time()
+last_batch = set()
 while batch_obj.read_chunk(min_size=b_size):
     theta = model.transform(batch_obj.mtx)
     post_count += np.array(theta.T @ batch_obj.mtx)
@@ -110,6 +111,9 @@ while batch_obj.read_chunk(min_size=b_size):
     batch_obj.brc['x'] = batch_obj.brc.x.map(lambda x : f"{x:.{args.precision}f}")
     batch_obj.brc['y'] = batch_obj.brc.y.map(lambda x : f"{x:.{args.precision}f}")
     batch_obj.brc.rename(columns = {'hex_id':'unit'}, inplace=True)
+    if len(last_batch) > 0:
+        batch_obj.brc.drop(index = batch_obj.brc.index[batch_obj.brc.unit.isin(last_batch)], inplace=True)
+    last_batch = set(batch_obj.brc.unit.values)
     batch_obj.brc[oheader].to_csv(out_f, sep='\t', index=False, header=False, float_format='%.3e', mode='a', compression={"method":"gzip"})
     logging.info(f"Transformed {n_batch} batches with total {n_unit} units, {t1/60:2f}min")
 

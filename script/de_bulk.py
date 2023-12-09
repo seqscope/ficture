@@ -20,6 +20,7 @@ parser.add_argument('--max_pval_output', default=1e-3, type=float, help='')
 parser.add_argument('--min_fold_output', default=1.5, type=float, help='')
 parser.add_argument('--min_output_per_factor', default=10, type=int, help='Even when there are no significant DE genes, output top genes for each factor')
 parser.add_argument('--thread', default=1, type=int, help='')
+parser.add_argument('--use_input_header', action = 'store_true', help='')
 args = parser.parse_args()
 
 pcut=args.max_pval_output
@@ -33,11 +34,15 @@ if os.path.exists(args.feature):
 info = pd.read_csv(args.input,sep='\t',header=0)
 oheader = []
 header = []
-for x in info.columns:
-    y = re.match('^[A-Za-z]*_*(\d+)$', x)
-    if y:
-        header.append(y.group(1))
-        oheader.append(x)
+if (args.use_input_header):
+    header = [x for x in info.columns if x != args.feature_label]
+    oheader = header
+else:
+    for x in info.columns:
+        y = re.match('^[A-Za-z]*_*(\d+)$', x)
+        if y:
+            header.append(y.group(1))
+            oheader.append(x)
 K = len(header)
 M = info.shape[0]
 reheader = {oheader[k]:header[k] for k in range(K)}
@@ -51,7 +56,7 @@ info["gene_tot"] = info.loc[:, header].sum(axis=1).astype(int)
 info = info[info["gene_tot"] > args.min_ct_per_feature]
 info.index = info.gene.values
 total_umi = info.gene_tot.sum()
-total_k = np.array(info.loc[:, [str(k) for k in range(K)]].sum(axis = 0) )
+total_k = np.array(info.loc[:, header].sum(axis = 0) )
 M = info.shape[0]
 
 print(f"Testing {M} genes over {K} factors")
@@ -61,7 +66,7 @@ def chisq(k,info,total_k,total_umi):
     if total_k <= 0:
         return res
     for name, v in info.iterrows():
-        if v[str(k)] <= 0:
+        if v[k] <= 0:
             continue
         tab=np.zeros((2,2))
         tab[0,0]=v[str(k)]
@@ -78,20 +83,20 @@ def chisq(k,info,total_k,total_umi):
 
 res = []
 if args.thread > 1:
-    for k in range(K):
+    for k, kname in enumerate(header):
         idx_slices = [idx for idx in utilt.gen_even_slices(M, args.thread)]
         with Parallel(n_jobs=args.thread, verbose=0) as parallel:
-            result = parallel(delayed(chisq)(k, \
-                        info.iloc[idx, :].loc[:, [str(k), 'gene_tot']],\
+            result = parallel(delayed(chisq)(kname, \
+                        info.iloc[idx, :].loc[:, [kname, 'gene_tot']],\
                         total_k[k], total_umi) for idx in idx_slices)
         res += [item for sublist in result for item in sublist]
 else:
     for name, v in info.iterrows():
-        for k in range(K):
+        for k, kname in enumerate(header):
             if total_k[k] <= 0 or v[str(k)] <= 0:
                 continue
             tab=np.zeros((2,2))
-            tab[0,0]=v[str(k)]
+            tab[0,0]=v[kname]
             tab[0,1]=v["gene_tot"]-tab[0,0]
             tab[1,0]=total_k[k]-tab[0,0]
             tab[1,1]=total_umi-total_k[k]-v["gene_tot"]+tab[0,0]
@@ -100,7 +105,7 @@ else:
                 continue
             tab = np.around(tab, 0).astype(int) + 1
             chi2, p, dof, ex = scipy.stats.chi2_contingency(tab, correction=False)
-            res.append([name,k,chi2,p,fd,v["gene_tot"]])
+            res.append([name,kname,chi2,p,fd,v["gene_tot"]])
 
 chidf=pd.DataFrame(res,columns=['gene','factor','Chi2','pval','FoldChange','gene_total'])
 chidf.sort_values(by=['factor','Chi2'],ascending=[True,False],inplace=True)
