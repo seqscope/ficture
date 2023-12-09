@@ -28,6 +28,7 @@ parser.add_argument('--hex_width', type=int, default=24, help='')
 parser.add_argument('--hex_radius', type=int, default=-1, help='')
 parser.add_argument('--precision', type=int, default=1, help='Number of digits to store spatial location (in um), 0 for integer.')
 parser.add_argument('--chunksize', type=int, default=100000, help='Number of lines to read at a time')
+parser.add_argument('--debug', type=int, default=0, help='')
 
 args = parser.parse_args()
 if not os.path.exists(args.input):
@@ -116,6 +117,8 @@ while batch_obj.read_chunk(min_size=b_size):
     last_batch = set(batch_obj.brc.unit.values)
     batch_obj.brc[oheader].to_csv(out_f, sep='\t', index=False, header=False, float_format='%.3e', mode='a', compression={"method":"gzip"})
     logging.info(f"Transformed {n_batch} batches with total {n_unit} units, {t1/60:2f}min")
+    if (args.debug > 0) and (n_unit >= args.debug):
+        break
 
 out_f = args.output + ".posterior.count.tsv.gz"
 pd.concat([pd.DataFrame({'gene': feature_kept}),\

@@ -4,6 +4,7 @@ import pandas as pd
 from scipy.sparse import *
 import subprocess as sp
 import random as rng
+from collections import defaultdict
 
 # Add parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -76,6 +77,7 @@ dty.update({x:str for x in ['X','Y','gene'] + args.group_within})
 
 n_unit = 0
 df_full = pd.DataFrame()
+last_batch = defaultdict(set)
 for chunk in pd.read_csv(args.input, sep='\t', chunksize=1000000, dtype=dty):
     if chunk.shape[0] == 0:
         logging.info(f"Empty? Left over size {df_full.shape[0]}.")
@@ -122,6 +124,8 @@ for chunk in pd.read_csv(args.input, sep='\t', chunksize=1000000, dtype=dty):
                 ct = pd.DataFrame({'hex_id':hex_crd, 'tot':brc[key].values, 'X':pts[:, 0], 'Y':pts[:,1]}).groupby(by = 'hex_id').agg({'tot': sum, 'X':np.min, 'Y':np.min}).reset_index()
                 mid_ct = np.median(ct.loc[ct.tot >= args.min_ct_per_unit, 'tot'].values)
                 ct = set(ct.loc[(ct.tot >= args.min_ct_per_unit) & (ct[mj] > st + diam/2) & (ct[mj] < ed - diam/2), 'hex_id'].values)
+                ct = ct - last_batch[(offs_x,offs_y,l)]
+                last_batch[(offs_x,offs_y,l)] = ct
                 if len(ct) < 2:
                     offs_y += 1
                     continue

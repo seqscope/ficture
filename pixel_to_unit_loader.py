@@ -160,7 +160,8 @@ class PixelToUnit:
         for offs_x in range(self.n_move):
             for offs_y in range(self.n_move):
                 x, y = pixel_to_hex(self.df[['X', 'Y']].values, self.radius, offs_x/self.n_move, offs_y/self.n_move)
-                self.df.hex_id = list(zip(x, y))
+                # self.df.hex_id = list(zip(x, y))
+                self.df.hex_id = [(x[i], y[i], offs_x, offs_y) for i in range(len(x))]
                 ct = self.df.groupby('hex_id').agg({self.key: sum}).reset_index()
                 ct = ct.loc[ct[self.key] >= self.min_ct_per_unit, :]
                 if len(ct) < 1:
