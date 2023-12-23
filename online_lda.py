@@ -85,6 +85,9 @@ class OnlineLDA:
         self._Elog_beta = utilt.dirichlet_expectation(self._lambda)
         self._expElog_beta = np.exp(self._Elog_beta)
 
+    def name_factor(self, factor_names):
+        assert len(factor_names) == self._K, "Invalid factor names"
+        self._factor_names = factor_names
 
     def _update_gamma(self, X, _gamma, alpha):
         gamma = copy.copy(_gamma)
@@ -148,18 +151,25 @@ class OnlineLDA:
         # E step to update gamma | lambda for mini-batch
         self.do_e_step(batch)
 
-        # Estimate likelihood for current values of lambda.
-        if self._verbose > 0:
-            scores = self.approx_score(batch)
-            print(f"{self._updatect}-th global update. Scores: " + ", ".join(['%.2e'%x for x in scores]))
-
         # Update global parameters
         rhot = pow(self._tau0 + self._updatect, -self._kappa)
         doc_ratio = float(self._N) / batch.n
+        update_ratio = ((self._sstats).sum(axis = 1) / self._lambda.sum(axis = 1)) * (rhot * doc_ratio) / (1-rhot)
+
         self._lambda = (1-rhot) * self._lambda + \
                        rhot * (doc_ratio * (self._eta + self._sstats) )
         self._Elog_beta = utilt.dirichlet_expectation(self._lambda)
+        beta0 = self._expElog_beta
         self._expElog_beta = np.exp(self._Elog_beta)
+
+        if self._verbose > 0:
+            scores = self.approx_score(batch)
+            max_rel_change_beta = (2 * np.abs(self._expElog_beta - beta0) / (self._expElog_beta + beta0)).max()
+            max_change_beta = np.abs(self._expElog_beta - beta0).max()
+            print(f"{self._updatect}-th global update. rho {rhot:.5f}, max change in expElogBeta {max_change_beta:.4f}, max relative change in expElogBeta {max_rel_change_beta:.5f}\nScores: " + ", ".join(['%.2e'%x for x in scores]))
+            print("Update magnitude ratio:")
+            print(", ".join(['%.2e'%x for x in update_ratio]))
+
         self._updatect += 1
         return batch.ll
 

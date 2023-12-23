@@ -280,3 +280,13 @@ def plot_colortable(colors, title, sort_colors=True, ncols=4, dpi = 80,\
         )
 
     return fig
+
+def read_ct_from_solo_barcodes_tsv(file, key, chunksize=500000, mu_scale=-1):
+    ct_idx = "gn,gt,spl,unspl,ambig".split(",").index(key)
+    reader = pd.read_csv(gzip.open(f,'rb'), sep='\t', usecols=[1,5,6,7], index_col=0, names=["unit","X","Y",key], dtype={'X':int, 'Y':int}, chunksize=chunksize)
+    for chunk in reader:
+        if mu_scale > 0:
+            chunk.X /= mu_scale
+            chunk.Y /= mu_scale
+        chunk[key]=chunk[key].map(lambda x : x.split(',')[ct_idx]).astype(int)
+        yield chunk

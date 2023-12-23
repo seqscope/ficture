@@ -28,6 +28,7 @@ parser.add_argument('--n_move', type=int, default=3, help='')
 parser.add_argument('--hex_width', type=int, default=24, help='')
 parser.add_argument('--hex_radius', type=int, default=-1, help='')
 parser.add_argument('--min_ct_per_unit', type=int, default=20, help='')
+parser.add_argument('--min_density_per_unit', type=float, default=0.5, help='')
 args = parser.parse_args()
 
 r_seed = time.time()
@@ -69,6 +70,8 @@ if radius < 0:
     radius = diam / np.sqrt(3)
 else:
     diam = int(radius*np.sqrt(3))
+area = radius * diam * 3 / 2
+min_ct_per_unit = max(args.min_ct_per_unit, args.min_density_per_unit * area)
 
 adt = {x:np.sum for x in ct_header}
 dty = {x:int for x in ct_header}
@@ -120,8 +123,8 @@ for chunk in pd.read_csv(args.input, sep='\t', chunksize=1000000, dtype=dty):
                 x,y = pixel_to_hex(pts, radius, offs_x/n_move, offs_y/n_move)
                 hex_crd = list(zip(x,y))
                 ct = pd.DataFrame({'hex_id':hex_crd, 'tot':brc[key].values, 'X':pts[:, 0], 'Y':pts[:,1]}).groupby(by = 'hex_id').agg({'tot': sum, 'X':np.min, 'Y':np.min}).reset_index()
-                mid_ct = np.median(ct.loc[ct.tot >= args.min_ct_per_unit, 'tot'].values)
-                ct = set(ct.loc[(ct.tot >= args.min_ct_per_unit) & (ct[mj] > st + diam/2) & (ct[mj] < ed - diam/2), 'hex_id'].values)
+                mid_ct = np.median(ct.loc[ct.tot >= min_ct_per_unit, 'tot'].values)
+                ct = set(ct.loc[(ct.tot >= min_ct_per_unit) & (ct[mj] > st + diam/2) & (ct[mj] < ed - diam/2), 'hex_id'].values)
                 if len(ct) < 2:
                     offs_y += 1
                     continue

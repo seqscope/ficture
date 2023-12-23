@@ -34,6 +34,7 @@ parser.add_argument('--epoch', type=int, default=1, help='How many times to loop
 parser.add_argument('--epoch_id_length', type=int, default=-1, help='')
 parser.add_argument('--use_model', type=str, default='', help="Use provided model to transform input data")
 parser.add_argument('--prior', type=str, default='', help="Dirichlet parameters for the global parameter beta (factor x gene)")
+parser.add_argument('--alpha', type=float, default=1, help='')
 parser.add_argument('--tau', type=int, default=9, help='')
 parser.add_argument('--kappa', type=float, default=0.7, help='')
 parser.add_argument('--N', type=float, default=1e4, help='')
@@ -112,39 +113,43 @@ if not args.overwrite and os.path.exists(model_f):
 factor_header = [str(x) for x in range(K)]
 chunksize=100000 if args.debug else 1000000
 if not use_existing_model:
-    if not os.path.exists(args.feature):
-        sys.exit("Unable to read feature list")
     prior = None
     if os.path.isfile(args.prior):
-        prior = pd.read_csv(args.prior, sep='\t', header=0, index_col=0)
-        if prior.shape[1] != K:
+        prior = pd.read_csv(args.prior, sep='\t', header=0)
+        if "gene" not in prior.columns:
+            sys.exit("ERROR: prior file must have a column named 'gene'")
+        if prior.shape[1] != K + 1:
             sys.exit(f"ERROR: number of factors in --prior file does not match --nFactor ({K})")
-    ### Use only the provided list of features
-    with gzip.open(args.feature, 'rt') as rf:
-        fheader = rf.readline().strip().split('\t')
-    fheader = [x.lower() for x in fheader]
-    feature=pd.read_csv(args.feature, sep='\t', skiprows=1, names=fheader, dtype={gene_key:str, key:int})
-    feature = feature[feature[key] >= args.min_ct_per_feature]
-    feature.sort_values(by=key,ascending=False,inplace=True)
-    feature.drop_duplicates(subset=gene_key,keep='first',inplace=True)
-    feature_kept = list(feature[gene_key].values)
-    ft_dict = {x:i for i,x in enumerate( feature_kept ) }
-    M = len(feature_kept)
+        feature_kept = list(prior.gene.values)
+        M = len(feature_kept)
+        prior.drop(columns=['gene'], inplace=True)
 
-    logging.info(f"Start fitting model ... {M} genes will be used")
-
-    if prior is None:
-        lda = LDA(n_components=K, learning_method='online', batch_size=b_size, n_jobs = args.thread, learning_offset = args.tau, learning_decay = args.kappa, random_state=seed, verbose = 0)
-    else:
-        prior = prior[prior.index.isin(ft_dict)]
-        prior.index = prior.index.map(lambda x: ft_dict[x])
-        prior_mtx = np.ones((K, M)) * .5
-        prior_mtx[:,prior.index] += prior.values.T
-        lda = OnlineLDA(vocab=feature_kept,K=K,N=args.N,tau0=args.tau,kappa=args.kappa,thread=args.thread,tol=1e-3)
-        lda.init_global_parameter(prior_mtx)
-        mt = prior_mtx.sum(axis =1)
+        lda = OnlineLDA(vocab=feature_kept,K=K,N=args.N,alpha=args.alpha/K,eta=1/M,tau0=args.tau,kappa=args.kappa,thread=args.thread,tol=1e-3,verbose=int(args.verbose))
+        lda.name_factor(prior.columns)
+        prior = np.array(prior).T # K x M
+        lda.init_global_parameter(prior)
+        mt = prior.sum(axis =1)
         mt = " ".join([f"{x:.2e}" for x in mt])
         logging.info(f"Read prior for global parameters. Prior magnitude: {mt}")
+    else:
+        ### Use only the provided list of features
+        if not os.path.exists(args.feature):
+            sys.exit("Unable to read feature list")
+        with gzip.open(args.feature, 'rt') as rf:
+            fheader = rf.readline().strip().split('\t')
+        fheader = [x.lower() for x in fheader]
+        feature=pd.read_csv(args.feature, sep='\t', skiprows=1, names=fheader, dtype={gene_key:str, key:int})
+        feature = feature[feature[key] >= args.min_ct_per_feature]
+        feature.sort_values(by=key,ascending=False,inplace=True)
+        feature.drop_duplicates(subset=gene_key,keep='first',inplace=True)
+        feature_kept = list(feature[gene_key].values)
+        M = len(feature_kept)
+
+        lda = LDA(n_components=K, learning_method='online', batch_size=b_size, n_jobs = args.thread, learning_offset = args.tau, learning_decay = args.kappa, random_state=seed, verbose = args.verbose)
+
+    ft_dict = {x:i for i,x in enumerate( feature_kept ) }
+
+    logging.info(f"Start fitting model ... {M} genes will be used")
 
     epoch = 0
     n_unit = 0

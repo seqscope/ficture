@@ -80,6 +80,10 @@ post_weight /= post_weight.sum()
 
 # DE genes
 f=path+"/DE/"+pref+".bulk_chisq.tsv"
+if not os.path.exists(f):
+    f=path+"/"+pref+".bulk_chisq.tsv"
+    if not os.path.exists(f):
+        sys.exit(f"Cannot find DE file")
 de = pd.read_csv(f, sep='\t')
 de.factor = de.factor.astype(int)
 top_gene = []

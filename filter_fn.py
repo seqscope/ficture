@@ -6,10 +6,14 @@ import sklearn.mixture
 
 # Add parent directory
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from hexagon_fn import pixel_to_hex, hex_to_pixel
+from hexagon_fn import pixel_to_hex, hex_to_pixel, collapse_to_hex
 
 
 def filter_by_density_mixture(df, key, radius, n_move, args):
+    '''
+    df: dataframe with columns X, Y, and key, (X, Y) are in um
+    Return a dataframe with kept anchor point coordinates x, y
+    '''
     pt = pd.DataFrame()
     m0v=[]
     m1v=[]
@@ -26,31 +30,45 @@ def filter_by_density_mixture(df, key, radius, n_move, args):
             if args.hard_threshold > 0:
                 cnt['det'] = cnt[key] > hex_area * args.hard_threshold
             else:
-                v = np.log10(cnt[key].values).reshape(-1, 1)
-                print(f"{len(v)}")
-                if len(v) > args.max_npts_to_fit_model:
-                    indx = np.random.choice(len(v), int(args.max_npts_to_fit_model), replace=False)
-                    gm = sklearn.mixture.GaussianMixture(n_components=2, random_state=0).fit(v[indx])
-                else:
-                    gm = sklearn.mixture.GaussianMixture(n_components=2, random_state=0).fit(v)
+                vorg = cnt[key].values
+                if len(vorg) > args.max_npts_to_fit_model:
+                    vorg = np.random.choice(vorg, int(args.max_npts_to_fit_model), replace=False)
+                print(f"[{i}, {j}], {len(vorg)} units")
+                # 1st try: fit a 2-component mixture model to log transformed density
+                v = np.log10(vorg).reshape(-1, 1)
+                gm = sklearn.mixture.GaussianMixture(n_components=2, random_state=0).fit(v)
                 lab_keep = np.argmax(gm.means_.squeeze())
                 cnt['det'] = gm.predict(v) == lab_keep
                 m0=(10**gm.means_.squeeze()[lab_keep])/hex_area
                 m1=(10**gm.means_.squeeze()[1-lab_keep])/hex_area
-                if m1 > m0 * 0.5 or m0 < args.min_abs_mol_density_squm:
-                    v = cnt[key].values.reshape(-1, 1)
-                    if len(v) > args.max_npts_to_fit_model:
-                        indx = np.random.choice(len(v), int(args.max_npts_to_fit_model), replace=False)
-                        gm = sklearn.mixture.GaussianMixture(n_components=2, random_state=0).fit(v[indx])
-                    else:
-                        gm = sklearn.mixture.GaussianMixture(n_components=2, random_state=0).fit(v)
-                    lab_keep = np.argmax(gm.means_.squeeze())
+                kept_min = cnt.loc[cnt.det.eq(True), key].min() / hex_area
+                print(f"1st: log, 2 component. {m0:.3f} v.s. {m1:.3f}, kept min density {kept_min:.3f}")
+                # If it does not seem right
+                # 2nd try: fit a 3-component mixture model to log transformed density
+                if m1 > m0 * 0.5 or m0 < args.min_abs_mol_density_squm_dense:
+                    v = np.log10(vorg)
+                    gm = sklearn.mixture.GaussianMixture(n_components=3, random_state=0).fit(v)
+                    lab_rank = np.argsort(gm.means_.squeeze())
+                    lab_keep = lab_rank[-1]
                     cnt['det'] = gm.predict(v) == lab_keep
-                    m0=gm.means_.squeeze()[lab_keep]/hex_area
-                    m1=gm.means_.squeeze()[1-lab_keep]/hex_area
-                if m0 < args.min_abs_mol_density_squm:
-                    continue
-                if m1 > m0 * .7:
+                    m0=(10**gm.means_.squeeze()[lab_keep])/hex_area
+                    m1=(10**gm.means_.squeeze()[lab_rank[1]])/hex_area
+                    m2=(10**gm.means_.squeeze()[lab_rank[0]])/hex_area
+                    kept_min = cnt.loc[cnt.det.eq(True), key].min() / hex_area
+                    print(f"2nd: log, 3 component. {m0:.3f} v.s. {m1:.3f} & {m2:.3f}, kept min density {kept_min:.3f}")
+                # # 3rd try: fit a 2-component mixture model to density of original scale
+                # if m1 > m0 * 0.5 or m0 < args.min_abs_mol_density_squm_dense:
+                #     v = vorg.reshape(-1, 1)
+                #     gm = sklearn.mixture.GaussianMixture(n_components=2, random_state=0).fit(v)
+                #     lab_keep = np.argmax(gm.means_.squeeze())
+                #     cnt['det'] = gm.predict(v) == lab_keep
+                #     m0=gm.means_.squeeze()[lab_keep]/hex_area
+                #     m1=gm.means_.squeeze()[1-lab_keep]/hex_area
+                #     kept_min = cnt.loc[cnt.det.eq(True), key].min() / hex_area
+                #     print(f"2nd: 2 component. {m0:.3f} v.s. {m1:.3f}, kept min density {kept_min:.3f}")
+                if m0 < args.min_abs_mol_density_squm_dense:
+                    cnt['det'] = cnt[key] > hex_area * args.min_abs_mol_density_squm_dense
+                elif m1 > m0 * .7:
                     cnt['det'] = 1
                 m0v.append(m0)
                 m1v.append(m1)
