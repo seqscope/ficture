@@ -20,7 +20,7 @@ from hexagon_fn import collapse_to_hex
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='Tab-delimited file including columns X, Y, and they key specified by --filter_based_on. If --feature is provided, need another columns named "gene"')
-parser.add_argument('--output', type=str, help='Output file')
+parser.add_argument('--output', type=str, default='', help='Output file')
 parser.add_argument('--output_boundary', type=str, help='Prefix for output boundary files')
 
 parser.add_argument('--feature', type=str, default='', help='')
@@ -33,13 +33,19 @@ parser.add_argument('--hard_threshold', type=float, default=-1, help='If provide
 parser.add_argument('--remove_small_polygons', type=float, default=-1, help='If provided, remove small and isolated polygons (squared um)')
 parser.add_argument('--radius', type=float, default=15, help='')
 parser.add_argument('--hex_n_move', type=int, default=2, help='')
+parser.add_argument('--max_edge', type=float, default=-1, help='')
+parser.add_argument('--boundary_only', action='store_true', help='')
 
 
 args = parser.parse_args()
 if not os.path.exists(args.input):
     sys.exit("Cannot find input file")
-if os.path.exists(args.output):
-    warnings.warn("Output file already exists, fill be overwritten")
+if not args.boundary_only:
+    if len(args.output) == 0:
+        sys.exit("Please specify output file")
+    if not os.path.exists(os.path.dirname(args.output)):
+        sys.exit("Output file directory does not exist")
+
 logging.basicConfig(level= getattr(logging, "INFO", None))
 
 key      = args.filter_based_on
@@ -47,7 +53,7 @@ n_move   = args.hex_n_move
 radius   = args.radius
 hex_diam = radius * np.sqrt(3)
 hex_area = radius**2*3*np.sqrt(3)/2
-max_edge_len = hex_diam * 2
+max_edge_len = args.max_edge if args.max_edge > 0 else hex_diam * 2
 
 gene_kept = set()
 if os.path.exists(args.feature):
@@ -119,7 +125,7 @@ def point_to_multipoly(pts, max_edge_len, buffer = 5, poly_area_cutoff = 0):
     return mrg_poly
 
 
-kept_indx = brc.index[brc.gn.gt(dcut_strict)]
+kept_indx = brc.index[brc[key].gt(dcut_strict)]
 pts = brc.loc[kept_indx, ['x', 'y']].values
 mrg_poly = point_to_multipoly(pts, max_edge_len, buffer = 5, poly_area_cutoff = args.remove_small_polygons)
 
@@ -128,13 +134,24 @@ with open(f, 'w') as wf:
     geojson.dump(mrg_poly.__geo_interface__, wf)
 
 
-kept_indx = brc.index[brc.gn.gt(dcut_lenient)]
+kept_indx = brc.index[brc[key].gt(dcut_lenient)]
 pts = brc.loc[kept_indx, ['x', 'y']].values
 mrg_poly = point_to_multipoly(pts, max_edge_len, buffer = radius, poly_area_cutoff = min(args.remove_small_polygons, hex_area*4))
 
 f = args.output_boundary + ".boundary.lenient.geojson"
 with open(f, 'w') as wf:
     geojson.dump(mrg_poly.__geo_interface__, wf)
+
+f = args.output_boundary + ".coordinate_minmax.tsv"
+xmin, ymin, xmax, ymax = mrg_poly.bounds
+with open(f, 'w') as wf:
+    wf.write(f"xmin\t{xmin}\nxmax\t{xmax}\nymin\t{ymin}\nymax\t{ymax}\n")
+
+if args.boundary_only:
+    sys.exit(0)
+
+if os.path.exists(args.output):
+    warnings.warn("Output file already exists, fill be overwritten")
 
 mrg_poly = shapely.prepared.prep(mrg_poly)
 ct = 0

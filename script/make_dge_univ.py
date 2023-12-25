@@ -4,6 +4,10 @@ import pandas as pd
 from scipy.sparse import *
 import subprocess as sp
 import random as rng
+import geojson
+import shapely.prepared, shapely.geometry
+from shapely.geometry import Point
+
 
 # Add parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -12,6 +16,7 @@ from hexagon_fn import pixel_to_hex, hex_to_pixel
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
 parser.add_argument('--output', type=str, help='')
+parser.add_argument('--boundary', type=str, default = '', help='')
 
 parser.add_argument('--major_axis', type=str, default="Y", help='X or Y')
 parser.add_argument('--mu_scale', type=float, default=1, help='Coordinate to um translate')
@@ -77,6 +82,11 @@ adt = {x:np.sum for x in ct_header}
 dty = {x:int for x in ct_header}
 dty.update({x:str for x in ['X','Y','gene'] + args.group_within})
 
+use_boundary = False
+if os.path.exists(args.boundary):
+    mpoly = shapely.geometry.shape(geojson.load(open(args.boundary, 'rb')))
+    mpoly = shapely.prepared.prep(mpoly)
+
 n_unit = 0
 df_full = pd.DataFrame()
 for chunk in pd.read_csv(args.input, sep='\t', chunksize=1000000, dtype=dty):
@@ -139,6 +149,9 @@ for chunk in pd.read_csv(args.input, sep='\t', chunksize=1000000, dtype=dty):
                 hx = cnt.hex_id.map(lambda x : x[0])
                 hy = cnt.hex_id.map(lambda x : x[1])
                 cnt['X'], cnt['Y'] = hex_to_pixel(hx, hy, radius, offs_x/n_move, offs_y/n_move)
+                if use_boundary:
+                    kept = [mpoly.contains(Point(*p)) for p in cnt[['X','Y']].values]
+                    cnt = cnt.loc[kept, :]
 
                 sub = sub.loc[:,['j','random_index']].merge(right = df, on='j', how = 'inner')
                 sub = sub.groupby(by = ['random_index','gene']).agg(adt).reset_index()
