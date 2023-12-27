@@ -85,6 +85,32 @@ def gen_even_slices(n, n_packs):
             yield np.arange(start, end)
             start = end
 
+def gen_even_slices_from_list(vec, n_packs):
+    start = 0
+    vec = np.array(vec)
+    n = len(vec)
+    if n_packs < 1:
+        raise ValueError("gen_even_slices got n_packs=%s, must be >=1" % n_packs)
+    for pack_num in range(n_packs):
+        this_n = n // n_packs
+        if pack_num < n % n_packs:
+            this_n += 1
+        if this_n > 0:
+            end = start + this_n
+            yield vec[start:end]
+            start = end
+
+def gen_slices_from_list(vec, bsize):
+    start = 0
+    vec = np.array(vec)
+    n = len(vec)
+    while start < n:
+        end = start + bsize
+        if end > n - bsize//2:
+            end = n
+        yield vec[start:end]
+        start = end
+
 def get_string_with_integer_suff(in_array):
     out = []
     for u in in_array:
@@ -281,6 +307,13 @@ def plot_colortable(colors, title, sort_colors=True, ncols=4, dpi = 80,\
 
     return fig
 
+def scale_to_prob(W, H):
+    uk = H.sum(axis = 1).reshape((-1, 1))
+    beta = H / uk
+    sn = W @ uk
+    theta = (W * uk.T)/sn
+    return theta, beta
+
 def read_ct_from_solo_barcodes_tsv(file, key, chunksize=500000, mu_scale=-1):
     ct_idx = "gn,gt,spl,unspl,ambig".split(",").index(key)
     reader = pd.read_csv(gzip.open(f,'rb'), sep='\t', usecols=[1,5,6,7], index_col=0, names=["unit","X","Y",key], dtype={'X':int, 'Y':int}, chunksize=chunksize)
@@ -290,3 +323,34 @@ def read_ct_from_solo_barcodes_tsv(file, key, chunksize=500000, mu_scale=-1):
             chunk.Y /= mu_scale
         chunk[key]=chunk[key].map(lambda x : x.split(',')[ct_idx]).astype(int)
         yield chunk
+
+def make_mtx_from_dge(file, min_ct_per_feature = 50, min_ct_per_unit = 100, feature_white_list = None, unit = "random_index", key = "gn", epoch=1):
+    df = pd.DataFrame()
+    for chunk in pd.read_csv(file, sep='\t', usecols = [unit,'X','Y','gene',key], dtype={unit:str}, chunksize=500000):
+        if epoch == 1 and chunk[unit].iloc[-1][:2] != "00":
+            df = pd.concat([df, chunk[chunk[unit].str.contains('^00') & chunk[key].ge(1)] ])
+            break
+        df = pd.concat([df, chunk[chunk[key].ge(1)] ])
+
+    feature = df.groupby(by=['gene']).agg({key:sum}).reset_index()
+    feature_white_list = set() if feature_white_list is None else set(feature_white_list)
+    feature = feature.loc[feature[key].ge(min_ct_per_feature ) | feature.gene.isin(feature_white_list), :]
+    M = len(feature)
+    feature.index = np.arange(M)
+    ft_dict = {x:i for i,x in enumerate(feature.gene)}
+    df.drop(index = df.index[~df.gene.isin(ft_dict)], inplace=True)
+
+    brc = df.groupby(by = unit).agg({key:sum}).reset_index()
+    brc.drop(index = brc.index[brc[key].lt(min_ct_per_unit)], inplace=True)
+    N = brc.shape[0]
+    brc.index = np.arange(N)
+    bc_dict = {x:i for i,x in enumerate(brc[unit])}
+    brc['j'] = brc[unit].map(bc_dict)
+    df.drop(index = df.index[~df[unit].isin(bc_dict)], inplace=True)
+    df['j'] = df[unit].map(bc_dict)
+    df.drop(columns = unit, inplace=True)
+    brc = brc.merge(right = df[['j','X','Y' ]].drop_duplicates(subset='j'), on = 'j', how = 'left')
+
+    mtx = sparse.coo_array((df[key].values, (df.j.values, df.gene.map(ft_dict))), shape=(N, M)).tocsr()
+
+    return df, feature, brc, mtx, ft_dict, bc_dict

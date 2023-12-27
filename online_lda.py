@@ -79,9 +79,10 @@ class OnlineLDA:
             self._lambda = _lambda
             assert self._lambda.shape == (self._K, self._M), "Invalid lambda"
         if self._lambda.min() <= 0 :
-            warnings.warn("Parameters must be positive, will clip to 1/10 the min nonzero value")
-            pseudo = self._lambda[self._lambda > 0].min()/10
-            self._lambda = np.clip(self._lambda, pseudo, None)
+            warnings.warn("Parameters must be positive, will replace non-positive values with random numbers")
+            pseudo = self._lambda[self._lambda > 0].min() * .2
+            rdfill = np.random.gamma(100., 1./100., (self._K, self._M)) * pseudo
+            self._lambda = np.where(self._lambda > 0, self._lambda, rdfill)
         self._Elog_beta = utilt.dirichlet_expectation(self._lambda)
         self._expElog_beta = np.exp(self._Elog_beta)
 
@@ -137,7 +138,7 @@ class OnlineLDA:
                 self._sstats += v[0]
                 batch.gamma[idx_slices[i], :] = v[1]
 
-        batch.ll = np.multiply(normalize(batch.gamma, norm='l1', axis=1), batch.mtx @ self._Elog_beta.T).sum() / batch.n
+        batch.ll = np.multiply(normalize(batch.gamma, norm='l1', axis=1), batch.mtx @ np.log(normalize(self._lambda, axis = 1, norm = 'l1').T) ).sum() / batch.n
         return
 
 

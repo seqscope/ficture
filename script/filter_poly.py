@@ -27,13 +27,14 @@ parser.add_argument('--feature', type=str, default='', help='')
 parser.add_argument('--filter_based_on', type=str, default="Count", help='')
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
 parser.add_argument('--max_npts_to_fit_model', type=float, default=1e6, help='')
-parser.add_argument('--min_abs_mol_density_squm_dense', type=float, default=0.5, help='Lowerbound for dense tissue region')
+parser.add_argument('--min_abs_mol_density_squm_dense', type=float, default=0.1, help='Lowerbound for dense tissue region')
 parser.add_argument('--min_abs_mol_density_squm', type=float, default=0.02, help='A safe lowerbound to remove very sparse technical noise before fitting mixture model')
 parser.add_argument('--hard_threshold', type=float, default=-1, help='If provided, filter by hard threshold (number of molecules per squared um)')
 parser.add_argument('--remove_small_polygons', type=float, default=-1, help='If provided, remove small and isolated polygons (squared um)')
 parser.add_argument('--radius', type=float, default=15, help='')
 parser.add_argument('--hex_n_move', type=int, default=2, help='')
 parser.add_argument('--max_edge', type=float, default=-1, help='')
+parser.add_argument('--quartile', type=int, default=2, choices=[0,1,2,3], help='')
 parser.add_argument('--boundary_only', action='store_true', help='')
 
 
@@ -92,17 +93,16 @@ m0=(10**gm.means_.squeeze()[lab_keep])/hex_area
 m1=(10**gm.means_.squeeze()[1-lab_keep])/hex_area
 
 indx = gm.predict(vorg.reshape(-1, 1)) == lab_keep
-kept_min = brc.loc[indx, key].min() / hex_area
-kept_med = np.median(brc.loc[indx, key]) / hex_area
+kept_qt = np.quantile(brc.loc[indx, key], [0, .25, .5, .75]) / hex_area
 
-logging.info(f"Fit 2 component model. {m0:.3f} v.s. {m1:.3f}, cluster min {kept_min:.3f}, median {kept_med:.3f}")
+logging.info(f"Fit 2 component model. {m0:.3f} v.s. {m1:.3f}, cluster min {kept_qt[0]:.3f}, quantiles " + ", ".join([f"{x:.3f}" for x in kept_qt[1:]]))
 
-dcut_lenient = (kept_min*.75 + kept_med*.25)
+dcut_lenient = kept_qt[0] * .75 + kept_qt[1] * .25
 
 if args.hard_threshold <= 0:
-    dcut_strict = kept_med
-    if kept_med < args.min_abs_mol_density_squm_dense:
-        logging.info(f"Identified density cutoff is lower than that specified by --min_abs_mol_density_squm_dense, will use {args.min_abs_mol_density_squm_dense} instead")
+    dcut_strict = kept_qt[args.quartile] if args.quartile > 0 else dcut_lenient
+    if dcut_strict < args.min_abs_mol_density_squm_dense:
+        logging.info(f"Identified density cutoff {dcut_strict} is lower than that specified by --min_abs_mol_density_squm_dense, will use {args.min_abs_mol_density_squm_dense} instead")
         dcut_strict = args.min_abs_mol_density_squm_dense
 
 logging.info(f"Strict density cutoff {dcut_strict:.3f}, lenient density cutoff {dcut_lenient:.3f}")

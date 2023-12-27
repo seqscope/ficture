@@ -25,7 +25,7 @@ def find_farthest_point(points, basis = None):
     distances = np.linalg.norm(points - prj, axis=1)
     return np.argmax(distances)
 
-def simplex_vertices(Q, epsilon, K, verbose = 0, info = None, seed = None):
+def simplex_vertices(Q, epsilon, K, verbose = 0, info = None, seed = None, fixed_vertices = None):
     V = Q.shape[0]
     prj_dim = int(4 * np.log(V) / epsilon**2)
     while prj_dim > V:
@@ -34,12 +34,20 @@ def simplex_vertices(Q, epsilon, K, verbose = 0, info = None, seed = None):
     # Project V points to a random 4*log(V)/epsilon^2 dimensional subspace
     Qprj = random_projection.SparseRandomProjection(prj_dim, random_state = seed).fit_transform(Q)
 
-    # Initialize S with the farthest point from the origin
-    far_idx = find_farthest_point(Qprj)
-    S_indices = [far_idx]
+    fixed = 0
+    S_indices = []
+    if fixed_vertices is not None:
+        S_indices = [x for x in fixed_vertices if x < V and x >= 0]
+        fixed = len(S_indices)
+        assert fixed == len(fixed_vertices), f"{len(fixed_vertices) - fixed} input vertices are out of range"
+        assert fixed < K, f"{fixed} input vertices are given, but K = {K}"
+    if fixed == 0:
+        # Initialize S with the farthest point from the origin
+        far_idx = find_farthest_point(Qprj)
+        S_indices = [far_idx]
 
     # Iteratively add the farthest point from the span of S
-    for i in range(1, K):
+    for i in range(fixed+1, K):
         far_idx = find_farthest_point(Qprj, basis=Qprj[S_indices, :])
         S_indices.append(far_idx)
     if verbose:
@@ -51,7 +59,7 @@ def simplex_vertices(Q, epsilon, K, verbose = 0, info = None, seed = None):
     it = 0
     while it < 10:
         n_change = 0
-        for i in range(K):
+        for i in range(fixed, K):
             temp_indices = final_indices[:i] + final_indices[i+1:]
             far_idx = find_farthest_point(Qprj, basis=Qprj[temp_indices, :])
             if far_idx not in S_indices:

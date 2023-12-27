@@ -5,7 +5,6 @@ import pandas as pd
 
 from scipy.sparse import *
 from sklearn.preprocessing import normalize
-from sklearn import random_projection
 
 import scipy.optimize
 from joblib import Parallel, delayed
@@ -52,7 +51,9 @@ parser.add_argument('--R', type=int, default = 1, help='')
 parser.add_argument('--anchor_min_ct', type=int, default=500, help='')
 parser.add_argument('--key', type=str, default='gn', help='')
 parser.add_argument('--epsilon', type=float, default = 0.2, help='')
+parser.add_argument('--n_anchor_per_cluster', type=int, default=5, help='')
 parser.add_argument('--thread', type=int, default=1, help='')
+parser.add_argument('--recoverKL', action='store_true', help='')
 parser.add_argument('--debug', action='store_true', help='')
 args = parser.parse_args()
 
@@ -75,26 +76,56 @@ if args.debug:
     prj_dim = int(4 * np.log(len(candi)) / args.epsilon**2)
     print(M, Q.shape, len(candi), prj_dim)
 
+print(f"Read {M} genes, start finding anchors")
+
 rng = np.random.default_rng(int(time.time() % 100000000) )
 result = []
-for r in range(args.R):
-    if args.debug:
+if args.debug:
+    for r in range(args.R):
         idx = simplex_vertices(Q[candi, :], args.epsilon, K, \
                 verbose = 1, info = feature[['gene', args.key]],
                 seed = rng.integers(low = 1, high = 2**31))
-    else:
+        result.append(candi[idx])
+elif args.thread > 1:
+    idx_list = Parallel(n_jobs=args.thread)(\
+        delayed(simplex_vertices)(Q[candi, :], args.epsilon, K, \
+            seed = rng.integers(low = 1, high = 2**31)) for i in range(args.R))
+    result = [candi[idx] for idx in idx_list]
+else:
+    for r in range(args.R):
         idx = simplex_vertices(Q[candi, :], args.epsilon, K, \
-                            seed = rng.integers(low = 1, high = 2**31))
-    result.append(candi[idx])
+                seed = rng.integers(low = 1, high = 2**31))
+        result.append(candi[idx])
 
+Qsym = np.minimum(Q, Q.T)
 anchor_list = pd.DataFrame()
 for r,v in enumerate(result):
-    sub = copy.copy(feature.loc[v, :] )
-    sub["Cluster"] = range(K)
-    sub["Run"] = r
-    anchor_list = pd.concat([anchor_list, sub])
-
+    candi_list = []
+    for k in range(K):
+        idx = np.argsort(-Qsym[v[k], :])[:args.n_anchor_per_cluster]
+        if v[k] not in idx:
+            idx = np.insert(idx, 0, v[k])
+        candi_list.append(list(feature.loc[idx, "gene"]))
+    to_rm = set()
+    for k in range(K-1):
+        if k in to_rm:
+            continue
+        for l in range(k+1, K):
+            cap = set(candi_list[k]) & set(candi_list[l])
+            if len(cap) > args.n_anchor_per_cluster // 2 + 1:
+                candi_list[k] += [x for x in candi_list[l] if x not in cap]
+                to_rm.add(l)
+                print(f"Run {r}, merge cluster {k} and {l} with {len(cap)} common genes: " + ",".join(list(cap)) )
+    candi_list = [x for i,x in enumerate(candi_list) if i not in to_rm]
+    for k,v in enumerate(candi_list):
+        anchor_list = pd.concat([anchor_list, \
+            pd.DataFrame({"Run": r, "Cluster": k, "gene": v})])
+    print(f"Run {r}, kept {len(candi_list)} clusters")
 anchor_list.to_csv(args.output + ".anchor.tsv", sep='\t', index=False)
+
+
+if not args.recoverKL:
+    sys.exit(0)
 
 model = pd.DataFrame()
 for r,v in enumerate(result):
@@ -115,4 +146,4 @@ for r,v in enumerate(result):
     sub = pd.concat([sub, pd.DataFrame(beta, columns = np.arange(K).astype(str)) ], axis = 1)
     model = pd.concat([model, sub])
 
-model.to_csv(args.output + ".model.tsv.gz", sep='\t', float_format = "%.4e", index=False)
+model.to_csv(args.output + ".models.tsv.gz", sep='\t', float_format = "%.4e", index=False)

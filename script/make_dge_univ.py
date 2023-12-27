@@ -33,7 +33,7 @@ parser.add_argument('--n_move', type=int, default=3, help='')
 parser.add_argument('--hex_width', type=int, default=24, help='')
 parser.add_argument('--hex_radius', type=int, default=-1, help='')
 parser.add_argument('--min_ct_per_unit', type=int, default=20, help='')
-parser.add_argument('--min_density_per_unit', type=float, default=0.5, help='')
+parser.add_argument('--min_density_per_unit', type=float, default=0.2, help='')
 args = parser.parse_args()
 
 r_seed = time.time()
