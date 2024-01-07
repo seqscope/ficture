@@ -156,16 +156,16 @@ class OnlineLDA:
         rhot = pow(self._tau0 + self._updatect, -self._kappa)
         doc_ratio = float(self._N) / batch.n
         update_ratio = ((self._sstats).sum(axis = 1) / self._lambda.sum(axis = 1)) * (rhot * doc_ratio) / (1-rhot)
-
+        beta0 = normalize(self._lambda, axis = 1, norm = 'l1')
         self._lambda = (1-rhot) * self._lambda + \
                        rhot * (doc_ratio * (self._eta + self._sstats) )
         self._Elog_beta = utilt.dirichlet_expectation(self._lambda)
-        beta0 = self._expElog_beta
         self._expElog_beta = np.exp(self._Elog_beta)
 
         if self._verbose > 0:
             scores = self.approx_score(batch)
-            max_rel_change_beta = (2 * np.abs(self._expElog_beta - beta0) / (self._expElog_beta + beta0)).max()
+            beta1 = normalize(self._lambda, axis = 1, norm = 'l1')
+            max_rel_change_beta = (2 * np.abs(beta1 - beta0) / (beta1 + beta0)).max()
             max_change_beta = np.abs(self._expElog_beta - beta0).max()
             print(f"{self._updatect}-th global update. rho {rhot:.5f}, max change in expElogBeta {max_change_beta:.4f}, max relative change in expElogBeta {max_rel_change_beta:.5f}\nScores: " + ", ".join(['%.2e'%x for x in scores]))
             print("Update magnitude ratio:")

@@ -5,8 +5,7 @@ import pandas as pd
 from datetime import datetime
 
 from scipy.sparse import *
-import sklearn.neighbors
-import sklearn.preprocessing
+from sklearn.preprocessing import normalize
 from sklearn.decomposition import LatentDirichletAllocation as LDA
 # Add parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -34,6 +33,7 @@ parser.add_argument('--epoch', type=int, default=1, help='How many times to loop
 parser.add_argument('--epoch_id_length', type=int, default=-1, help='')
 parser.add_argument('--use_model', type=str, default='', help="Use provided model to transform input data")
 parser.add_argument('--prior', type=str, default='', help="Dirichlet parameters for the global parameter beta (factor x gene)")
+parser.add_argument('--rescale_prior', type = float, default = -1,)
 parser.add_argument('--alpha', type=float, default=1, help='')
 parser.add_argument('--tau', type=int, default=9, help='')
 parser.add_argument('--kappa', type=float, default=0.7, help='')
@@ -119,14 +119,21 @@ if not use_existing_model:
         if "gene" not in prior.columns:
             sys.exit("ERROR: prior file must have a column named 'gene'")
         if prior.shape[1] != K + 1:
-            sys.exit(f"ERROR: number of factors in --prior file does not match --nFactor ({K})")
+            logging.warn(f"Number of factors in --prior file does not match --nFactor ({K}), will use all factors in the prior file")
+        K = prior.shape[1] - 1
         feature_kept = list(prior.gene.values)
         M = len(feature_kept)
         prior.drop(columns=['gene'], inplace=True)
-
+        factor_header = list(prior.columns)
         lda = OnlineLDA(vocab=feature_kept,K=K,N=args.N,alpha=args.alpha/K,eta=1/M,tau0=args.tau,kappa=args.kappa,thread=args.thread,tol=1e-3,verbose=int(args.verbose))
-        lda.name_factor(prior.columns)
+        lda.name_factor(factor_header)
         prior = np.array(prior).T # K x M
+        if args.rescale_prior > 0:
+            w = prior.sum(axis=1)
+            target_w = w * (args.N * args.rescale_prior / w.sum())
+            prior = normalize(prior, norm='l1', axis=1) * target_w.reshape((-1, 1))
+            print("Scaled prior")
+            print(prior.sum(axis = 1).round(2))
         lda.init_global_parameter(prior)
         mt = prior.sum(axis =1)
         mt = " ".join([f"{x:.2e}" for x in mt])
@@ -145,7 +152,7 @@ if not use_existing_model:
         feature_kept = list(feature[gene_key].values)
         M = len(feature_kept)
 
-        lda = LDA(n_components=K, learning_method='online', batch_size=b_size, n_jobs = args.thread, learning_offset = args.tau, learning_decay = args.kappa, random_state=seed, verbose = args.verbose)
+        lda = LDA(n_components=K, learning_method='online', batch_size=b_size, total_samples = args.N, n_jobs = args.thread, learning_offset = args.tau, learning_decay = args.kappa, random_state=seed, verbose = args.verbose)
 
     ft_dict = {x:i for i,x in enumerate( feature_kept ) }
 
@@ -164,9 +171,10 @@ if not use_existing_model:
             unit_id=unit_key,unit_attr=[])
         while batch_obj.update_batch(b_size):
             N = batch_obj.mtx.shape[0]
-            x1 = np.median(batch_obj.brc[train_on].values)
-            x2 = np.mean(batch_obj.brc[train_on].values)
-            logging.info(f"Made DGE {N}, median/mean count: {x1:.1f}/{x2:.1f}")
+            if args.verbose or args.debug:
+                x1 = np.median(batch_obj.brc[train_on].values)
+                x2 = np.mean(batch_obj.brc[train_on].values)
+                logging.info(f"Made DGE {N}, median/mean count: {x1:.1f}/{x2:.1f}")
             n_unit += N
             if prior is None:
                 _ = lda.partial_fit(batch_obj.mtx)

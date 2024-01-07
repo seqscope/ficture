@@ -5,7 +5,7 @@ import subprocess as sp
 
 class BlockIndexedLoader:
 
-    def __init__(self, input, xmin = -np.inf, xmax = np.inf, ymin = -np.inf, ymax = np.inf, full = False, offseted = True, filter_cmd = "", idtype={}) -> None:
+    def __init__(self, input, xmin = -np.inf, xmax = np.inf, ymin = -np.inf, ymax = np.inf, full = False, offseted = True, filter_cmd = "", idtype={}, chunksize=1000000) -> None:
         self.meta = {}
         self.header = []
         nheader = 0
@@ -48,7 +48,7 @@ class BlockIndexedLoader:
         self.ymin = max(ymin, 0)
         self.ymax = min(ymax, self.meta["SIZE_Y"])
         if full:
-            self.reader = pd.read_csv(input,sep='\t',skiprows=nheader,chunksize=1000000,names=self.header, dtype=dty)
+            self.reader = pd.read_csv(input,sep='\t',skiprows=nheader,chunksize=chunksize,names=self.header, dtype=dty)
         else:
             # Translate target region to index
             block = [int(x / self.meta['BLOCK_SIZE']) for x in [self.xmin, self.xmax - 1] ]
@@ -67,7 +67,7 @@ class BlockIndexedLoader:
                 cmd = cmd + " | " + filter_cmd
             logging.info(cmd)
             process = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.STDOUT, shell=True)
-            self.reader = pd.read_csv(process.stdout,sep='\t',chunksize=1000000,names=self.header, dtype=dty)
+            self.reader = pd.read_csv(process.stdout,sep='\t',chunksize=chunksize,names=self.header, dtype=dty)
 
     def __iter__(self):
         return self

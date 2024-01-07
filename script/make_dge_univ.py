@@ -48,7 +48,7 @@ key = args.key
 if key not in ct_header:
     key = ct_header[0]
     logging.warning(f"The designated major key is not one of the specified count columns, --key is ignored the first existing key is chosen")
-if not os.path.exists(args.input):
+if not os.path.isfile(args.input):
     sys.exit(f"ERROR: cannot find input file \n {args.input}")
 with gzip.open(args.input, 'rt') as rf:
     input_header=rf.readline().strip().split('\t')
@@ -83,9 +83,11 @@ dty = {x:int for x in ct_header}
 dty.update({x:str for x in ['X','Y','gene'] + args.group_within})
 
 use_boundary = False
-if os.path.exists(args.boundary):
+if os.path.isfile(args.boundary):
     mpoly = shapely.geometry.shape(geojson.load(open(args.boundary, 'rb')))
     mpoly = shapely.prepared.prep(mpoly)
+    use_boundary = True
+    logging.info(f"Load boundary from {args.boundary}")
 
 n_unit = 0
 df_full = pd.DataFrame()

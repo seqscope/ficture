@@ -324,15 +324,23 @@ def read_ct_from_solo_barcodes_tsv(file, key, chunksize=500000, mu_scale=-1):
         chunk[key]=chunk[key].map(lambda x : x.split(',')[ct_idx]).astype(int)
         yield chunk
 
-def make_mtx_from_dge(file, min_ct_per_feature = 50, min_ct_per_unit = 100, feature_white_list = None, unit = "random_index", key = "gn", epoch=1):
+def make_mtx_from_dge(file, min_ct_per_feature = 50, min_ct_per_unit = 100, feature_white_list = None, unit = "random_index", key = "gn", epoch=1, epoch_id_length=2, return_df = False):
     df = pd.DataFrame()
+    epoch_id_list = set()
     for chunk in pd.read_csv(file, sep='\t', usecols = [unit,'X','Y','gene',key], dtype={unit:str}, chunksize=500000):
-        if epoch == 1 and chunk[unit].iloc[-1][:2] != "00":
-            df = pd.concat([df, chunk[chunk[unit].str.contains('^00') & chunk[key].ge(1)] ])
+        unit_list = chunk[unit].str[:epoch_id_length].unique()
+        i = 0
+        while len(epoch_id_list) < epoch and i < len(unit_list):
+            epoch_id_list.add(unit_list[i])
+            i += 1
+        if len(epoch_id_list) >= epoch and unit_list[-1] not in epoch_id_list:
+            pat = '^' + '|'.join(list(epoch_id_list))
+            df = pd.concat([df, chunk[chunk[unit].str.contains(pat) & chunk[key].ge(1)] ])
             break
         df = pd.concat([df, chunk[chunk[key].ge(1)] ])
-
-    feature = df.groupby(by=['gene']).agg({key:sum}).reset_index()
+    epoch0 = df[unit].iloc[0][:epoch_id_length]
+    one_pass = df[unit].str[:epoch_id_length].eq(epoch0)
+    feature = df[one_pass].groupby(by=['gene']).agg({key:sum}).reset_index()
     feature_white_list = set() if feature_white_list is None else set(feature_white_list)
     feature = feature.loc[feature[key].ge(min_ct_per_feature ) | feature.gene.isin(feature_white_list), :]
     M = len(feature)
@@ -348,9 +356,16 @@ def make_mtx_from_dge(file, min_ct_per_feature = 50, min_ct_per_unit = 100, feat
     brc['j'] = brc[unit].map(bc_dict)
     df.drop(index = df.index[~df[unit].isin(bc_dict)], inplace=True)
     df['j'] = df[unit].map(bc_dict)
+    brc["epoch"] = brc[unit].str[:epoch_id_length]
     df.drop(columns = unit, inplace=True)
     brc = brc.merge(right = df[['j','X','Y' ]].drop_duplicates(subset='j'), on = 'j', how = 'left')
 
     mtx = sparse.coo_array((df[key].values, (df.j.values, df.gene.map(ft_dict))), shape=(N, M)).tocsr()
 
-    return df, feature, brc, mtx, ft_dict, bc_dict
+    feature["Weight"] = mtx.sum(axis = 0)
+    feature.Weight = feature.Weight * 1. / feature.Weight.sum()
+
+    if return_df:
+        return df, feature, brc, mtx, ft_dict, bc_dict
+    else:
+        return feature, brc, mtx, ft_dict, bc_dict
