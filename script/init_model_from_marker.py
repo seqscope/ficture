@@ -68,7 +68,7 @@ if len(rm_r) > 0:
 
 
 feature, brc, mtx, ft_dict, bc_dict = make_mtx_from_dge(args.input,\
-    min_ct_per_feature = 50, min_ct_per_unit = 50,\
+    min_ct_per_feature = 50, min_ct_per_unit = args.init_min_ct,\
     feature_white_list = anchors.gene.unique(),\
     unit = unit, key = key, epoch = args.epoch)
 
@@ -77,9 +77,7 @@ N, M = mtx.shape
 anchors.drop(index = anchors.index[~anchors.gene.isin(ft_dict)], inplace=True)
 anchors["gene_id"] = anchors.gene.map(ft_dict)
 xsum = mtx.sum(axis = 1).reshape((-1, 1))
-kept_unit = brc.index[brc[key].ge(args.init_min_ct)]
 logging.info(f"Read {N} units and {M} features")
-logging.info(f"Kept {len(kept_unit)}/{N} units with at least {args.init_min_ct} counts")
 pval_cutoff = .1
 
 models = {}

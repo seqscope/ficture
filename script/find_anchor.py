@@ -24,7 +24,8 @@ parser.add_argument('--R', type=int, default = 1, help='')
 parser.add_argument('--candidate', type=str, default='', help='')
 parser.add_argument('--fixed', type=str, nargs="*", default=[], help='')
 parser.add_argument('--anchor_min_ct', type=int, default=-1, help='')
-parser.add_argument('--search_cutoff_qt', type=float, nargs="*", default=[0.2, 0.3, 0.4, 0.5, 0.6, 0.7], help='')
+parser.add_argument('--search_cutoff_qt', type=float, nargs="*", default=[0.2, 0.3, 0.4, 0.5, 0.6], help='')
+parser.add_argument('--search_cutoff_upper', type=float, default = .99, help='')
 parser.add_argument('--key', type=str, default='gn', help='')
 parser.add_argument('--epsilon', type=float, default = 0.2, help='')
 parser.add_argument('--n_anchor_per_cluster', type=int, default=-1, help='')
@@ -33,11 +34,13 @@ parser.add_argument('--min_anchor_per_cluster', type=int, default=3, help='')
 # parser.add_argument('--anchor_list', type=str, default='', help='')
 parser.add_argument('--thread', type=int, default=1, help='')
 parser.add_argument('--recoverKL', action='store_true', help='')
+parser.add_argument('--recoverKL_allmodel', action='store_true', help='')
 parser.add_argument('--debug', action='store_true', help='')
 args = parser.parse_args()
 logging.basicConfig(level= getattr(logging, "INFO", None))
 
 K = args.K
+cut_upper = args.search_cutoff_upper
 
 with open(args.input, 'rb') as rf:
     Q = np.load(rf, allow_pickle=True)
@@ -67,6 +70,7 @@ if len(fixed_idx) > 0:
     logging.info(f"{len(fixed_idx)}/{len(args.fixed)} pre-selected anchors are found in the input file")
 
 ct_cutoffs = []
+ct_upper = int(np.quantile(feature[args.key], q = cut_upper) )
 if args.anchor_min_ct > 0:
     ct_cutoffs = [args.anchor_min_ct]
 else:
@@ -88,11 +92,14 @@ if os.path.isfile(args.candidate):
     if len(miss) > 0:
         logging.info(f"{len(miss)} pre-selected anchors are not among the input candidates.")
         kept_idx = np.append(kept_idx, miss)
+kept_idx = kept_idx[feature.loc[kept_idx, args.key].lt(ct_upper)]
+print(feature.loc[:, args.key].describe( percentiles=[.25, .5, .75, .95, .98] ))
+print(feature.loc[kept_idx, args.key].describe( percentiles=[.25, .5, .75, .95, .98] ))
 for j, cutoff in enumerate(ct_cutoffs):
-    candi = kept_idx[feature.loc[kept_idx, args.key] >= cutoff]
+    candi = kept_idx[feature.loc[kept_idx, args.key].ge(cutoff)]
     candi_map = {x:i for i,x in enumerate(candi)}
     fixed_vtx = [candi_map[x] for x in fixed_idx]
-    logging.info(f"Min count of candidate anchor genes {cutoff}, start finding anchors among {len(candi)} candidates.")
+    logging.info(f"Min/max count of candidate anchor genes {cutoff}/{ct_upper}, start finding anchors among {len(candi)} candidates.")
     if args.epsilon > 0:
         prj_dim = int(4 * np.log(len(candi)) / args.epsilon**2)
         logging.info(f"Random projection to {prj_dim} dimensions.")
@@ -132,18 +139,21 @@ for j, cutoff in enumerate(ct_cutoffs):
 
 pd.DataFrame(scores_full, columns = ["Cutoff", "Run", "k","Variance_explained","Reconstruction_error_l2", "Reconstruction_error_l1", "OrgSpace"]).to_csv(args.output + ".anchor_trace.tsv", sep='\t', index=False)
 
+
+kept_idx = feature[feature[args.key].lt(ct_upper)].index.values
 Qsym = np.minimum(Q, Q.T)
 np.fill_diagonal(Qsym, 0)
+Qsym = Qsym[:, kept_idx]
 anchor_df = pd.DataFrame()
 for r,v in enumerate(anchors_full):
     cutoff = final_score[r][0]
     run = final_score[r][1]
     candi_list = []
-    print(f"Anchor set {r}: " + ", ".join(gene_list[v]))
+    logging.info(f"Anchor set {r}: " + ", ".join(gene_list[v]))
     for k in range(K):
         idx = [v[k]]
         if args.n_anchor_per_cluster > 0:
-            idx += list(np.argsort(-Qsym[v[k], :])[:args.n_anchor_per_cluster] )
+            idx += list(kept_idx[np.argsort(-Qsym[v[k], :])[:args.n_anchor_per_cluster] ] )
         else:
             m = max(100, args.max_anchor_per_cluster)
             v_idx = np.argsort(-Qsym[v[k], :])[:m]
@@ -151,7 +161,7 @@ for r,v in enumerate(anchors_full):
             kn = kneed.KneeLocator(x=np.arange(m), y=y, S=1, curve="convex", direction="decreasing")
             m = max(kn.knee + 1, args.min_anchor_per_cluster)
             m = min(m, args.max_anchor_per_cluster)
-            idx = [v[k]] + list(v_idx[:m])
+            idx = [v[k]] + list(kept_idx[v_idx[:m] ])
             logging.info(f"Anchor set {r}, cluster {k}, add {m} genes (knee {kn.knee + 1}): " + ",".join(gene_list[idx]) )
         candi_list.append(list(gene_list[idx]))
     to_rm = set()
@@ -218,7 +228,7 @@ sub.to_csv(args.output + f".{cutoff0}_{r0}.model.tsv.gz", sep='\t', float_format
 
 Clist = sorted(list(anchor_df.Cutoff.unique()))
 Rlist = sorted(list(anchor_df.Run.unique()))
-if len(Rlist) == 1 and len(Clist) == 1:
+if not args.recoverKL_allmodel or (len(Rlist) == 1 and len(Clist) == 1):
     sys.exit(0)
 
 if args.output_tmp == '' or not os.path.exists(os.path.dirname(args.output_tmp)):
@@ -234,7 +244,7 @@ for cutoff in Clist:
         tab = anchor_df.loc[anchor_df.Cutoff.eq(cutoff) & anchor_df.Run.eq(r), :]
         clst = sorted(list(tab.Cluster.unique()))
         k = len(clst)
-        logging.info(f"Recover model for run {r} with {k} clusters")
+        logging.info(f"Recover model for cutoff {cutoff} run {r} with {k} clusters")
         aks = []
         for i,l in enumerate(clst):
             v = tab.loc[tab.Cluster.eq(l), 'gene'].values
