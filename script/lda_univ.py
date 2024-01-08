@@ -2,10 +2,10 @@ import sys, os, copy, gzip, logging
 import pickle, argparse
 import numpy as np
 import pandas as pd
+from datetime import datetime
 
 from scipy.sparse import *
-import sklearn.neighbors
-import sklearn.preprocessing
+from sklearn.preprocessing import normalize
 from sklearn.decomposition import LatentDirichletAllocation as LDA
 # Add parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -33,9 +33,12 @@ parser.add_argument('--epoch', type=int, default=1, help='How many times to loop
 parser.add_argument('--epoch_id_length', type=int, default=-1, help='')
 parser.add_argument('--use_model', type=str, default='', help="Use provided model to transform input data")
 parser.add_argument('--prior', type=str, default='', help="Dirichlet parameters for the global parameter beta (factor x gene)")
+parser.add_argument('--rescale_prior', type = float, default = -1,)
+parser.add_argument('--alpha', type=float, default=1, help='')
 parser.add_argument('--tau', type=int, default=9, help='')
 parser.add_argument('--kappa', type=float, default=0.7, help='')
 parser.add_argument('--N', type=float, default=1e4, help='')
+parser.add_argument('--seed', type=int, default=-1, help='')
 parser.add_argument('--debug', action='store_true')
 parser.add_argument('--verbose', action='store_true')
 parser.add_argument('--overwrite', action='store_true')
@@ -51,6 +54,10 @@ else:
 
 if args.use_model != '' and not os.path.exists(args.use_model):
     sys.exit("Invalid model file")
+
+seed = args.seed
+if seed <= 0:
+    seed = int(datetime.now().timestamp() )
 
 unit_attr = [x.lower() for x in args.unit_attr]
 key = args.key.lower()
@@ -106,39 +113,50 @@ if not args.overwrite and os.path.exists(model_f):
 factor_header = [str(x) for x in range(K)]
 chunksize=100000 if args.debug else 1000000
 if not use_existing_model:
-    if not os.path.exists(args.feature):
-        sys.exit("Unable to read feature list")
     prior = None
     if os.path.isfile(args.prior):
-        prior = pd.read_csv(args.prior, sep='\t', header=0, index_col=0)
-        if prior.shape[1] != K:
-            sys.exit(f"ERROR: number of factors in --prior file does not match --nFactor ({K})")
-    ### Use only the provided list of features
-    with gzip.open(args.feature, 'rt') as rf:
-        fheader = rf.readline().strip().split('\t')
-    fheader = [x.lower() for x in fheader]
-    feature=pd.read_csv(args.feature, sep='\t', skiprows=1, names=fheader, dtype={gene_key:str, key:int})
-    feature = feature[feature[key] >= args.min_ct_per_feature]
-    feature.sort_values(by=key,ascending=False,inplace=True)
-    feature.drop_duplicates(subset=gene_key,keep='first',inplace=True)
-    feature_kept = list(feature[gene_key].values)
-    ft_dict = {x:i for i,x in enumerate( feature_kept ) }
-    M = len(feature_kept)
-
-    logging.info(f"Start fitting model ... {M} genes will be used")
-
-    if prior is None:
-        lda = LDA(n_components=K, learning_method='online', batch_size=b_size, n_jobs = args.thread, learning_offset = args.tau, learning_decay = args.kappa, verbose = 0)
-    else:
-        prior = prior[prior.index.isin(ft_dict)]
-        prior.index = prior.index.map(lambda x: ft_dict[x])
-        prior_mtx = np.ones((K, M)) * .5
-        prior_mtx[:,prior.index] += prior.values.T
-        lda = OnlineLDA(vocab=feature_kept,K=K,N=args.N,tau0=args.tau,kappa=args.kappa,thread=args.thread,tol=1e-3)
-        lda.init_global_parameter(prior_mtx)
-        mt = prior_mtx.sum(axis =1)
+        prior = pd.read_csv(args.prior, sep='\t', header=0)
+        if "gene" not in prior.columns:
+            sys.exit("ERROR: prior file must have a column named 'gene'")
+        if prior.shape[1] != K + 1:
+            logging.warn(f"Number of factors in --prior file does not match --nFactor ({K}), will use all factors in the prior file")
+        K = prior.shape[1] - 1
+        feature_kept = list(prior.gene.values)
+        M = len(feature_kept)
+        prior.drop(columns=['gene'], inplace=True)
+        factor_header = list(prior.columns)
+        lda = OnlineLDA(vocab=feature_kept,K=K,N=args.N,alpha=args.alpha/K,eta=1/M,tau0=args.tau,kappa=args.kappa,thread=args.thread,tol=1e-3,verbose=int(args.verbose))
+        lda.name_factor(factor_header)
+        prior = np.array(prior).T # K x M
+        if args.rescale_prior > 0:
+            w = prior.sum(axis=1)
+            target_w = w * (args.N * args.rescale_prior / w.sum())
+            prior = normalize(prior, norm='l1', axis=1) * target_w.reshape((-1, 1))
+            print("Scaled prior")
+            print(prior.sum(axis = 1).round(2))
+        lda.init_global_parameter(prior)
+        mt = prior.sum(axis =1)
         mt = " ".join([f"{x:.2e}" for x in mt])
         logging.info(f"Read prior for global parameters. Prior magnitude: {mt}")
+    else:
+        ### Use only the provided list of features
+        if not os.path.exists(args.feature):
+            sys.exit("Unable to read feature list")
+        with gzip.open(args.feature, 'rt') as rf:
+            fheader = rf.readline().strip().split('\t')
+        fheader = [x.lower() for x in fheader]
+        feature=pd.read_csv(args.feature, sep='\t', skiprows=1, names=fheader, dtype={gene_key:str, key:int})
+        feature = feature[feature[key] >= args.min_ct_per_feature]
+        feature.sort_values(by=key,ascending=False,inplace=True)
+        feature.drop_duplicates(subset=gene_key,keep='first',inplace=True)
+        feature_kept = list(feature[gene_key].values)
+        M = len(feature_kept)
+
+        lda = LDA(n_components=K, learning_method='online', batch_size=b_size, total_samples = args.N, n_jobs = args.thread, learning_offset = args.tau, learning_decay = args.kappa, random_state=seed, verbose = args.verbose)
+
+    ft_dict = {x:i for i,x in enumerate( feature_kept ) }
+
+    logging.info(f"Start fitting model ... {M} genes will be used")
 
     epoch = 0
     n_unit = 0
@@ -153,9 +171,10 @@ if not use_existing_model:
             unit_id=unit_key,unit_attr=[])
         while batch_obj.update_batch(b_size):
             N = batch_obj.mtx.shape[0]
-            x1 = np.median(batch_obj.brc[train_on].values)
-            x2 = np.mean(batch_obj.brc[train_on].values)
-            logging.info(f"Made DGE {N}, median/mean count: {x1:.1f}/{x2:.1f}")
+            if args.verbose or args.debug:
+                x1 = np.median(batch_obj.brc[train_on].values)
+                x2 = np.mean(batch_obj.brc[train_on].values)
+                logging.info(f"Made DGE {N}, median/mean count: {x1:.1f}/{x2:.1f}")
             n_unit += N
             if prior is None:
                 _ = lda.partial_fit(batch_obj.mtx)

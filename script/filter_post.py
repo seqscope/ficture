@@ -16,12 +16,13 @@ parser.add_argument('--ref_pt', type=str, help='')
 parser.add_argument('--filter_based_on', type=str, default="Count", help='')
 parser.add_argument('--feature', type=str, default='', help='')
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
-parser.add_argument('--filter_batch_size', type=float, default=1000, help='In um, along the streaming axis')
-parser.add_argument('--filter_batch_ncut', type=int, default=2, help='')
+parser.add_argument('--filter_batch_size', type=float, default=5000, help='In um, along the streaming axis')
+parser.add_argument('--filter_batch_ncut', type=int, default=1, help='')
 parser.add_argument('--major_axis', type=str, default="X", help='')
 parser.add_argument('--precision_um', type=float, default=2, help='')
 parser.add_argument('--log', default = '', type=str, help='files to write log to')
 parser.add_argument('--max_npts_to_fit_model', type=float, default=1e6, help='')
+parser.add_argument('--min_abs_mol_density_squm_dense', type=float, default=0.2, help='Lowerbound for dense tissue region')
 parser.add_argument('--min_abs_mol_density_squm', type=float, default=0.02, help='A safe lowerbound to remove very sparse technical noise')
 parser.add_argument('--hard_threshold', type=float, default=-1, help='If provided, filter by hard threshold (number of molecules per squared um)')
 parser.add_argument('--radius', type=float, default=7, help='')
@@ -108,9 +109,11 @@ else:
         ### Detect grid points falling inside dense tissue region
         for w in df.win.unique():
             indx = df.win.eq(w)
+            xmin, ymin = df.loc[indx, ['X','Y']].min()
+            xmax, ymax = df.loc[indx, ['X','Y']].max()
             sub, m0, m1 = filter_by_density_mixture(df.loc[indx, :], key, radius, n_move, args)
             pt = pd.concat([pt, sub])
-            logging.info(f"Window {str(w)}:\t{m0:.3f} v.s. {m1:.3f}")
+            logging.info(f"Window {str(w)} ({xmax-xmin:.1f} X {ymax-ymin:.1f} ):\t{m0:.3f} v.s. {m1:.3f}")
         df=pd.DataFrame()
         if args.debug:
             break

@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 ### Transform between cartesian and hexagon coordinates
 ### "pointy-top" orientation & axial coordinate
@@ -32,3 +33,23 @@ def hex_to_pixel(x,y,size,offset_x=0,offset_y=0):
     ptx = size * (np.sqrt(3) * (x-offset_x) + np.sqrt(3)/2 * (y-offset_y))
     pty = size * 3/2 * (y-offset_y)
     return ptx, pty
+
+def collapse_to_hex(df, hex_width = -1, radius = -1, n_move = 1, key = "Count", ):
+    if hex_width > 0:
+        radius = hex_width / np.sqrt(3)
+    assert radius > 0
+    df.rename(columns={"x":"X","y":"Y"}, inplace=True)
+    assert "X" in df.columns and "Y" in df.columns
+    brc = pd.DataFrame()
+    for i in range(n_move):
+        for j in range(n_move):
+            cnt = pd.DataFrame()
+            cnt["hex_x"], cnt["hex_y"] = pixel_to_hex(df.loc[:, ['X','Y']].values, radius, i/n_move, j/n_move)
+            cnt[key] = df[key].values
+            cnt = cnt.groupby(by = ['hex_x','hex_y']).agg({key:sum}).reset_index()
+            cnt["offset"] = f"{i}_{j}"
+            cnt["ID"] = list(zip(cnt.hex_x, cnt.hex_y, cnt.offset))
+            cnt["x"], cnt["y"] = hex_to_pixel(cnt.hex_x, cnt.hex_y, radius, i/n_move, j/n_move)
+            cnt.drop(columns=["hex_x","hex_y","offset"], inplace=True)
+            brc = pd.concat([brc, cnt.reset_index(drop=True)])
+    return brc

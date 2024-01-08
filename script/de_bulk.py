@@ -109,9 +109,7 @@ else:
 
 chidf=pd.DataFrame(res,columns=['gene','factor','Chi2','pval','FoldChange','gene_total'])
 chidf.sort_values(by=['factor','Chi2'],ascending=[True,False],inplace=True)
-chidf['Rank'] = 0
-for k in range(K):
-    chidf.loc[chidf.factor.eq(k), 'Rank'] = np.arange((chidf.factor==k).sum())
+chidf["Rank"] = chidf.groupby(by = "factor")["Chi2"].rank(ascending=False)
 chidf = chidf.loc[((chidf.pval<pcut)&(chidf.FoldChange>fcut)) | (chidf.Rank < args.min_output_per_factor), :]
 chidf.sort_values(by=['factor','Chi2'],ascending=[True,False])
 chidf.Chi2 = chidf.Chi2.map(lambda x : "{:.1f}".format(x) )

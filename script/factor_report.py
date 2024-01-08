@@ -24,11 +24,13 @@ parser.add_argument('--n_top_gene_on_tree', type=int, default=10, help='')
 parser.add_argument('--tree_figure', type=str, default='', help='')
 parser.add_argument('--cprob_cut', type=str, default='.99', help='Only visualize top factors with cumulative probability > cprob_cut')
 parser.add_argument('--model', type=str, default='', help='')
+parser.add_argument('--anchor', type=str, default='', help='')
 parser.add_argument('--circle_if', type=int, default=24, help='')
 parser.add_argument('--remake_tree', action='store_true')
 parser.add_argument('--circle', action='store_true')
 parser.add_argument('--vertical', action='store_true')
 args = parser.parse_args()
+logging.basicConfig(level= getattr(logging, "INFO", None))
 
 path=args.path
 pref=args.pref
@@ -50,11 +52,13 @@ if output_pref == '':
 
 # Color code
 color_f = args.color_table
-if os.path.isfile(args.color_table):
-    color_table = pd.read_csv(args.color_table, sep='\t')
-else:
+if not os.path.isfile(color_f):
     color_f = path+"/figure/"+model_id+".rgb.tsv"
-    color_table = pd.read_csv(color_f, sep='\t')
+if not os.path.isfile(color_f):
+    sys.exit(f"Cannot find color table")
+color_table = pd.read_csv(color_f, sep='\t')
+logging.info(f"Read color table from {color_f}")
+
 K = color_table.shape[0]
 factor_header = np.arange(K).astype(str)
 color_table.Name = color_table.Name.astype(int)
@@ -68,6 +72,7 @@ node_color = {str(i):v['HEX'] for i,v in color_table.iterrows() }
 # Posterior count
 f=path+"/"+pref+".posterior.count.tsv.gz"
 post = pd.read_csv(f, sep='\t')
+logging.info(f"Read posterior count from {f}")
 recol = {}
 for u in post.columns:
     v = re.match('^[A-Za-z]*_*(\d+)$', u.strip())
@@ -81,7 +86,12 @@ post_weight /= post_weight.sum()
 
 # DE genes
 f=path+"/DE/"+pref+".bulk_chisq.tsv"
+if not os.path.exists(f):
+    f=path+"/"+pref+".bulk_chisq.tsv"
+    if not os.path.exists(f):
+        sys.exit(f"Cannot find DE file")
 de = pd.read_csv(f, sep='\t')
+logging.info(f"Read DE genes from {f}")
 de.factor = de.factor.astype(int)
 top_gene = []
 top_gene_anno = []
@@ -123,10 +133,21 @@ table = pd.DataFrame({'Factor':np.arange(K), 'RGB':color_table.RGB.values,
                       'TopGene_pval':[x[1] for x in top_gene],
                       'TopGene_fc':[x[2] for x in top_gene],
                       'TopGene_weight':[x[3] for x in top_gene] })
+oheader = ["Factor", "RGB", "Weight", "PostUMI", "TopGene_pval", "TopGene_fc", "TopGene_weight"]
+# Anchor genes used for initialization if applicable
+anchor_f = args.anchor
+if not os.path.exists(anchor_f):
+    anchor_f = path + "/" + model_id + ".model_anchors.tsv"
+if os.path.exists(anchor_f):
+    ak = pd.read_csv(anchor_f, sep='\t', names = ["Factor", "Anchors"])
+    table = table.merge(ak, on = "Factor", how = "left")
+    oheader.insert(4, "Anchors")
+    logging.info(f"Read anchor genes from {anchor_f}")
+
 table.sort_values(by = 'Weight', ascending = False, inplace=True)
 
 f = output_pref+".factor.info.tsv"
-table.to_csv(f, sep='\t', index=False, header=True, float_format="%.5f")
+table[oheader].to_csv(f, sep='\t', index=False, header=True, float_format="%.5f")
 
 f = output_pref+".factor.info.tsv"
 with open(f, 'r') as rf:

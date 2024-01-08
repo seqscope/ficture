@@ -70,7 +70,7 @@ class UnitLoaderAugmented:
 
 class UnitLoader:
 
-    def __init__(self, reader, ft_dict, key, batch_id_prefix=0, min_ct_per_unit=1, unit_id='unit', unit_attr=['x','y'], train_key=None, debug=False) -> None:
+    def __init__(self, reader, ft_dict, key, batch_id_prefix=0, min_ct_per_unit=1, unit_id='unit', unit_attr=['x','y'], train_key=None, epoch = 2**15, skip_epoch=[], debug=False) -> None:
         self.reader = reader
         self.ft_dict = ft_dict
         self.key = key
@@ -79,12 +79,14 @@ class UnitLoader:
         self.mtx = None
         self.brc = None
         self.prefix = batch_id_prefix
+        self.epoch = epoch
         self.min_ct_per_unit = min_ct_per_unit
         self.unit_id = unit_id
         self.unit_attr = list(unit_attr)
         self.M = max(self.ft_dict.values()) + 1
         self.debug = debug
         self.batch_id_list = set()
+        self.skip_epoch = set(skip_epoch)
         self.train_key = key if train_key is None else train_key
         self.test_mtx = None
 
@@ -92,13 +94,18 @@ class UnitLoader:
         n_unit = 0
         if len(self.df) > 0:
             n_unit = len(self.df.unit.unique())
-        if not self.file_is_open:
+        if len(self.batch_id_list) > self.epoch or not self.file_is_open:
             return 0
         while n_unit <= bsize:
             try:
                 chunk = next(self.reader)
                 chunk.rename(columns={self.unit_id:'unit'}, inplace=True)
                 chunk = chunk[chunk.gene.isin(self.ft_dict)]
+                if len(self.skip_epoch) > 0:
+                    lab = chunk.unit.str[:self.prefix]
+                    chunk = chunk[~lab.isin(self.skip_epoch)]
+                if len(chunk) == 0:
+                    continue
                 if self.debug:
                     print(f"Read {chunk.shape[0]} lines from file")
             except StopIteration:
@@ -121,7 +128,7 @@ class UnitLoader:
         N = len(bt_dict)
         self.df = self.df[self.df.unit.isin(bt_dict)]
         if self.prefix > 0:
-            self.batch_id_list.update(set(self.df.unit.map(lambda x : x[:self.prefix]).values))
+            self.batch_id_list.update( [x[:self.prefix] for x in self.df.unit.unique()] )
         self.mtx = coo_array((self.df[self.train_key].values, \
                             (self.df.unit.map(bt_dict).values, \
                              self.df.gene.map(self.ft_dict).values) ), \

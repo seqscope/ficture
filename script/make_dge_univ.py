@@ -5,6 +5,10 @@ from scipy.sparse import *
 import subprocess as sp
 import random as rng
 from collections import defaultdict
+import geojson
+import shapely.prepared, shapely.geometry
+from shapely.geometry import Point
+
 
 # Add parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -13,6 +17,7 @@ from hexagon_fn import pixel_to_hex, hex_to_pixel
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
 parser.add_argument('--output', type=str, help='')
+parser.add_argument('--boundary', type=str, default = '', help='')
 
 parser.add_argument('--major_axis', type=str, default="Y", help='X or Y')
 parser.add_argument('--mu_scale', type=float, default=1, help='Coordinate to um translate')
@@ -29,6 +34,7 @@ parser.add_argument('--n_move', type=int, default=3, help='')
 parser.add_argument('--hex_width', type=int, default=24, help='')
 parser.add_argument('--hex_radius', type=int, default=-1, help='')
 parser.add_argument('--min_ct_per_unit', type=int, default=20, help='')
+parser.add_argument('--min_density_per_unit', type=float, default=0.2, help='')
 args = parser.parse_args()
 
 r_seed = time.time()
@@ -43,7 +49,7 @@ key = args.key
 if key not in ct_header:
     key = ct_header[0]
     logging.warning(f"The designated major key is not one of the specified count columns, --key is ignored the first existing key is chosen")
-if not os.path.exists(args.input):
+if not os.path.isfile(args.input):
     sys.exit(f"ERROR: cannot find input file \n {args.input}")
 with gzip.open(args.input, 'rt') as rf:
     input_header=rf.readline().strip().split('\t')
@@ -70,10 +76,19 @@ if radius < 0:
     radius = diam / np.sqrt(3)
 else:
     diam = int(radius*np.sqrt(3))
+area = radius * diam * 3 / 2
+min_ct_per_unit = max(args.min_ct_per_unit, args.min_density_per_unit * area)
 
 adt = {x:np.sum for x in ct_header}
 dty = {x:int for x in ct_header}
 dty.update({x:str for x in ['X','Y','gene'] + args.group_within})
+
+use_boundary = False
+if os.path.isfile(args.boundary):
+    mpoly = shapely.geometry.shape(geojson.load(open(args.boundary, 'rb')))
+    mpoly = shapely.prepared.prep(mpoly)
+    use_boundary = True
+    logging.info(f"Load boundary from {args.boundary}")
 
 n_unit = 0
 df_full = pd.DataFrame()
@@ -122,8 +137,8 @@ for chunk in pd.read_csv(args.input, sep='\t', chunksize=1000000, dtype=dty):
                 x,y = pixel_to_hex(pts, radius, offs_x/n_move, offs_y/n_move)
                 hex_crd = list(zip(x,y))
                 ct = pd.DataFrame({'hex_id':hex_crd, 'tot':brc[key].values, 'X':pts[:, 0], 'Y':pts[:,1]}).groupby(by = 'hex_id').agg({'tot': sum, 'X':np.min, 'Y':np.min}).reset_index()
-                mid_ct = np.median(ct.loc[ct.tot >= args.min_ct_per_unit, 'tot'].values)
-                ct = set(ct.loc[(ct.tot >= args.min_ct_per_unit) & (ct[mj] > st + diam/2) & (ct[mj] < ed - diam/2), 'hex_id'].values)
+                mid_ct = np.median(ct.loc[ct.tot >= min_ct_per_unit, 'tot'].values)
+                ct = set(ct.loc[(ct.tot >= min_ct_per_unit) & (ct[mj] > st + diam/2) & (ct[mj] < ed - diam/2), 'hex_id'].values)
                 ct = ct - last_batch[(offs_x,offs_y,l)]
                 last_batch[(offs_x,offs_y,l)] = ct
                 if len(ct) < 2:
@@ -140,6 +155,9 @@ for chunk in pd.read_csv(args.input, sep='\t', chunksize=1000000, dtype=dty):
                 hx = cnt.hex_id.map(lambda x : x[0])
                 hy = cnt.hex_id.map(lambda x : x[1])
                 cnt['X'], cnt['Y'] = hex_to_pixel(hx, hy, radius, offs_x/n_move, offs_y/n_move)
+                if use_boundary:
+                    kept = [mpoly.contains(Point(*p)) for p in cnt[['X','Y']].values]
+                    cnt = cnt.loc[kept, :]
 
                 sub = sub.loc[:,['j','random_index']].merge(right = df, on='j', how = 'inner')
                 sub = sub.groupby(by = ['random_index','gene']).agg(adt).reset_index()
