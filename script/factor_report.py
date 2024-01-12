@@ -78,10 +78,10 @@ for u in post.columns:
     v = re.match('^[A-Za-z]*_*(\d+)$', u.strip())
     if v:
         recol[v.group(0)] = v.group(1)
-        post[u] = post[u].astype(int)
+        post[u] = post[u].astype(float)
 post.rename(columns=recol, inplace=True)
 post_umi = post.loc[:, factor_header].sum(axis = 0).astype(int).values
-post_weight = post.loc[:, factor_header].sum(axis = 0).values
+post_weight = post.loc[:, factor_header].sum(axis = 0).values.astype(float)
 post_weight /= post_weight.sum()
 
 # DE genes

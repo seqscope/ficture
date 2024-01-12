@@ -15,6 +15,14 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 from matplotlib.path import Path
 
+from sklearn.utils import check_random_state
+from sklearn.decomposition._online_lda_fast import (
+    _dirichlet_expectation_1d as cy_dirichlet_expectation_1d,
+)
+from sklearn.decomposition._online_lda_fast import (
+    _dirichlet_expectation_2d,
+)
+
 def dirichlet_expectation(alpha):
     """
     For a vector theta ~ Dir(alpha), computes E[log(theta)] given alpha.
@@ -23,6 +31,36 @@ def dirichlet_expectation(alpha):
     if (len(alpha.shape) == 1):
         return(psi(alpha) - psi(np.sum(alpha)))
     return(psi(alpha) - psi(np.sum(alpha, axis=1)).reshape((-1, 1)))
+
+def init_latent_vars(model, n_features, dtype=np.float64, gamma = None, ):
+    """Initialize latent variables."""
+    model.random_state_ = check_random_state(model.random_state)
+    model.n_batch_iter_ = 1
+    model.n_iter_ = 0
+    if model.doc_topic_prior is None:
+        model.doc_topic_prior_ = 1.0 / model.n_components
+    else:
+        model.doc_topic_prior_ = model.doc_topic_prior
+    if model.topic_word_prior is None:
+        model.topic_word_prior_ = 1.0 / model.n_components
+    else:
+        model.topic_word_prior_ = model.topic_word_prior
+
+    init_gamma = 100.0
+    init_var = 1.0 / init_gamma
+    # In the literature, this is called `lambda`
+    if gamma is None:
+        model.components_ = model.random_state_.gamma(
+            init_gamma, init_var, (model.n_components, n_features)
+        ).astype(dtype, copy=False)
+    else:
+        assert gamma.shape == (model.n_components, n_features)
+        model.components_ = gamma.astype(dtype, copy=False)
+
+    # In the literature, this is `exp(E[log(beta)])`
+    model.exp_dirichlet_component_ = np.exp(
+        _dirichlet_expectation_2d(model.components_)
+    )
 
 def pg_mean(b,c=0):
     if np.isscalar(c) and c == 0:
@@ -324,7 +362,7 @@ def read_ct_from_solo_barcodes_tsv(file, key, chunksize=500000, mu_scale=-1):
         chunk[key]=chunk[key].map(lambda x : x.split(',')[ct_idx]).astype(int)
         yield chunk
 
-def make_mtx_from_dge(file, min_ct_per_feature = 50, min_ct_per_unit = 100, feature_white_list = None, unit = "random_index", key = "gn", epoch=1, epoch_id_length=2, return_df = False):
+def make_mtx_from_dge(file, min_ct_per_feature = 50, min_ct_per_unit = 100, feature_white_list = None, feature_list = None, unit = "random_index", key = "gn", epoch=1, epoch_id_length=2, return_df = False):
     df = pd.DataFrame()
     epoch_id_list = set()
     for chunk in pd.read_csv(file, sep='\t', usecols = [unit,'X','Y','gene',key], dtype={unit:str}, chunksize=500000):
@@ -340,9 +378,15 @@ def make_mtx_from_dge(file, min_ct_per_feature = 50, min_ct_per_unit = 100, feat
         df = pd.concat([df, chunk[chunk[key].ge(1)] ])
     epoch0 = df[unit].iloc[0][:epoch_id_length]
     one_pass = df[unit].str[:epoch_id_length].eq(epoch0)
-    feature = df[one_pass].groupby(by=['gene']).agg({key:sum}).reset_index()
-    feature_white_list = set() if feature_white_list is None else set(feature_white_list)
-    feature = feature.loc[feature[key].ge(min_ct_per_feature ) | feature.gene.isin(feature_white_list), :]
+    if feature_list is not None:
+        feature = pd.DataFrame({"gene": feature_list})
+        ct = df[one_pass].groupby(by=['gene']).agg({key:sum}).reset_index()
+        feature = feature.merge(right = ct, on = 'gene', how = 'left')
+        feature[key] = feature[key].fillna(0).astype(int)
+    else:
+        feature = df[one_pass].groupby(by=['gene']).agg({key:sum}).reset_index()
+        feature_white_list = set() if feature_white_list is None else set(feature_white_list)
+        feature = feature.loc[feature[key].ge(min_ct_per_feature ) | feature.gene.isin(feature_white_list), :]
     M = len(feature)
     feature.index = np.arange(M)
     ft_dict = {x:i for i,x in enumerate(feature.gene)}

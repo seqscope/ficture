@@ -8,10 +8,10 @@ import pickle, argparse
 import numpy as np
 import pandas as pd
 import random as rng
-
+from sklearn.decomposition import LatentDirichletAllocation as LDA
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from unit_loader import UnitLoader
-from online_lda import OnlineLDA
+from utilt import init_latent_vars
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
@@ -64,12 +64,11 @@ if args.debug:
 
 ### Model
 if args.model.endswith('.tsv.gz') or args.model.endswith('tsv'):
-    model_mtx = pd.read_csv(args.model, sep='\t')
-    feature_kept=list(model_mtx.gene)
-    model_mtx = np.array(model_mtx.iloc[:, 1:])
+    model_mtx = pd.read_csv(args.model, sep='\t', index_col = 0)
+    feature_kept=list(model_mtx.index)
     M, K = model_mtx.shape
-    model = OnlineLDA(vocab=feature_kept,K=K,N=1e4,thread=args.thread,tol=1e-3)
-    model.init_global_parameter(model_mtx.T)
+    model = LDA(n_components=K, learning_method='online', batch_size=512, n_jobs = args.thread, verbose = 0)
+    init_latent_vars(model, n_features = M, gamma = np.array(model_mtx).T)
 else:
     try:
         model = pickle.load(open(args.model, 'rb'))

@@ -5,10 +5,9 @@ import pandas as pd
 import scipy.stats
 from scipy.sparse import *
 from sklearn.preprocessing import normalize
-
+from sklearn.decomposition import LatentDirichletAllocation as LDA
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utilt import gen_slices_from_list, make_mtx_from_dge
-from online_lda import OnlineLDA
+from utilt import gen_slices_from_list, make_mtx_from_dge, init_latent_vars
 from lda_minibatch import Minibatch
 from itertools import combinations
 from scipy.optimize import linear_sum_assignment
@@ -143,22 +142,21 @@ init_N = N//args.epoch
 idx_list = [idx for idx in gen_slices_from_list(idx_shuffle[:(N//args.epoch)], bsize) ] # Does not use all units to pick a model
 model_snapshot = {}
 model_score = []
-# model_lambda = {}
 for r in Rlist:
     prior = np.clip(np.array(models[r]["init_prior"].drop(columns = "gene")).T, 0, np.inf)
     K = prior.shape[0]
     n = models[r]["init_n"].sum()
-    lda = OnlineLDA(vocab=feature.gene.values,K=K,N=n,alpha=1/K,eta=1/np.sqrt(M),tau0=int(n//bsize+10),thread=args.thread,tol=1e-4,verbose=0)
-    lda.init_global_parameter(prior)
+    lda = LDA(n_components=K, learning_method='online', batch_size = args.bsize, n_jobs=args.thread, verbose=0)
+    init_latent_vars(lda, n_features = M, gamma = prior)
     logl_rec = []
     for i, idx in enumerate(idx_list):
-        logl = lda.update_lambda(Minibatch(mtx[idx, :]))
+        _ = lda.partial_fit(mtx[idx, :])
+        logl = lda.score(mtx[idx, :])
         logl_rec.append([len(idx), logl])
         print(r, i, logl)
     logl_rec = np.array(logl_rec)
     avg_logl = np.mean((logl_rec[:, 0]/bsize) * logl_rec[:, 1])
     model_score.append(avg_logl )
-    # model_lambda[r] = lda._lambda
     model_snapshot[r] = lda
     print(r, avg_logl)
 
@@ -181,20 +179,18 @@ lda = model_snapshot[r_best]
 if args.epoch > 1:
     idx_list = [idx for idx in gen_slices_from_list(idx_shuffle[(N//args.epoch):], bsize) ]
     for i, idx in enumerate(idx_list):
-        logl = lda.update_lambda(Minibatch(mtx[idx, :]))
+        _ = lda.partial_fit(mtx[idx, :])
+        logl = lda.score(mtx[idx, :])
         print(i, logl)
 
-K = lda._lambda.shape[0]
+K = lda.n_components
 f = args.output + ".model_matrix.tsv.gz"
-pd.DataFrame(lda._lambda.T, index = pd.Index(feature.gene.values, name='gene'), columns = range(K)).to_csv(f, sep='\t', index=True, float_format='%.2f')
+pd.DataFrame(lda.components_.T, index = pd.Index(feature.gene.values, name='gene'), columns = range(K)).to_csv(f, sep='\t', index=True, float_format='%.2f')
 
 one_pass = brc.epoch.eq(brc.epoch.iloc[0])
 idx = brc.index[one_pass].values
 theta = lda.transform(mtx[idx, :])
 res = pd.DataFrame(theta, columns = np.arange(K), index = idx)
-
-# theta = lda.transform(mtx)
-# res = pd.DataFrame(theta, columns = np.arange(K), index = brc.index)
 
 res["topK"] = theta.argmax(axis=1)
 res["topP"] = theta.max(axis=1)
