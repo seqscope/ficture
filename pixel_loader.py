@@ -8,6 +8,7 @@ from scipy.sparse import coo_array
 import sklearn.neighbors
 import sklearn.preprocessing
 from joblib.parallel import Parallel, delayed
+from sklearn.decomposition._online_lda_fast import _dirichlet_expectation_2d
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import utilt
@@ -131,8 +132,8 @@ class PixelMinibatch:
 
         # Pixel to anchor weight
         indx, dist = self.bt.query_radius(X = np.array(grid_pt), r = self.radius, return_distance = True)
-        r_indx = [i for i,x in enumerate(indx) for y in range(len(x))]
-        c_indx = [x for y in indx for x in y]
+        r_indx = [i for i,x in enumerate(indx) for y in range(len(x))] # anchor
+        c_indx = [x for y in indx for x in y] # pixel
         wij = np.array([x for y in dist for x in y])
         wij = 1-(wij / self.radius)**self.nu
         wij = coo_array((wij, (r_indx,c_indx)),shape=(n,self.N0)).tocsc().T
@@ -161,31 +162,33 @@ class PixelMinibatch:
             batch.init_from_matrix(self.dge_mtx[b_indx, :], grid_pt, wij, psi = psi_org, m_gamma = theta)
             _ = slda.do_e_step(batch)
 
-            tmp = self.brc.iloc[b_indx, :]
-            v = np.arange(N)[(tmp.X > x_min+self.out_buff) &\
-                             (tmp.X < x_max-self.out_buff) &\
-                             (tmp.Y > y_min+self.out_buff) &\
-                             (tmp.Y < y_max-self.out_buff)]
-            post_count += batch.phi[v, :].T @ batch.mtx[v, :]
-
             tmp = copy.copy(self.brc.loc[b_indx, ['j','X','Y']] )
             tmp.index = range(tmp.shape[0])
             tmp = pd.concat([tmp, pd.DataFrame(batch.phi, \
                              columns = self.factor_header)], axis = 1)
-            tmp = tmp.iloc[v, :]
+            if self.file_is_open:
+                v = np.arange(N)[(tmp.X > x_min+self.out_buff) &\
+                                (tmp.X < x_max-self.out_buff) &\
+                                (tmp.Y > y_min+self.out_buff) &\
+                                (tmp.Y < y_max-self.out_buff)]
+                post_count += batch.phi[v, :].T @ batch.mtx[v, :]
+                tmp = tmp.iloc[v, :]
+            else:
+                post_count += batch.phi.T @ batch.mtx
             pixel_result = pd.concat([pixel_result, tmp], axis = 0)
 
-            expElog_theta = np.exp(utilt.dirichlet_expectation(batch.gamma))
+            expElog_theta = np.exp(_dirichlet_expectation_2d(batch.gamma))
             expElog_theta/= expElog_theta.sum(axis = 1).reshape((-1, 1))
             tmp = pd.DataFrame({'minibatch':b,'X':grid_pt[:,0],'Y':grid_pt[:,1]})
             asum = batch.psi.T @ batch.mtx.sum(axis = 1).reshape((-1, 1))
             tmp['avg_size'] = np.array(asum).reshape(-1)
             for v in range(self.K):
                 tmp[str(v)] = expElog_theta[:, v]
-            tmp = tmp.loc[(tmp.X > x_min+self.out_buff) & \
-                          (tmp.X < x_max-self.out_buff) & \
-                          (tmp.Y > y_min+self.out_buff) & \
-                          (tmp.Y < y_max-self.out_buff), :]
+            if self.file_is_open:
+                tmp = tmp.loc[(tmp.X > x_min+self.out_buff) & \
+                            (tmp.X < x_max-self.out_buff) & \
+                            (tmp.Y > y_min+self.out_buff) & \
+                            (tmp.Y < y_max-self.out_buff), :]
             anchor_result = pd.concat([anchor_result, tmp], axis = 0)
         return post_count, pixel_result, anchor_result
 
@@ -243,7 +246,7 @@ class PixelMinibatch:
             tmp = tmp.iloc[v, :]
             pixel_result = pd.concat([pixel_result, tmp], axis = 0)
 
-            expElog_theta = np.exp(utilt.dirichlet_expectation(batch.gamma))
+            expElog_theta = np.exp(_dirichlet_expectation_2d(batch.gamma))
             expElog_theta/= expElog_theta.sum(axis = 1).reshape((-1, 1))
             tmp = pd.DataFrame({'minibatch':b,'X':grid_pt[:,0],'Y':grid_pt[:,1]})
             asum = batch.psi.T @ batch.mtx.sum(axis = 1).reshape((-1, 1))

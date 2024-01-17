@@ -16,6 +16,7 @@ parser.add_argument('--model', type=str, help='')
 parser.add_argument('--output', type=str, help='')
 parser.add_argument('--anchor', type=str, help='')
 parser.add_argument('--anchor_in_um', action='store_true')
+parser.add_argument('--feature', type=str, default='', help='')
 
 # Data realted parameters
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
@@ -63,28 +64,35 @@ batch_id = args.batch_id.lower()
 chunk_size = 500000
 
 ### Load model
+factor_names = []
 if args.model.endswith(".tsv.gz") or args.model.endswith(".tsv"):
     # If input is a gzip tsv file
     model = pd.read_csv(args.model, sep='\t')
-    gene_kept = list(model.gene)
+    factor_names = list(model.columns)[1:]
+    feature_kept = model.gene.values
     model = np.array(model.iloc[:,1:]).T
     model = np.clip(model, 0.5, None)
 else:
     # If input is a pickled model object
     try:
         model = pickle.load(open( args.model, "rb" ))
-        gene_kept = model.feature_names_in_
+        feature_kept = np.array(model.feature_names_in_)
         model = model.components_
     except:
         sys.exit("ERROR: --model input should be either a tsv file containing gene names and factor profiles, or a pickled model object with at least two attributes, feature_names_in_ and components_, like those defined in scikit-learn LDA model")
+if os.path.isfile(args.feature):
+    feature = pd.read_csv(args.feature, sep='\t')
+    kept_idx = np.where(np.in1d(feature_kept, feature.gene.values))[0]
+    feature_kept = np.array(feature_kept)[kept_idx]
+    model = model[:, kept_idx]
 
 K, M = model.shape
-ft_dict = {x:i for i,x in enumerate( gene_kept ) }
+ft_dict = {x:i for i,x in enumerate( feature_kept ) }
 if args.model_scale > 0:
     model = normalize(model, norm='l1', axis=1) * args.model_scale
 logging.info(f"{M} genes and {K} factors are read from input model")
 
-slda = OnlineLDA(vocab=gene_kept, K=K, N=1e6, iter_inner=args.inner_max_iter, verbose = 1)
+slda = OnlineLDA(vocab=feature_kept, K=K, N=1e6, iter_inner=args.inner_max_iter, verbose = 1)
 slda.init_global_parameter(model)
 init_bound = 1./K * args.theta_init_bound_multiplier
 
@@ -119,29 +127,33 @@ while True:
     read_n_batch = pixel_obj.read_chunk(args.thread)
     logging.info(f"Read {read_n_batch} batches ({pixel_obj.dge_mtx.shape})")
     pcount, pixel, anchor  = pixel_obj.run_chunk(slda, init_bound)
-    logging.info(f"Output {pixel.shape[0]} pixels and {anchor.shape[0]} anchors")
     pixel.X = pixel.X.map('{:.2f}'.format)
     pixel.Y = pixel.Y.map('{:.2f}'.format)
     if args.lite_topk_output_pixel > 0 and args.lite_topk_output_pixel < K:
-        part = np.argpartition(-pixel[factor_header].values, kth=np.arange(args.lite_topk_output_pixel), axis=1)[:, :args.lite_topk_output_pixel]
+        X = pixel[factor_header].values
+        partial_indices = np.argpartition(X, -args.lite_topk_output_pixel, axis=1)[:, -args.lite_topk_output_pixel:]
+        sorted_top_indices = np.argsort(X[np.arange(X.shape[0])[:, None], partial_indices], axis=1)[:, ::-1]
+        top_indices = partial_indices[np.arange(partial_indices.shape[0])[:, None], sorted_top_indices]
+        top_values = X[np.arange(X.shape[0])[:, None], top_indices]
         for k in range(args.lite_topk_output_pixel):
-            pixel[f"K{k}"] = part[:,k]
-        part = np.partition(-pixel[factor_header].values, kth=np.arange(args.lite_topk_output_pixel), axis=1)[:, :args.lite_topk_output_pixel]
-        for k in range(args.lite_topk_output_pixel):
-            pixel[f"P{k}"] = np.clip(-part[:,k], 0, 1)
+            pixel[f"K{k+1}"] = top_indices[:, k]
+            pixel[f"P{k+1}"] = np.clip(top_values[:, k], 0, 1)
         pixel.drop(columns = factor_header, inplace=True)
     write_mode = 'w' if n_batch == 0 else 'a'
     header_include = True if n_batch == 0 else False
     pixel.to_csv(args.output+".pixel.tsv.gz", sep='\t', index=False, header=header_include, mode=write_mode, float_format="%.2e", compression={"method":"gzip"})
+    logging.info(f"Output {pixel.shape[0]} pixels and {anchor.shape[0]} anchors")
     anchor.X = anchor.X.map('{:.2f}'.format)
     anchor.Y = anchor.Y.map('{:.2f}'.format)
     if args.lite_topk_output_anchor > 0 and args.lite_topk_output_anchor < K:
-        part = np.argpartition(-anchor[factor_header].values, kth=np.arange(args.lite_topk_output_anchor), axis=1)[:, :args.lite_topk_output_anchor]
+        X = anchor[factor_header].values
+        partial_indices = np.argpartition(X, -args.lite_topk_output_anchor, axis=1)[:, -args.lite_topk_output_anchor:]
+        sorted_top_indices = np.argsort(X[np.arange(X.shape[0])[:, None], partial_indices], axis=1)[:, ::-1]
+        top_indices = partial_indices[np.arange(partial_indices.shape[0])[:, None], sorted_top_indices]
+        top_values = X[np.arange(X.shape[0])[:, None], top_indices]
         for k in range(args.lite_topk_output_anchor):
-            anchor[f"K{k}"] = part[:,k]
-        part = np.partition(-anchor[factor_header].values, kth=np.arange(args.lite_topk_output_anchor), axis=1)[:, :args.lite_topk_output_anchor]
-        for k in range(args.lite_topk_output_anchor):
-            anchor[f"P{k}"] = np.clip(-part[:,k], 0, 1)
+            anchor[f"K{k+1}"] = top_indices[:, k]
+            anchor[f"P{k+1}"] = np.clip(top_values[:, k], 0, 1)
         anchor.drop(columns = factor_header, inplace=True)
     anchor.to_csv(args.output+".anchor.tsv.gz", sep='\t', index=False, header=header_include, mode=write_mode, float_format="%.2e", compression={"method":"gzip"})
     n_batch += read_n_batch
@@ -150,8 +162,10 @@ while True:
         break
 
 ### Output posterior summaries
+if len(factor_names) == K:
+    factor_header = factor_names
 out_f = args.output + ".posterior.count.tsv.gz"
-pd.concat([pd.DataFrame({'gene': gene_kept}),\
+pd.concat([pd.DataFrame({'gene': feature_kept}),\
            pd.DataFrame(post_count.T, dtype='float64',\
                         columns = factor_header)],\
         axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.2f', compression={"method":"gzip"})

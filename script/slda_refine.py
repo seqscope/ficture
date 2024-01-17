@@ -11,7 +11,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from hexagon_fn import pixel_to_hex, hex_to_pixel
 from online_slda import OnlineLDA
 from slda_minibatch import minibatch
-import utilt
+from sklearn.decomposition._online_lda_fast import _dirichlet_expectation_2d
 
 parser = argparse.ArgumentParser()
 
@@ -307,7 +307,7 @@ for it_epoch in range(args.epoch):
                 else:
                     tmp.to_csv(args.output+".pixel.tsv.gz", sep='\t', index=False, header=False, mode='a', float_format="%.2e", compression={"method":"gzip"})
 
-                expElog_theta = np.exp(utilt.dirichlet_expectation(batch.gamma))
+                expElog_theta = np.exp(_dirichlet_expectation_2d(batch.gamma))
                 expElog_theta/= expElog_theta.sum(axis = 1).reshape((-1, 1))
                 tmp = pd.DataFrame({'minibatch':b,'X':grid_pt[:,0],'Y':grid_pt[:,1]})
                 asum = batch.psi.T @ batch.mtx.sum(axis = 1).reshape((-1, 1))

@@ -34,7 +34,7 @@ if os.path.exists(args.feature):
 info = pd.read_csv(args.input,sep='\t',header=0)
 oheader = []
 header = []
-if (args.use_input_header):
+if args.use_input_header:
     header = [x for x in info.columns if x != args.feature_label]
     oheader = header
 else:

@@ -11,11 +11,13 @@ from sklearn.decomposition import LatentDirichletAllocation as LDA
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from pixel_to_unit_loader import PixelToUnit
 from utilt import init_latent_vars
+from sklearn.decomposition._online_lda_fast import _dirichlet_expectation_2d
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
 parser.add_argument('--output', '--output_pref', type=str, help='')
 parser.add_argument('--model', type=str, help='')
+parser.add_argument('--feature', type=str, default='', help='')
 
 parser.add_argument('--key', type=str, default = 'gn', help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced')
 parser.add_argument('--major_axis', type=str, default=None, help='X or Y')
@@ -60,9 +62,11 @@ reader = pd.read_csv(gzip.open(args.input, 'rt'), sep='\t',\
                     usecols=usecol, dtype=adt)
 
 ### Model
+factor_header = []
 if args.model.endswith('.tsv.gz') or args.model.endswith('tsv'):
     model_mtx = pd.read_csv(args.model, sep='\t', index_col = 0)
-    feature_kept=list(model_mtx.index)
+    factor_header = list(model_mtx.columns)
+    feature_kept =list(model_mtx.index)
     M, K = model_mtx.shape
     model = LDA(n_components=K, learning_method='online', batch_size=512, n_jobs = args.thread, verbose = 0)
     init_latent_vars(model, n_features = M, gamma = np.array(model_mtx).T)
@@ -73,13 +77,23 @@ else:
         feature_kept = model.feature_names_in_
         K, M = model.components_.shape
         model.feature_names_in_ = None
+        factor_header = list(np.arange(K).astype(str) )
     except:
         sys.exit("ERROR: --model must be either a tsv file containing gene name and factor-gene loadings or a pickle model object from sklearn LDA")
+if os.path.isfile(args.feature):
+    feature = pd.read_csv(args.feature, sep='\t')
+    kept_idx = np.where(np.in1d(feature_kept, feature.gene.values))[0]
+    feature_kept = np.array(feature_kept)[kept_idx]
+    model.components_ = model.components_[:, kept_idx]
+    model.exp_dirichlet_component_ = np.exp(
+        _dirichlet_expectation_2d(model.components_)
+    )
+    M = len(feature_kept)
+
 ft_dict = {x:i for i,x in enumerate(feature_kept)}
 logging.info(f"Model loaded with {M} features and {K} factors")
 
 ### Basic parameterse
-factor_header = [str(x) for x in range(K)]
 radius = args.hex_radius
 if radius < 0:
     radius = args.hex_width / np.sqrt(3)
@@ -95,7 +109,7 @@ batch_obj = PixelToUnit(reader, ft_dict, key, radius,\
 post_count = np.zeros((K, M))
 n_unit = 0
 n_batch= 0
-oheader = ["unit",key,"x","y","topK","topP"]+factor_header
+oheader = ["unit",key,"x","y","topK","topP"]+[str(x) for x in range(K)]
 out_f = args.output + ".fit_result.tsv.gz"
 with gzip.open(out_f, 'wt') as wf:
     wf.write('\t'.join(oheader) + '\n')
@@ -109,7 +123,7 @@ while batch_obj.read_chunk(min_size=b_size):
     t1 = time.time() - t0
     batch_obj.brc['topK'] = np.argmax(theta, axis = 1)
     batch_obj.brc['topP'] = theta.max(axis = 1)
-    batch_obj.brc = pd.concat([batch_obj.brc, pd.DataFrame(theta, columns=factor_header)], axis=1)
+    batch_obj.brc = pd.concat([batch_obj.brc, pd.DataFrame(theta, columns=[str(x) for x in range(K)] )], axis=1)
     batch_obj.brc['x'] = batch_obj.brc.x.map(lambda x : f"{x:.{args.precision}f}")
     batch_obj.brc['y'] = batch_obj.brc.y.map(lambda x : f"{x:.{args.precision}f}")
     batch_obj.brc.rename(columns = {'hex_id':'unit'}, inplace=True)
@@ -124,5 +138,5 @@ while batch_obj.read_chunk(min_size=b_size):
 out_f = args.output + ".posterior.count.tsv.gz"
 pd.concat([pd.DataFrame({'gene': feature_kept}),\
            pd.DataFrame(post_count.T, dtype='float64',\
-                        columns = [str(k) for k in range(K)])],\
+                        columns = factor_header)],\
             axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.2f', compression={"method":"gzip"})

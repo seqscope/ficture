@@ -278,7 +278,7 @@ for it_epoch in range(args.epoch):
                 else:
                     tmp.to_csv(args.output+".pixel.tsv.gz", sep='\t', index=False, header=False, mode='a', float_format="%.2e", compression={"method":"gzip"})
 
-                expElog_theta = np.exp(utilt.dirichlet_expectation(batch.gamma))
+                expElog_theta = np.exp(_dirichlet_expectation_2d(batch.gamma))
                 expElog_theta/= expElog_theta.sum(axis = 1).reshape((-1, 1))
                 tmp = pd.DataFrame({'X':grid_pt[:,0],'Y':grid_pt[:,1]})
                 tmp['avg_size'] = np.array(batch.psi.sum(axis = 0)).reshape(-1)

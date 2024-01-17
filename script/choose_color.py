@@ -16,7 +16,15 @@ parser.add_argument('--output', type=str, help='')
 parser.add_argument('--cmap_name', type=str, default="turbo", help="Name of Matplotlib colormap to use (better close to a circular colormap)")
 parser.add_argument('--top_color', type=str, default="#fcd217", help="HEX color code for the top factor")
 parser.add_argument('--even_space', action='store_true', help="Evenly space the factors on the circle")
+parser.add_argument('--annotation', type=str, default = '', help='')
 args = parser.parse_args()
+
+factor_name = {}
+if os.path.isfile(args.annotation):
+    with open(args.annotation) as f:
+        for line in f:
+            x = line.strip().split('\t')
+            factor_name[x[0]] = x[1]
 
 cmap_name = args.cmap_name
 if args.cmap_name not in plt.colormaps():
@@ -39,6 +47,8 @@ if args.even_space:
 else:
     weight = df.loc[:, factor_header].sum(axis = 0).values
     weight = weight**(1/2)
+    weight /= weight.sum()
+    weight = np.clip(weight, .2/K, 1)
     weight /= weight.sum()
 
 # Find neearest neighbors
@@ -63,12 +73,17 @@ mtx = mtx + mtx.T
 
 # Assign color using MDS with circular constraint
 c_pos = assign_color_mds_circle(mtx, cmap_name, weight=weight, top_color=args.top_color)
+spectral_offset = .05 # avoid extremely dark colors
+c_pos = (c_pos - c_pos.min()) / (c_pos.max() - c_pos.min()) * (1 - spectral_offset) + spectral_offset
 
 c_rank = np.argsort(np.argsort(c_pos))
 cmtx = plt.get_cmap(cmap_name)(c_pos) # K x 4
-cdict = {k:cmtx[k,:] for k in range(K)}
-df = pd.DataFrame({"Name":range(K), "Color_index":c_rank})
+df = pd.DataFrame({"Name":np.arange(K).astype(str), "Color_index":c_rank})
 df = pd.concat([df, pd.DataFrame(cmtx[:, :3], columns=["R", "G", "B"])], axis=1)
+cdict = {k:cmtx[k,:] for k in range(K)}
+if len(factor_name) > 0:
+    df["Annotation"] = df.Name.map(factor_name)
+    cdict = {factor_name[str(k)]:cmtx[k,:] for k in range(K)}
 
 # Output RGB table
 f = args.output + ".rgb.tsv"

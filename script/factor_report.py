@@ -18,6 +18,7 @@ parser.add_argument('--min_top_gene', type=int, default=10, help='')
 parser.add_argument('--max_pval', type=float, default=0.001, help='')
 parser.add_argument('--min_fc', type=float, default=1.5, help='')
 parser.add_argument('--output_pref', type=str, default='', help='')
+parser.add_argument('--annotation', type=str, default = '', help='')
 
 parser.add_argument('--hc_tree', action='store_true')
 parser.add_argument('--n_top_gene_on_tree', type=int, default=10, help='')
@@ -57,17 +58,22 @@ if not os.path.isfile(color_f):
 if not os.path.isfile(color_f):
     sys.exit(f"Cannot find color table")
 color_table = pd.read_csv(color_f, sep='\t')
+K = color_table.shape[0]
 logging.info(f"Read color table from {color_f}")
 
-K = color_table.shape[0]
 factor_header = np.arange(K).astype(str)
-color_table.Name = color_table.Name.astype(int)
-color_table.sort_values(by = 'Name', inplace=True)
-color_table.index = color_table.Name.values
+factor_name = {}
+if os.path.isfile(args.annotation):
+    with open(args.annotation) as f:
+        for line in f:
+            x = line.strip().split('\t')
+            factor_name[x[0]] = x[1]
+            factor_header[int(x[0])] = x[1]
+
+print(factor_header)
 color_table['RGB'] = [','.join(x) for x in np.clip((color_table.loc[:, ['R','G','B']].values * 255).astype(int), 0, 255).astype(str) ]
 color_table['HEX'] = [ matplotlib.colors.to_hex(v) for v in np.array(color_table.loc[:, ['R','G','B']]) ]
-node_color = {str(i):v['HEX'] for i,v in color_table.iterrows() }
-
+node_color = {factor_header[v['Name']]:v['HEX'] for i,v in color_table.iterrows() }
 
 # Posterior count
 f=path+"/"+pref+".posterior.count.tsv.gz"
@@ -78,8 +84,10 @@ for u in post.columns:
     v = re.match('^[A-Za-z]*_*(\d+)$', u.strip())
     if v:
         recol[v.group(0)] = v.group(1)
-        post[u] = post[u].astype(float)
-post.rename(columns=recol, inplace=True)
+if len(recol) == K:
+    post.rename(columns=recol, inplace=True)
+for u in factor_header:
+    post[u] = post[u].astype(float)
 post_umi = post.loc[:, factor_header].sum(axis = 0).astype(int).values
 post_weight = post.loc[:, factor_header].sum(axis = 0).values.astype(float)
 post_weight /= post_weight.sum()
@@ -92,7 +100,7 @@ if not os.path.exists(f):
         sys.exit(f"Cannot find DE file")
 de = pd.read_csv(f, sep='\t')
 logging.info(f"Read DE genes from {f}")
-de.factor = de.factor.astype(int)
+# de.factor = de.factor.astype(int)
 top_gene = []
 top_gene_anno = []
 de['Rank'] = 0
@@ -100,22 +108,24 @@ de['Rank'] = 0
 de.gene = de.gene.str.replace('unspl_', 'u_')
 # Top genes by Chi2
 de.sort_values(by=['factor','Chi2'],ascending=False,inplace=True)
-for k in range(K):
-    v = de.loc[de.factor.eq(k), 'gene'].iloc[:args.n_top_gene_on_tree].values
+de["Rank"] = de.groupby(by = "factor").Chi2.rank(ascending=False, method = "min").astype(int)
+for k, kname in enumerate(factor_header):
+    indx = de.factor.eq(kname)
+    v = de.loc[indx, 'gene'].iloc[:args.n_top_gene_on_tree].values
     top_gene_anno.append(', '.join(v))
-    de.loc[de.factor.eq(k), 'Rank'] = np.arange(de.factor.eq(k).sum())
-    v = de.loc[de.factor.eq(k) & ( (de.Rank < mtop) | \
+    v = de.loc[indx & ( (de.Rank < mtop) | \
                ((de.pval <= pval_max) & (de.FoldChange >= fc_min)) ), \
                'gene'].iloc[:ntop].values
     if len(v) == 0:
-        top_gene.append([k, '.'])
+        top_gene.append([kname, '.'])
     else:
-        top_gene.append([k, ', '.join(v)])
+        top_gene.append([kname, ', '.join(v)])
 # Top genes by fold change
 de.sort_values(by=['factor','FoldChange'],ascending=False,inplace=True)
-for k in range(K):
-    de.loc[de.factor.eq(k), 'Rank'] = np.arange(de.factor.eq(k).sum())
-    v = de.loc[de.factor.eq(k) & ( (de.Rank < mtop) | \
+de["Rank"] = de.groupby(by = "factor").FoldChange.rank(ascending=False, method = "min").astype(int)
+for k, kname in enumerate(factor_header):
+    indx = de.factor.eq(kname)
+    v = de.loc[indx & ( (de.Rank < mtop) | \
                ((de.pval <= pval_max) & (de.FoldChange >= fc_min)) ), \
                'gene'].iloc[:ntop].values
     if len(v) == 0:
@@ -123,12 +133,12 @@ for k in range(K):
     else:
         top_gene[k].append(', '.join(v))
 # Top genes by absolute weight
-for k in range(K):
-    v = post.gene.iloc[np.argsort(post.loc[:, str(k)].values)[::-1][:ntop] ].values
+for k, kname in enumerate(factor_header):
+    v = post.gene.iloc[np.argsort(-post.loc[:, kname].values)[:ntop] ].values
     top_gene[k].append(', '.join(v))
 
 # Summary
-table = pd.DataFrame({'Factor':np.arange(K), 'RGB':color_table.RGB.values,
+table = pd.DataFrame({'Factor':factor_header, 'RGB':color_table.RGB.values,
                       'Weight':post_weight, 'PostUMI':post_umi,
                       'TopGene_pval':[x[1] for x in top_gene],
                       'TopGene_fc':[x[2] for x in top_gene],
@@ -139,7 +149,7 @@ anchor_f = args.anchor
 if not os.path.exists(anchor_f):
     anchor_f = path + "/" + model_id + ".model_anchors.tsv"
 if os.path.exists(anchor_f):
-    ak = pd.read_csv(anchor_f, sep='\t', names = ["Factor", "Anchors"])
+    ak = pd.read_csv(anchor_f, sep='\t', names = ["Factor", "Anchors"], dtype={"Factor":str})
     table = table.merge(ak, on = "Factor", how = "left")
     oheader.insert(4, "Anchors")
     logging.info(f"Read anchor genes from {anchor_f}")
@@ -183,7 +193,8 @@ if args.hc_tree:
                 model = post
             else:
                 model = pd.read_csv(model_f, sep='\t')
-            model_prob = np.array(model.iloc[:, 1:]).T + .1
+            # model_prob = np.array(model.iloc[:, 1:]).T + .1
+            model_prob = np.array(model.loc[:, factor_header]).T + .1
             model_prob = model_prob / model_prob.sum(axis = 1).reshape((-1,1))
 
             circle = args.circle
@@ -194,7 +205,7 @@ if args.hc_tree:
                 if k > args.circle_if:
                     circle = True
             tree = visual_hc(model_prob, post_weight, top_gene_anno, \
-                             node_color = node_color, circle = circle, \
+                             node_color = node_color, factor_name = factor_header, circle = circle, \
                              output_f = tree_f, cprob_cut = cprob_cut)
     print(f"Tree figure path: {tree_f}")
     image_base64 = image_to_base64(tree_f)

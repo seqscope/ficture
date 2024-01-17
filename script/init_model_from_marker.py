@@ -8,7 +8,6 @@ from sklearn.preprocessing import normalize
 from sklearn.decomposition import LatentDirichletAllocation as LDA
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utilt import gen_slices_from_list, make_mtx_from_dge, init_latent_vars
-from lda_minibatch import Minibatch
 from itertools import combinations
 from scipy.optimize import linear_sum_assignment
 
@@ -36,7 +35,7 @@ logging.basicConfig(level= getattr(logging, "INFO", None))
 anchors = pd.read_csv(args.anchors, sep='\t')
 Rlist = sorted(anchors.Run.unique())
 R = len(Rlist)
-print(f"Read {R} sets of anchors")
+logging.info(f"Read {R} sets of anchors")
 # Check if anchor sets are redundant (highly overlap)
 ncls = anchors.groupby(by = 'Run').agg({'Cluster':lambda x : len(set(x))}).Cluster
 matches_info = {}
@@ -60,7 +59,7 @@ for i,r1 in enumerate(Rlist[:-1]):
             rm_r.append(r2)
 rm_r = set(rm_r)
 if len(rm_r) > 0:
-    print(f"Remove {len(rm_r)} redundant anchor sets")
+    logging.info(f"Remove {len(rm_r)} redundant anchor sets")
     anchors.drop(index=anchors.index[anchors.Run.isin(rm_r)], inplace=True)
     Rlist = [r for r in Rlist if r not in rm_r]
     R = len(Rlist)
@@ -109,6 +108,7 @@ for r in Rlist:
     max_p = []
     for i,k in enumerate(clusters):
         sub = tab.loc[tab.Cluster.eq(k) & tab.Rank.lt(2), :]
+        print(k, sub.shape[0], sub.pval.lt(.05).sum() )
         if sub.shape[0] < args.init_min_unit:
             sub = pd.concat([sub, tab.loc[tab.Cluster.eq(k) & tab.Rank.eq(2) & \
                             (tab.pval_2nd/tab.pval_min).le(2), :]])
@@ -128,37 +128,46 @@ for r in Rlist:
         clusters = [clusters[i] for i in kept_c]
         init_assign = init_assign[kept_c, :]
     init_ct = (init_assign @ mtx).toarray().T
+    nnz = (init_ct > 1).sum(axis = 0)
     init_ct = pd.DataFrame(init_ct, columns = clusters)
     init_ct["gene"] = feature.gene.values
     f = args.output_tmp + f".{r}.init_prior.tsv.gz"
     init_ct.to_csv(f, sep='\t', index=False)
     models[r] = {"anchor": tab, "init_prior": init_ct, "init_n":init_assign.sum(axis = 1)}
-    print(r, K, models[r]["init_n"], len(init_b), np.around(max_p, 3))
-
-
+    print(r, K, models[r]["init_n"])
+    print([f"{x:.2e}" for x in max_p])
+    print(nnz)
 
 idx_shuffle = np.random.permutation(N)
 init_N = N//args.epoch
-idx_list = [idx for idx in gen_slices_from_list(idx_shuffle[:(N//args.epoch)], bsize) ] # Does not use all units to pick a model
+idx_list = [idx for idx in gen_slices_from_list(idx_shuffle[:init_N], bsize) ] # Does not use all units to pick a model
 model_snapshot = {}
 model_score = []
 for r in Rlist:
-    prior = np.clip(np.array(models[r]["init_prior"].drop(columns = "gene")).T, 0, np.inf)
+    prior = np.clip(np.array(models[r]["init_prior"].drop(columns = "gene")).T, 2, np.inf)
     K = prior.shape[0]
     n = models[r]["init_n"].sum()
-    lda = LDA(n_components=K, learning_method='online', batch_size = args.bsize, n_jobs=args.thread, verbose=0)
+
+    w = prior.sum(axis = 1)
+    w = w / w.sum()
+    print(" ".join( [f"{x:.2e}" for x in w]) )
+
+    lda = LDA(n_components=K, total_samples=n, learning_offset=(n//args.bsize + 1), learning_method='online', batch_size = args.bsize, n_jobs=args.thread, verbose=0)
     init_latent_vars(lda, n_features = M, gamma = prior)
     logl_rec = []
     for i, idx in enumerate(idx_list):
         _ = lda.partial_fit(mtx[idx, :])
         logl = lda.score(mtx[idx, :])
         logl_rec.append([len(idx), logl])
-        print(r, i, logl)
+        print(r, i, f"{logl:.3e}")
+        w = lda.components_.sum(axis = 1)
+        w = w / w.sum()
+        print(" ".join( [f"{x:.2e}" for x in w]) )
     logl_rec = np.array(logl_rec)
     avg_logl = np.mean((logl_rec[:, 0]/bsize) * logl_rec[:, 1])
     model_score.append(avg_logl )
     model_snapshot[r] = lda
-    print(r, avg_logl)
+    print(r, f"{avg_logl:.3e}")
 
 r_best = Rlist[np.argmax(model_score)]
 

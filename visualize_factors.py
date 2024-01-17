@@ -68,11 +68,13 @@ def NJ_logrank(orgmtx):
         Z.append([ v1, v2, 1-candi[0][1], len(lvs) ])
     return Z
 
-def visual_hc(model_prob, weight, top_gene, node_color=None, circle=False, vertical=False, output_f=None, cprob_cut=.99):
+def visual_hc(model_prob, weight, top_gene, node_color=None, factor_name=None, circle=False, vertical=False, output_f=None, cprob_cut=.99):
 
     K = model_prob.shape[0]
     assert len(weight) == K, "model_prob.shape[0] != len(weight)"
     assert len(top_gene) == K, "len(top_gene) != K"
+    if factor_name is None:
+        factor_name = [str(x) for x in range(K)]
 
     model_prob = normalize(np.array(model_prob), norm='l1', axis=1)
     weight = np.array(weight)
@@ -84,7 +86,8 @@ def visual_hc(model_prob, weight, top_gene, node_color=None, circle=False, verti
         k = K - 1
     else:
         k = np.arange(K)[w > cprob_cut][0]
-    kept_factor = v[:(k+1)].astype(str)
+    kept_factor = factor_name[v[:(k+1)]]
+    kept_idx = v[:(k+1)].astype(str)
 
     # # Hierarchical clustering
     # cd_dist = scipy.spatial.distance.pdist(model_prob, metric='cosine')
@@ -117,9 +120,13 @@ def visual_hc(model_prob, weight, top_gene, node_color=None, circle=False, verti
                 node_dict[c.id] = ch
                 stack.append(c)
 
-    node_list = [x for x in tr.traverse() if x.is_leaf() and x.name in kept_factor]
+    node_list = [x for x in tr.traverse() if x.is_leaf() and x.name in
+    kept_idx]
     subtr = tr.copy()
     subtr.prune( [x.name for x in node_list] )
+    for x in subtr.traverse():
+        if x.is_leaf():
+            x.name = factor_name[int(x.name)]
 
     if output_f is None:
         return subtr
@@ -139,10 +146,10 @@ def visual_hc(model_prob, weight, top_gene, node_color=None, circle=False, verti
                 nstyle["fgcolor"] = node_color[n.name]
                 nstyle['size'] = 10
                 n.set_style(nstyle)
-    node_anno = {k: " " + str(k) + " ("+weight_anno[k] + "): " + v  for k,v in enumerate(top_gene) }
+    node_anno = {factor_name[k]: " " + factor_name[k] + " ("+weight_anno[k] + "): " + v  for k,v in enumerate(top_gene) }
     def layout(node):
         if node.is_leaf():
-            ete3.faces.add_face_to_node(ete3.TextFace(node_anno[int(node.name)]), node, column=0)
+            ete3.faces.add_face_to_node(ete3.TextFace(node_anno[node.name]), node, column=0)
 
     # Tree style
     ts = TreeStyle()

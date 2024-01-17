@@ -17,10 +17,7 @@ from matplotlib.path import Path
 
 from sklearn.utils import check_random_state
 from sklearn.decomposition._online_lda_fast import (
-    _dirichlet_expectation_1d as cy_dirichlet_expectation_1d,
-)
-from sklearn.decomposition._online_lda_fast import (
-    _dirichlet_expectation_2d,
+    _dirichlet_expectation_1d, _dirichlet_expectation_2d,
 )
 
 def dirichlet_expectation(alpha):
@@ -29,8 +26,8 @@ def dirichlet_expectation(alpha):
     """
     assert alpha.min() > 0, "Expecting positive Dirichlet parameters"
     if (len(alpha.shape) == 1):
-        return(psi(alpha) - psi(np.sum(alpha)))
-    return(psi(alpha) - psi(np.sum(alpha, axis=1)).reshape((-1, 1)))
+        return( _dirichlet_expectation_2d(alpha.reshape((-1, 1))) )
+    return _dirichlet_expectation_2d(alpha)
 
 def init_latent_vars(model, n_features, dtype=np.float64, gamma = None, ):
     """Initialize latent variables."""

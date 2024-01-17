@@ -53,6 +53,7 @@ feature.index = np.arange(M)
 ft_dict = {x:i for i,x in enumerate(feature.gene.values )}
 # dangeraous
 kept_gene_id = set(feature.gene_id.values)
+logging.info(f"Load {M} feature from {args.feature}")
 
 mj_max = np.inf
 use_boundary = False
@@ -81,13 +82,13 @@ for chunk in reader:
     ed = chunk[mj].iloc[-1]
     df = pd.concat([df, chunk])
     if ed - st > wsize:
-        print(st, ed, df.shape[0])
+        logging.info(f"{st:.1f}, {ed:.1f}, {df.shape[0]}")
         df.X = (df.X / resolution).astype(int) * resolution
         df.Y = (df.Y / resolution).astype(int) * resolution
         brc = df.groupby(by=["X","Y"]).agg({key:sum}).reset_index()
         if use_boundary:
             kept = [mpoly.contains(Point(*p)) for p in brc[['X','Y']].values]
-            print(brc.shape[0], np.sum(kept))
+            logging.info(f"Boundary filter: {brc.shape[0]} -> {np.sum(kept)}")
             brc = brc.loc[kept, :]
             if len(brc) < 2:
                 df = pd.DataFrame()
@@ -102,7 +103,7 @@ for chunk in reader:
         df.drop(index = df.index[~df.i.isin(bc_dict)], inplace=True)
         df['i'] = df.i.map(bc_dict)
         mtx = coo_array((df[key].values, (df.i.values, df.gene.map(ft_dict))), shape=(N,M) ).tocsr()
-        print(len(df), len(brc), mtx.shape)
+        logging.info(f"Processing {N} (collapsed) pixels")
 
         xmax = brc[mi].max()
         xst = brc[mi].min()
@@ -112,7 +113,7 @@ for chunk in reader:
                 xed = xmax
             indx = brc.index[(brc[mi] >= xst - buff) & (brc[mi] <= xed)]
             n = len(indx)
-            print(f"{n}, ({xst}, {xed}) x ({st}, {ed})")
+            logging.info(f"{n}, ({xst}, {xed}) x ({st:.0f}, {ed:.0f})")
             xst = xed
             if n < 2:
                 continue

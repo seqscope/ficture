@@ -7,10 +7,12 @@ import numpy as np
 from scipy.special import gammaln, psi, logsumexp, expit, logit
 from scipy.sparse import *
 from sklearn.preprocessing import normalize
+from sklearn.decomposition._online_lda_fast import (
+    _dirichlet_expectation_1d, _dirichlet_expectation_2d,
+)
 
-# Add directory
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-import utilt
+# # Add directory
+# sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 class OnlineLDA:
     """
@@ -70,7 +72,7 @@ class OnlineLDA:
             self._lambda = np.random.gamma(100., 1./100., (self._K, self._M))
         else:
             self._lambda = m_lambda
-        self._Elog_beta = utilt.dirichlet_expectation(self._lambda)
+        self._Elog_beta = _dirichlet_expectation_2d(self._lambda)
 
     def do_e_step(self, batch):
         """
@@ -86,7 +88,7 @@ class OnlineLDA:
         if batch.gamma is None:
             batch.gamma = copy.copy(batch.alpha)
         gamma_old = copy.copy(batch.gamma)
-        Elog_theta = utilt.dirichlet_expectation(batch.gamma) # n x K
+        Elog_theta = _dirichlet_expectation_2d(batch.gamma) # n x K
         meanchange = self._tol + 1
         it = 0
 
@@ -104,7 +106,7 @@ class OnlineLDA:
             batch.psi.data = np.exp(batch.psi.data)
             batch.psi = normalize(batch.psi, norm='l1', axis=1)
             batch.gamma = batch.alpha + batch.psi.T @ batch.phi
-            Elog_theta = utilt.dirichlet_expectation(batch.gamma)
+            Elog_theta = _dirichlet_expectation_2d(batch.gamma)
 
             meanchange = np.abs(batch.gamma - gamma_old).max(axis=1).mean()
             gamma_old = copy.copy(batch.gamma)
@@ -161,7 +163,7 @@ class OnlineLDA:
         rhot = pow(self._tau0 + self._updatect, -self._kappa)
         self._lambda = (1-rhot) * self._lambda + \
                        rhot * ((self._N / batch.N) * lambda_org)
-        self._Elog_beta = utilt.dirichlet_expectation(self._lambda)
+        self._Elog_beta = _dirichlet_expectation_2d(self._lambda)
         self._updatect += 1
         return 1
 
@@ -182,7 +184,7 @@ class OnlineLDA:
         rhot = pow(self._tau0 + self._updatect, -self._kappa)
         self._lambda = (1-rhot) * self._lambda + \
                        rhot * ((self._N / batch.N) * (self._eta + sstats) )
-        self._Elog_beta = utilt.dirichlet_expectation(self._lambda)
+        self._Elog_beta = _dirichlet_expectation_2d(self._lambda)
         self._updatect += 1
         return scores
 
@@ -190,7 +192,7 @@ class OnlineLDA:
 
         score_gamma = 0
         score_beta  = 0
-        Elog_theta = utilt.dirichlet_expectation(batch.gamma)
+        Elog_theta = _dirichlet_expectation_2d(batch.gamma)
 
         # E[log p(x | theta, phi, beta)]
         score_pixel = batch.mtx @ self._Elog_beta.T

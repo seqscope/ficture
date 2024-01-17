@@ -8,6 +8,9 @@ from scipy.special import gammaln, psi, logsumexp, expit, logit
 from scipy.sparse import issparse
 from sklearn.preprocessing import normalize
 from joblib.parallel import Parallel, delayed
+from sklearn.decomposition._online_lda_fast import (
+    _dirichlet_expectation_1d, _dirichlet_expectation_2d,
+)
 
 # Add directory
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -83,7 +86,7 @@ class OnlineLDA:
             pseudo = self._lambda[self._lambda > 0].min() * .2
             rdfill = np.random.gamma(100., 1./100., (self._K, self._M)) * pseudo
             self._lambda = np.where(self._lambda > 0, self._lambda, rdfill)
-        self._Elog_beta = utilt.dirichlet_expectation(self._lambda)
+        self._Elog_beta = _dirichlet_expectation_2d(self._lambda)
         self._expElog_beta = np.exp(self._Elog_beta)
 
     def name_factor(self, factor_names):
@@ -93,7 +96,7 @@ class OnlineLDA:
     def _update_gamma(self, X, _gamma, alpha):
         gamma = copy.copy(_gamma)
         sstats = np.zeros((self._K, self._M))
-        expElog_theta = np.exp(utilt.dirichlet_expectation(gamma))
+        expElog_theta = np.exp(_dirichlet_expectation_2d(gamma))
         for j in range(X.shape[0]):
             maxchange = self._tol + 1
             it = 0
@@ -103,7 +106,8 @@ class OnlineLDA:
                 gamma[j, :] = alpha[j, :] +\
                     np.multiply(expElog_theta[j, :], \
                                 (X[[j], :].multiply(1./phi_norm)) @ self._expElog_beta.T) # 1 x K
-                expElog_theta[j, :] = np.exp(utilt.dirichlet_expectation(gamma[j, :]))
+                _dirichlet_expectation_1d(gamma[j, :], 0, expElog_theta[j, :])
+                # expElog_theta[j, :] = np.exp(utilt.dirichlet_expectation(gamma[j, :]))
                 maxchange = np.abs(old_gamma/old_gamma.sum() - gamma[j, :]/gamma[j, :].sum()).max()
                 it += 1
                 if self._verbose > 2 or (self._verbose > 1 and it % 10 == 0):
@@ -159,7 +163,7 @@ class OnlineLDA:
         beta0 = normalize(self._lambda, axis = 1, norm = 'l1')
         self._lambda = (1-rhot) * self._lambda + \
                        rhot * (doc_ratio * (self._eta + self._sstats) )
-        self._Elog_beta = utilt.dirichlet_expectation(self._lambda)
+        self._Elog_beta = _dirichlet_expectation_2d(self._lambda)
         self._expElog_beta = np.exp(self._Elog_beta)
 
         if self._verbose > 0:
@@ -209,7 +213,7 @@ class OnlineLDA:
         """
         score_gamma = 0
         score_beta  = 0
-        Elog_theta = utilt.dirichlet_expectation(batch.gamma)
+        Elog_theta = _dirichlet_expectation_2d(batch.gamma)
         E_theta = normalize(batch.gamma, norm='l1', axis=1)
 
         # E[log p(x | theta, beta)]

@@ -95,14 +95,14 @@ class OnlineLDAPenalized:
         if self._lambda.min() <= 0 :
             warnings.warn("Parameters must be positive, will clip to epsilon")
             self._lambda = np.clip(self._lambda, self._eps, np.inf)
-        self._Elog_beta = utilt.dirichlet_expectation(self._lambda)
+        self._Elog_beta = _dirichlet_expectation_2d(self._lambda)
         self._expElog_beta = np.exp(self._Elog_beta)
 
 
     def _update_gamma(self, X, _gamma, alpha):
         gamma = copy.copy(_gamma)
         sstats = np.zeros((self._K, self._M))
-        expElog_theta = np.exp(utilt.dirichlet_expectation(gamma))
+        expElog_theta = np.exp(_dirichlet_expectation_2d(gamma))
         for j in range(X.shape[0]):
             maxchange = self._tol + 1
             it = 0
@@ -112,7 +112,8 @@ class OnlineLDAPenalized:
                 gamma[j, :] = alpha[j, :] +\
                     np.multiply(expElog_theta[j, :], \
                                 (X[[j], :].multiply(1./phi_norm)) @ self._expElog_beta.T) # 1 x K
-                expElog_theta[j, :] = np.exp(utilt.dirichlet_expectation(gamma[j, :]))
+                _dirichlet_expectation_1d(gamma[j, :], 0, expElog_theta[j, :])
+                # expElog_theta[j, :] = np.exp(utilt.dirichlet_expectation(gamma[j, :]))
                 maxchange = np.abs(old_gamma - gamma[j, :] ).max()
                 it += 1
                 if self._verbose > 3 or (self._verbose > 2 and it % 10 == 0):
@@ -217,7 +218,7 @@ class OnlineLDAPenalized:
         rhot = pow(self._tau0 + self._updatect, -self._kappa)
         doc_ratio = float(self._N) / batch.n
         self._lambda = (1-rhot) * self._lambda + rhot * (doc_ratio * lam_hat)
-        self._Elog_beta = utilt.dirichlet_expectation(self._lambda)
+        self._Elog_beta = _dirichlet_expectation_2d(self._lambda)
         self._expElog_beta = np.exp(self._Elog_beta)
         self._updatect += 1
         if self._verbose > 0:
@@ -265,7 +266,7 @@ class OnlineLDAPenalized:
         """
         score_gamma = 0
         score_beta  = 0
-        Elog_theta = utilt.dirichlet_expectation(batch.gamma)
+        Elog_theta = _dirichlet_expectation_2d(batch.gamma)
         E_theta = normalize(batch.gamma, norm='l1', axis=1)
 
         # E[log p(x | theta, beta)]
