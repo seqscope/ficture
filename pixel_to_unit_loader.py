@@ -33,6 +33,8 @@ class PixelToUnit:
         self.brc = None
         self.mtx = None
         self.lattice = xy_lattice
+        self.n_batch = 0
+        self.bound = self.radius * np.sqrt(3)/2
 
     def read_chunk(self, min_size = 200):
         if not self.file_is_open:
@@ -136,7 +138,7 @@ class PixelToUnit:
         mj_size = 0
         mi_size = 0
         if len(self.df) > 0:
-            mj_range = [self.df[self.mj].max(), self.df[self.mj].min()]
+            mj_range = [self.df[self.mj].iloc[-1], self.df[self.mj].iloc[0]]
             mi_range = [self.df[self.mi].max(), self.df[self.mi].min()]
             mj_size = mj_range[0] - mj_range[1]
             mi_size = mi_range[0] - mi_range[1]
@@ -149,8 +151,8 @@ class PixelToUnit:
             chunk = chunk[chunk.gene.isin(self.ft_dict)]
             chunk.X = chunk.X.astype(float) * self.scale
             chunk.Y = chunk.Y.astype(float) * self.scale
-            mj_range[0] = max(mj_range[0], chunk[self.mj].max())
-            mj_range[1] = min(mj_range[1], chunk[self.mj].min())
+            mj_range[0] = chunk[self.mj].iloc[-1]
+            mj_range[1] = min(mj_range[1], chunk[self.mj].iloc[0])
             mi_range[0] = max(mi_range[0], chunk[self.mi].max())
             mi_range[1] = min(mi_range[1], chunk[self.mi].min())
             mj_size = mj_range[0] - mj_range[1]
@@ -165,6 +167,14 @@ class PixelToUnit:
                 x, y = pixel_to_hex(self.df[['X', 'Y']].values, self.radius, offs_x/self.n_move, offs_y/self.n_move)
                 self.df.hex_id = list(zip(x, y))
                 ct = self.df.groupby('hex_id').agg({self.key: sum}).reset_index()
+                ct['X'], ct['Y'] = \
+                        hex_to_pixel([v[0] for v in ct.hex_id.values],\
+                                     [v[1] for v in ct.hex_id.values],\
+                        self.radius, offs_x/self.n_move, offs_y/self.n_move)
+                # Drop hexagons with centers within sqrt(3)*raidus/2 from each boundary
+                ct.drop(index = ct.index[\
+                    (ct[self.mj].lt(mj_range[1] + self.bound) ) | \
+                    (ct[self.mj].gt(mj_range[0] - self.bound) ) ], inplace=True)
                 ct.drop(index = ct.index[ct[self.key] < self.min_ct_per_unit], inplace=True)
                 if len(ct) < 1:
                     continue
@@ -172,25 +182,18 @@ class PixelToUnit:
                 N = len(bt_dict)
                 brc = self.df[self.df.hex_id.isin(bt_dict)].groupby(by = ['hex_id', 'gene']).agg({self.key: sum}).reset_index()
                 self.mtx = vstack([self.mtx, coo_array((brc[self.key].values, (brc.hex_id.map(bt_dict).values, brc.gene.map(self.ft_dict).values) ), shape = (N, self.M))])
-                if self.lattice:
-                    ct['x'], ct['y'] = \
-                        hex_to_pixel([v[0] for v in ct.hex_id.values],\
-                                     [v[1] for v in ct.hex_id.values],\
-                        self.radius, offs_x/self.n_move, offs_y/self.n_move)
-                else:
+                if not self.lattice:
                     ct = brc.groupby(by = ['hex_id']).agg({self.key: sum, 'X': np.median, 'Y':np.median}).reset_index()
-                    ct.rename(columns = {'X':'x', 'Y':'y'}, inplace=True)
+                ct.rename(columns = {'X':'x', 'Y':'y'}, inplace=True)
                 ct.index = ct.hex_id.map(bt_dict)
                 ct.sort_index(inplace=True)
                 ct['hex_id'] = ct.hex_id.map(lambda x : '_'.join([str(u) for u in x]))
                 ct.hex_id = offs_iden + '_' + ct.hex_id.values
                 self.brc = pd.concat([self.brc, ct])
                 print(N, self.mtx.shape, self.brc.shape)
-        if self.Y is not None:
-            self.df = self.df[self.df[self.mj] >= mj_range[0] - self.radius]
-            self.df.drop(columns = ['hex_id'], inplace = True)
-        else:
-            self.df = pd.DataFrame()
+        self.df = self.df[self.df[self.mj] >= mj_range[0] - 2 * self.radius]
+        self.df.drop(columns = ['hex_id'], inplace = True)
         self.mtx = self.mtx.tocsr()
         self.brc.index = range(self.brc.shape[0])
+        self.n_batch += 1
         return self.brc.shape[0]

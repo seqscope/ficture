@@ -6,13 +6,9 @@ import sys, os, copy, gc, re, gzip, pickle, argparse, logging, warnings
 import numpy as np
 import pandas as pd
 from scipy.sparse import *
-import subprocess as sp
-from joblib.parallel import Parallel, delayed
-import matplotlib as mpl
 import cv2
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import utilt
 from pixel_factor_loader import BlockIndexedLoader
 
 parser = argparse.ArgumentParser()
@@ -24,6 +20,7 @@ parser.add_argument('--unmapped', type=str, default='', help='')
 parser.add_argument('--color_table', type=str, help='Pre-defined color map')
 parser.add_argument('--color_table_index_column', type=str, default='Name', help='')
 parser.add_argument('--input_rgb_uint8', action="store_true",help="If input rgb is from 0-255 instead of 0-1")
+parser.add_argument('--background', type=str, default="000000", help='')
 
 parser.add_argument('--xmin', type=float, default=-np.inf, help="in um")
 parser.add_argument('--ymin', type=float, default=-np.inf, help="in um")
@@ -40,6 +37,12 @@ logging.basicConfig(level= getattr(logging, "INFO", None), format='%(asctime)s %
 
 # Read color table
 rgb=['B','G','R'] # opencv rgb order
+args.background = args.background.lstrip('#')
+match = re.search(r'^(?:[0-9a-fA-F]{3}){1,2}$', args.background)
+if not match:
+    logging.warning(f"Invalid background color {args.background}")
+    args.background = "000000"
+logging.info(f"Background color {args.background}")
 cdty = {x:float for x in rgb}
 cdty[args.color_table_index_column] = str
 sep=',' if args.color_table.endswith(".csv") else '\t'
@@ -87,6 +90,10 @@ if os.path.exists(args.category_map):
 
 # Read input file, fill the rgb matrix
 img = np.zeros((height,width,3), dtype=np.uint8)
+bg = args.background
+bg = [ np.uint8(int(bg[i:i+2], 16) ) for i in [0,2,4] ]
+for c in range(3):
+    img[:,:,c] = bg[c]
 keptcol = ['X','Y'] + rgb
 for df in loader:
     if df.shape[0] == 0:

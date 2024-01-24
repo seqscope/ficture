@@ -140,10 +140,10 @@ for chunk in pd.read_csv(args.input, sep='\t', chunksize=1000000, dtype=dty):
                 mid_ct = np.median(ct.loc[ct.tot >= min_ct_per_unit, 'tot'].values)
                 ct = set(ct.loc[(ct.tot >= min_ct_per_unit) & (ct[mj] > st + diam/2) & (ct[mj] < ed - diam/2), 'hex_id'].values)
                 ct = ct - last_batch[(offs_x,offs_y,l)]
-                last_batch[(offs_x,offs_y,l)] = ct
                 if len(ct) < 2:
                     offs_y += 1
                     continue
+                last_batch[(offs_x,offs_y,l)] = ct
                 hex_list = list(ct)
                 suff = [str(x[0])[-1]+str(x[1])[-1] for x in hex_list]
                 hex_dict = {x: str(rng.randint(1, random_index_max)).zfill(random_index_length) + suff[i] for i,x in enumerate(hex_list)}

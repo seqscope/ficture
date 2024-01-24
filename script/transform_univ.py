@@ -29,7 +29,7 @@ parser.add_argument('--n_move', type=int, default=3, help='')
 parser.add_argument('--hex_width', type=float, default=24, help='')
 parser.add_argument('--hex_radius', type=float, default=-1, help='')
 parser.add_argument('--precision', type=int, default=1, help='Number of digits to store spatial location (in um), 0 for integer.')
-parser.add_argument('--chunksize', type=int, default=100000, help='Number of lines to read at a time')
+parser.add_argument('--chunksize', type=int, default=1000000, help='Number of lines to read at a time')
 parser.add_argument('--xy_median', action='store_true', help='Output the median of pixel cooredinates inside each hexagon, default is to output hexagon centers exactly as lattice points')
 parser.add_argument('--debug', type=int, default=0, help='')
 
@@ -97,7 +97,7 @@ logging.info(f"Model loaded with {M} features and {K} factors")
 radius = args.hex_radius
 if radius < 0:
     radius = args.hex_width / np.sqrt(3)
-b_size = radius * 10
+b_size = radius * 20
 
 # Pixel reader
 batch_obj = PixelToUnit(reader, ft_dict, key, radius,\
