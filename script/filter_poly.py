@@ -9,7 +9,7 @@ import pandas as pd
 import sklearn.mixture
 
 import shapely
-from shapely.geometry import Polygon, Point
+from shapely.geometry import Polygon, MultiPolygon, Point
 from shapely.ops import unary_union
 from scipy.spatial import Delaunay
 import geojson
@@ -132,7 +132,6 @@ dcut_strict *= hex_area
 
 def point_to_multipoly(pts, max_edge_len, buffer = 5, poly_area_cutoff = 0):
     tri = Delaunay(pts)
-    n_tri = tri.simplices.shape[0]
     max_edge = [max([ np.sqrt(((pts[x[i], :] - pts[x[(i+2) % 3], :])**2).sum() ) for i in [0,1,2] ]) for x in tri.simplices]
     kept_smpl_coord = []
     for i, simplex in enumerate(tri.simplices):
@@ -140,8 +139,10 @@ def point_to_multipoly(pts, max_edge_len, buffer = 5, poly_area_cutoff = 0):
             kept_smpl_coord.append( [ tuple(pts[simplex[i], :]) for i in [0,1,2]] )
     mrg_poly = [ shapely.buffer(Polygon(x),buffer) for x in kept_smpl_coord ]
     mrg_poly = unary_union(mrg_poly)
-    if poly_area_cutoff > 0:
+    if isinstance(mrg_poly, MultiPolygon) and poly_area_cutoff > 0:
         mrg_poly = unary_union([P for P in mrg_poly.geoms if P.area > poly_area_cutoff ])
+    if isinstance(mrg_poly, Polygon):
+        mrg_poly = MultiPolygon([mrg_poly])
     return mrg_poly
 
 # Output lenient boundary

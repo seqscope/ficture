@@ -137,6 +137,7 @@ while True:
         top_values = X[np.arange(X.shape[0])[:, None], top_indices]
         for k in range(args.lite_topk_output_pixel):
             pixel[f"K{k+1}"] = top_indices[:, k]
+        for k in range(args.lite_topk_output_pixel):
             pixel[f"P{k+1}"] = np.clip(top_values[:, k], 0, 1)
         pixel.drop(columns = factor_header, inplace=True)
     write_mode = 'w' if n_batch == 0 else 'a'
@@ -153,6 +154,7 @@ while True:
         top_values = X[np.arange(X.shape[0])[:, None], top_indices]
         for k in range(args.lite_topk_output_anchor):
             anchor[f"K{k+1}"] = top_indices[:, k]
+        for k in range(args.lite_topk_output_anchor):
             anchor[f"P{k+1}"] = np.clip(top_values[:, k], 0, 1)
         anchor.drop(columns = factor_header, inplace=True)
     anchor.to_csv(args.output+".anchor.tsv.gz", sep='\t', index=False, header=header_include, mode=write_mode, float_format="%.2e", compression={"method":"gzip"})
