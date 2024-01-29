@@ -98,7 +98,7 @@ if not os.path.exists(f):
     f=path+"/"+pref+".bulk_chisq.tsv"
     if not os.path.exists(f):
         sys.exit(f"Cannot find DE file")
-de = pd.read_csv(f, sep='\t')
+de = pd.read_csv(f, sep='\t', dtype={'factor':str})
 logging.info(f"Read DE genes from {f}")
 # de.factor = de.factor.astype(int)
 top_gene = []
