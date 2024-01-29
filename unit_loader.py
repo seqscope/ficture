@@ -85,40 +85,16 @@ class UnitLoader:
         self.unit_attr = list(unit_attr)
         self.M = max(self.ft_dict.values()) + 1
         self.debug = debug
-        self.batch_id_list = set()
+        self.batch_id_list = []
         self.skip_epoch = set(skip_epoch)
         self.train_key = key if train_key is None else train_key
         self.test_mtx = None
 
-    def update_batch(self, bsize):
-        n_unit = 0
-        if len(self.df) > 0:
-            n_unit = len(self.df.unit.unique())
-        if len(self.batch_id_list) > self.epoch or not self.file_is_open:
-            return 0
-        while n_unit <= bsize:
-            try:
-                chunk = next(self.reader)
-                chunk.rename(columns={self.unit_id:'unit'}, inplace=True)
-                chunk = chunk[chunk.gene.isin(self.ft_dict)]
-                if len(self.skip_epoch) > 0:
-                    lab = chunk.unit.str[:self.prefix]
-                    chunk = chunk[~lab.isin(self.skip_epoch)]
-                if len(chunk) == 0:
-                    continue
-                if self.debug:
-                    print(f"Read {chunk.shape[0]} lines from file")
-            except StopIteration:
-                self.file_is_open = False
-                break
-            self.df = pd.concat([self.df, chunk])
-            n_unit = len(self.df.unit.unique())
-        left = pd.DataFrame()
-        if self.file_is_open:
-            last_indx = self.df.unit.iloc[-1]
-            left = self.df[self.df.unit == last_indx]
-            self.df = self.df[self.df.unit != last_indx]
+    def _make_matrix(self):
         self.brc = self.df[['unit']+self.unit_attr].drop_duplicates(subset=['unit'])
+        if self.prefix > 0:
+            lab = self.brc.unit.str[:self.prefix].unique()
+            self.batch_id_list += [x for x in lab if x not in self.batch_id_list]
         self.brc = self.brc.merge(right = self.df.groupby(by='unit').agg({self.train_key:sum}).reset_index(), on = 'unit', how = 'inner' )
         if self.key != self.train_key:
             self.brc = self.brc.merge(right = self.df.groupby(by='unit').agg({self.key:sum}).reset_index(), on = 'unit', how = 'inner' )
@@ -127,8 +103,6 @@ class UnitLoader:
         bt_dict={x:i for i,x in enumerate(barcode_kept)}
         N = len(bt_dict)
         self.df = self.df[self.df.unit.isin(bt_dict)]
-        if self.prefix > 0:
-            self.batch_id_list.update( [x[:self.prefix] for x in self.df.unit.unique()] )
         self.mtx = coo_array((self.df[self.train_key].values, \
                             (self.df.unit.map(bt_dict).values, \
                              self.df.gene.map(self.ft_dict).values) ), \
@@ -140,5 +114,69 @@ class UnitLoader:
                              self.df.gene.map(self.ft_dict).values) ), \
                             shape=(N, self.M)).tocsr()
             self.test_mtx.eliminate_zeros()
+        return N
+
+    def update_batch(self, bsize):
+        n_unit = 0
+        if len(self.df) > 0:
+            n_unit = len(self.df.unit.unique())
+        if len(self.batch_id_list) > self.epoch or not self.file_is_open:
+            return 0
+        while n_unit <= bsize:
+            try:
+                chunk = next(self.reader)
+            except StopIteration:
+                self.file_is_open = False
+                break
+            chunk.rename(columns={self.unit_id:'unit'}, inplace=True)
+            chunk = chunk[chunk.gene.isin(self.ft_dict)]
+            if len(self.skip_epoch) > 0:
+                lab = chunk.unit.str[:self.prefix]
+                chunk = chunk[~lab.isin(self.skip_epoch)]
+            if len(chunk) == 0:
+                continue
+            if self.debug:
+                print(f"Read {chunk.shape[0]} lines from file")
+            self.df = pd.concat([self.df, chunk])
+            n_unit = len(self.df.unit.unique())
+        left = pd.DataFrame()
+        if self.file_is_open:
+            last_indx = self.df.unit.iloc[-1]
+            left = self.df[self.df.unit == last_indx]
+            self.df = self.df[self.df.unit != last_indx]
+        N = self._make_matrix()
+        self.df = copy.copy(left)
+        return N
+
+
+    def read_one_epoch(self):
+        if not self.file_is_open:
+            return 0
+        if self.prefix <= 0:
+            print(f"UnitLoader::read_one_epoch Will read the whole file")
+        left = pd.DataFrame()
+        local_epoch_list = []
+        if len(self.df > 0) and self.prefix > 0:
+            local_epoch_list = list(np.unique([x[:self.prefix] for x in self.df.unit.unique()]) )
+        while len(local_epoch_list) < 2:
+            try:
+                chunk = next(self.reader)
+            except StopIteration:
+                self.file_is_open = False
+                break
+            chunk.rename(columns={self.unit_id:'unit'}, inplace=True)
+            chunk = chunk[chunk.gene.isin(self.ft_dict)]
+            if len(chunk) == 0:
+                continue
+            if self.prefix > 0:
+                lab = np.unique([x[:self.prefix] for x in chunk.unit.unique()])
+                local_epoch_list += [x for x in lab if x not in local_epoch_list]
+                if len(local_epoch_list) > 1:
+                    left = chunk[~chunk.unit.str[:self.prefix].eq(local_epoch_list[0])]
+                    chunk = chunk[chunk.unit.str[:self.prefix].eq(local_epoch_list[0])]
+            self.df = pd.concat([self.df, chunk])
+            if self.debug:
+                print(f"Read {chunk.shape[0]} lines from file")
+        N = self._make_matrix()
         self.df = copy.copy(left)
         return N

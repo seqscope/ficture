@@ -1,4 +1,4 @@
-import sys, io, os, gzip, glob, copy, re, time, warnings, argparse, logging
+import sys, io, os, gzip, glob, copy, re, time, warnings, pickle, argparse, logging
 from collections import defaultdict,Counter
 import numpy as np
 import pandas as pd
@@ -6,112 +6,237 @@ import pandas as pd
 from scipy.sparse import *
 from sklearn.preprocessing import normalize
 from joblib import Parallel, delayed
+from sklearn.decomposition import LatentDirichletAllocation as LDA
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from kloptim import optim_kl
-from utilt import gen_even_slices, scale_to_prob
-
+from utilt import gen_even_slices, chisq, make_mtx_from_dge
+from unit_loader import UnitLoader
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
-parser.add_argument('--models', type=str, help='')
 parser.add_argument('--output', type=str, help='')
+parser.add_argument('--nFactor', type=int, help='')
 parser.add_argument('--key', type=str, default='gn', help='')
-parser.add_argument('--iter', type=int, default=3, help='')
+parser.add_argument('--R', type=int, default=5, help='')
+parser.add_argument('--epoch_init', type=int, default=1, help='')
+parser.add_argument('--epoch', type=int, default=1, help='')
+parser.add_argument('--test_split', type=float, default=.5, help='')
 parser.add_argument('--thread', type=int, default=1, help='')
+
+parser.add_argument('--log_norm', action='store_true', help='')
+parser.add_argument('--log_norm_size_factor', action='store_true', help='')
+
+parser.add_argument('--unit_label', default = 'random_index', type=str, help='Which column to use as unit identifier')
+parser.add_argument('--feature_label', default = "gene", type=str, help='Which column to use as feature identifier')
+parser.add_argument('--unit_attr', type=str, nargs='+', default=[], help='')
+parser.add_argument('--epoch_id_length', type=int, default=2, help='')
+parser.add_argument('--min_ct_per_unit', type=int, default=50, help='')
 parser.add_argument('--debug', action='store_true', help='')
 args = parser.parse_args()
 
 key = args.key
 thread = args.thread
-niter = args.iter
+R = args.R
+K = args.nFactor
+b_size = 512
+topM = 10
+score_feature_min = 100
+unit_key = args.unit_label.lower()
+unit_attr = [x.lower() for x in args.unit_attr]
+gene_key = args.feature_label.lower()
 logging.basicConfig(level= getattr(logging, "INFO", None))
 
-df = pd.DataFrame()
-for chunk in pd.read_csv(args.input, sep='\t', usecols = ['random_index','X','Y','gene',key], dtype={'random_index':str}, chunksize=500000):
-    if chunk.random_index.iloc[-1][:2] != "00":
-        df = pd.concat([df, chunk[chunk.random_index.str.contains('^00') & chunk[key].ge(1)] ])
-        break
-    df = pd.concat([df, chunk[chunk[key].ge(1)] ])
+feature, brc, mtx_org, ft_dict, bc_dict = make_mtx_from_dge(args.input,\
+    min_ct_per_unit = args.min_ct_per_unit, min_ct_per_feature = 50,\
+    unit = args.unit_label, key = key)
+unit_sum = mtx_org.sum(axis = 1)
+unit_sum_mean = np.mean(unit_sum)
+size_factor = unit_sum / unit_sum_mean
+gene_f = feature.Weight.values
 
-models = pd.read_csv(args.models, sep='\t')
-Rlist = sorted(models.Run.unique())
-Klist = [x for x in models.columns if x.isnumeric()]
-R = len(Rlist)
-K = len(Klist)
-print(f"Read {R} models with {K} components")
+N, M = mtx_org.shape
+Ntrain = int(N*args.test_split)
+Ntest = N - Ntrain
+train_idx = set(np.random.choice(N, Ntrain, replace=False) )
+test_idx = set(range(N)) - train_idx
+train_idx = sorted(list(train_idx))
+test_idx = sorted(list(test_idx))
 
-gene_list = models.loc[models.Run.eq(Rlist[0]), "gene"].values
-ft_dict = {x:i for i,x in enumerate(gene_list)}
-models["gene_id"] = models.gene.map(ft_dict)
-models.sort_values(by = ["Run", "gene_id"], inplace=True)
-M = len(ft_dict)
-df.drop(index = df.index[~df.gene.isin(ft_dict)], inplace=True)
+scale_const = 1
+if args.log_norm_size_factor:
+    mtx_log_norm = mtx_org / size_factor.reshape((-1, 1))
+    mtx_log_norm.data = np.log(mtx_log_norm.data + 1)
+    scale_const = np.log(1/np.quantile(size_factor, q=.95) + 1)
+    mtx_log_norm.data = mtx_log_norm.data / scale_const
+elif args.log_norm:
+    mtx_log_norm = normalize(mtx_org, norm = 'l1', axis = 1)
+    mtx_log_norm.data = np.log(mtx_log_norm.data + 1)
+    scale_const = np.log(1/np.quantile(unit_sum, q=.95) + 1)
+    mtx_log_norm.data = mtx_log_norm.data / scale_const
+else:
+    mtx_log_norm = mtx_org
 
-brc = df.groupby(by = 'random_index').agg({key:sum}).reset_index()
-brc.drop(index = brc.index[brc[key].lt(100)], inplace=True)
-N = brc.shape[0]
-brc.index = np.arange(N)
-bc_dict = {x:i for i,x in enumerate(brc.random_index)}
-brc['j'] = brc.random_index.map(bc_dict)
-df.drop(index = df.index[~df.random_index.isin(bc_dict)], inplace=True)
-df['j'] = df.random_index.map(bc_dict)
-df.drop(columns = "random_index", inplace=True)
-brc = brc.merge(right = df[['j','X','Y' ]].drop_duplicates(subset='j'), on = 'j', how = 'left')
+mtx_log_norm = mtx_log_norm.tocsr()
+results = {}
+coh_score = []
+mtx = mtx_org[test_idx, :].tocsc()
+factor_header = list(np.arange(K).astype(str) )
+for r in range(R):
+    t0 = time.time()
+    model = LDA(n_components=K, learning_method='online', batch_size=b_size, total_samples = N, n_jobs = thread, verbose = 0)
+    for e in range(args.epoch_init):
+        _ = model.partial_fit(mtx_log_norm[train_idx, :])
+    score_train = model.score(mtx_log_norm[train_idx, :])/Ntrain
+    score_test = model.score(mtx_log_norm[test_idx, :])/Ntest
+    logging.info(f"{r}: {score_train:.2f}, {score_test:.2f}")
+    theta = model.transform(mtx_log_norm[test_idx, :])
+    topk = theta.argmax(axis = 1)
+    logging.info(f"{Counter(topk)}")
 
-mtx = coo_array((df[key].values, (df.j.values, df.gene.map(ft_dict))), shape=(N, M)).tocsr()
-xsum = mtx.sum(axis = 1).reshape((-1, 1))
-print(f"Read {N} units with {M} genes")
+    info = mtx.T @ theta
+    info = pd.DataFrame(info, columns = factor_header)
+    info.index = feature.gene.values
+    info['gene_tot'] = info[factor_header].sum(axis = 1)
+    info.drop(index = info.index[info.gene_tot < score_feature_min], inplace = True)
+    total_k = np.array(info[factor_header].sum(axis = 0) )
+    total_umi = info[factor_header].sum().sum()
+    res = []
+    for k, kname in enumerate(factor_header):
+        idx_slices = [idx for idx in gen_even_slices(len(info), thread)]
+        with Parallel(n_jobs=thread, verbose=0) as parallel:
+            result = parallel(delayed(chisq)(kname, \
+                        info.iloc[idx, :].loc[:, [kname, 'gene_tot']],\
+                        total_k[k], total_umi) for idx in idx_slices)
+        res += [item for sublist in result for item in sublist]
+    chidf=pd.DataFrame(res,columns=['gene','factor','Chi2','pval','FoldChange','gene_total'])
+    chidf["Rank"] = chidf.groupby(by = "factor")["Chi2"].rank(ascending=False)
+    chidf.gene_total = chidf.gene_total.astype(int)
+    chidf.sort_values(by=['factor','Chi2'],ascending=[True,False],inplace=True)
 
-model_beta = {}
-model_theta = {}
-model_score = np.zeros((R, niter))
-for ri, r in enumerate(Rlist):
-    Ht = np.array(models.loc[models.Run.eq(r), Klist] ).T
-    Wt = normalize(np.random.beta(1,1,size=(N,K)), axis = 1, norm = 'l1') * xsum
-    Ht0 = Ht.copy()
-    obj0 = np.inf
-    it = 0
-    while it < niter:
-        t0 = time.time()
-        results = Parallel(n_jobs=thread)(\
-                    delayed(optim_kl)(mtx[idx,:], Wt[idx, :], Ht, tol=1e-4, verbose=args.debug, method="SLSQP") for idx in gen_even_slices(N, thread) )
-        t1 = time.time() - t0
-        Wt = np.vstack([x[0] for x in results])
-        objv = np.mean(np.hstack([x[1] for x in results]))
-        logging.info(f"{r}, {it} - update W {t1/60:.2f} min, obj {objv:.3f}")
+    score = []
+    for k in range(K):
+        wd_idx = chidf.loc[chidf.factor.eq(str(k))].gene.iloc[:topM].map(ft_dict).values
+        wd_idx = sorted( list(wd_idx), key = lambda x : -gene_f[x])
+        s = 0
+        for ii in range(topM - 1):
+            for jj in range(ii+1, topM):
+                i = wd_idx[ii]
+                j = wd_idx[jj]
+                idx = mtx.indices[mtx.indptr[i]:mtx.indptr[i+1]]
+                denom = mtx[:, [i]].toarray()[idx] * gene_f[j] / gene_f[i]
+                num = mtx[:, [j]].toarray()[idx]
+                s += (theta[idx, k].reshape((-1, 1)) * np.log(num/denom + 1)).sum()
+        s0 = s / theta[:, k].sum()
+        coh_score.append([r, k, s, s0])
+        score.append(s0)
 
-        t0 = time.time()
-        results = Parallel(n_jobs=thread)(\
-                    delayed(optim_kl)(mtx[:, idx].T, Ht[:,idx].T, Wt.T, tol=1e-6, verbose=args.debug, method="SLSQP") for idx in gen_even_slices(M, thread) )
-        t1 = time.time() - t0
-        Ht = np.hstack([x[0].T for x in results])
-        objv = np.mean(np.hstack([x[1] for x in results])) * (M/N)
-        logging.info(f"{r}, {it} - update H {t1/60:.2f} min, obj {objv:.3f}")
-        model_score[ri, it] = objv
-        if objv > obj0:
-            logging.warning(f"{r}, {it} - Objective value increased from {obj0:.3f} to {objv:.3f}, roll back to saved checkpoint")
-            Ht = Ht0
-            Wt = normalize(np.random.beta(1,1,size=(N,K)), axis = 1, norm = 'l1') * xsum
+    t1 = time.time() - t0
+    t0 = time.time()
+    logging.info(f"R={r}, {np.mean(score):.2f}, {np.median(score):.2f}, {t1:.2f}")
+    results[r] = {'score_train':score_train, 'score_test':score_test, 'model':model, 'coherence':score}
+
+pickle.dump(results, open(args.output + ".model_selection_candidates.p", 'wb'))
+coh_score = pd.DataFrame(coh_score, columns = ["R","K","Score0","Score"])
+coh_score.to_csv(args.output + ".coherence.tsv", sep='\t', index = False)
+v = coh_score.groupby(by = "R").Score.mean()
+v = v.sort_values(ascending = False)
+
+### Further update the selected model
+best_r = v.index[0]
+model = results[best_r]['model']
+epoch = .5
+n_unit = 0
+chunksize = 2000000
+with gzip.open(args.input, 'rt') as rf:
+    header = rf.readline().strip().split('\t')
+header = [x.lower() for x in header]
+adt = {unit_key:str, key:int}
+adt.update({x:str for x in unit_attr})
+while epoch < args.epoch:
+    reader = pd.read_csv(gzip.open(args.input, 'rt'), \
+            sep='\t',chunksize=chunksize, skiprows=1, names = header,
+            usecols=[unit_key,gene_key,key], dtype=adt)
+    batch_obj =  UnitLoader(reader, ft_dict, key, \
+        batch_id_prefix=args.epoch_id_length, \
+        min_ct_per_unit=args.min_ct_per_unit,
+        unit_id=unit_key,unit_attr=[])
+    while batch_obj.update_batch(b_size):
+        N = batch_obj.mtx.shape[0]
+        if args.log_norm_size_factor:
+            rsum = batch_obj.mtx.sum(axis = 1) / unit_sum_mean
+            mtx = batch_obj.mtx / rsum.reshape((-1, 1))
+            mtx.data = np.log(mtx.data + 1) / scale_const
+        elif args.log_norm:
+            mtx = normalize(batch_obj.mtx, norm='l1', axis=1)
+            mtx.data = np.log(mtx.data + 1) / scale_const
         else:
-            obj0 = objv
-            Ht0 = Ht
-        it += 1
+            mtx = batch_obj.mtx
+        _ = model.partial_fit(mtx)
+        n_unit += N
+        if args.debug:
+            logl = model.score(mtx) / N
+            e = len(batch_obj.batch_id_list)
+            logging.info(f"Epoch {e-1}, finished {n_unit} units. batch logl: {logl:.4f}")
+        if len(batch_obj.batch_id_list) > args.epoch:
+            break
+    if args.epoch_id_length > 0:
+        epoch += len(batch_obj.batch_id_list)
+    else:
+        epoch += 1
 
-    model_theta[r], model_beta[r] = scale_to_prob(Wt, Ht)
+### Rerun all units once and store results
+oheader = ["unit",key,"x","y","topK","topP"]+factor_header
+dtp = {'topK':int,key:int,"unit":str}
+dtp.update({x:float for x in ['topP']+factor_header})
+res_f = args.output+".fit_result.tsv.gz"
+nbatch = 0
+logging.info(f"Result file {res_f}")
+ucol = [unit_key,gene_key,key] + unit_attr
+reader = pd.read_csv(gzip.open(args.input, 'rt'), \
+        sep='\t',chunksize=chunksize, skiprows=1, names=header, \
+        usecols=ucol, dtype=adt)
+batch_obj =  UnitLoader(reader, ft_dict, key, \
+    batch_id_prefix=args.epoch_id_length, \
+    min_ct_per_unit=args.min_ct_per_unit, \
+    unit_id=unit_key, unit_attr=unit_attr, train_key=key)
+post_count = np.zeros((K, M))
+while batch_obj.update_batch(b_size):
+    N = batch_obj.mtx.shape[0]
+    if args.log_norm_size_factor:
+        rsum = batch_obj.mtx.sum(axis = 1) / unit_sum_mean
+        mtx = batch_obj.mtx / rsum.reshape((-1, 1))
+        mtx.data = np.log(mtx.data + 1) / scale_const
+    elif args.log_norm:
+        mtx = normalize(batch_obj.mtx, norm='l1', axis=1)
+        mtx.data = np.log(mtx.data + 1) / scale_const
+    else:
+        mtx = batch_obj.mtx
+    theta = model.transform(mtx)
+    post_count += np.array(theta.T @ batch_obj.mtx)
+    brc = pd.concat((batch_obj.brc.reset_index(), \
+        pd.DataFrame(theta, columns = factor_header )), axis = 1)
+    brc['topK'] = np.argmax(theta, axis = 1).astype(int)
+    brc['topP'] = np.max(theta, axis = 1)
+    brc = brc.astype(dtp)
+    logging.info(f"{nbatch}-th batch with {brc.shape[0]} units")
+    mod = 'w' if nbatch == 0 else 'a'
+    hdr = True if nbatch == 0 else False
+    brc[oheader].to_csv(res_f, sep='\t', mode=mod, float_format="%.4e", index=False, header=hdr, compression={"method":"gzip"})
+    nbatch += 1
+    if args.epoch_id_length > 0 and len(batch_obj.batch_id_list) > 1:
+        break
+logging.info(f"Finished ({nbatch})")
+out_f = args.output+".posterior.count.tsv.gz"
+pd.concat([pd.DataFrame({gene_key: feature.gene.values}),\
+           pd.DataFrame(post_count.T, columns = factor_header, dtype='float64')],\
+    axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.2f', compression={"method":"gzip"})
 
-best_r = Rlist[np.argmin(model_score[:, -1]) ]
+model.feature_names_in_ = feature.gene.values
+model.log_norm_scaling_const_ = scale_const
+model.unit_sum_mean_ = np.mean(unit_sum)
+pickle.dump(model, open(args.output + ".model.p", 'wb'))
 
-f = args.output + ".model_score.tsv"
-pd.DataFrame(model_score.T, index = np.arange(niter), columns = Rlist).to_csv(f, sep='\t', index=True, float_format='%.4e')
-
-beta = model_beta[best_r]
-beta = pd.DataFrame(beta, columns = Klist, index = gene_list)
-f = args.output + ".init_model.tsv.gz"
-beta.to_csv(f, sep='\t', index=True, float_format='%.4e')
-
-
-theta = model_theta[best_r]
-brc = brc[["j","X","Y",key]].merge(right = pd.DataFrame(theta, columns = Klist, index = brc.index), left_index=True, right_index=True)
-f = args.output + ".init_fit.tsv.gz"
-brc.to_csv(f, sep='\t', index=False, float_format='%.4e')
+out_f = args.output + ".model_matrix.tsv.gz"
+pd.concat([pd.DataFrame({gene_key: feature.gene.values }),\
+           pd.DataFrame(model.components_.T, columns = factor_header, dtype='float64')], \
+    axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.4e', compression={"method":"gzip"})

@@ -79,7 +79,8 @@ if os.path.isfile(args.feature):
     feature = pd.read_csv(args.feature, sep='\t', header=0)
     gene_kept = set(feature.gene.values)
 
-use_header = ["X","Y",key] + ['gene'] if len(gene_kept) > 0 else []
+use_header = ["X","Y",key]
+use_header += ['gene'] if len(gene_kept) > 0 else []
 reader = pd.read_csv(gzip.open(args.input,'rb'), sep='\t', usecols=use_header, chunksize=500000)
 brc = pd.DataFrame()
 for chunk in reader:

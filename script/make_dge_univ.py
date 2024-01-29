@@ -109,9 +109,9 @@ for chunk in pd.read_csv(args.input, sep='\t', chunksize=1000000, dtype=dty):
 
     if df_full[mj].iloc[-1] - df_full[mj].iloc[0] < ovlp_buffer * args.mu_scale:
         # This chunk is too narrow, leave to process together with neighbors
-        r = int(df_full[mj].iloc[-1]*args.mu_scale)
-        l = int(df_full[mj].iloc[0] *args.mu_scale)
-        logging.info(f"Left over size {df_full.shape[0]} ({l}, {r}).")
+        r = int(df_full[mj].iloc[-1]*mu_scale)
+        l = int(df_full[mj].iloc[0] *mu_scale)
+        logging.info(f"Not enough pixels, left over size {df_full.shape[0]} ({l}, {r}).")
         continue
 
     left = copy.copy(df_full.loc[df_full[mj] > ed - ovlp_buffer * args.mu_scale, keep_header])
@@ -126,7 +126,7 @@ for chunk in pd.read_csv(args.input, sep='\t', chunksize=1000000, dtype=dty):
         st = brc[mj].min()
         ed = brc[mj].max()
         pts = np.asarray(brc[['X','Y']])
-        logging.info(f"Read {brc.shape[0]} pixels.")
+        logging.info(f"Processing {brc.shape[0]} pixels ({len(df)} {st}, {ed}).")
         brc["hex_id"] = ""
         brc["random_index"] = 0
         offs_x = 0
@@ -157,6 +157,7 @@ for chunk in pd.read_csv(args.input, sep='\t', chunksize=1000000, dtype=dty):
                 cnt['X'], cnt['Y'] = hex_to_pixel(hx, hy, radius, offs_x/n_move, offs_y/n_move)
                 if use_boundary:
                     kept = [mpoly.contains(Point(*p)) for p in cnt[['X','Y']].values]
+                    logging.info(f"Keep {sum(kept)}/{len(cnt)} units within boundary.")
                     cnt = cnt.loc[kept, :]
 
                 sub = sub.loc[:,['j','random_index']].merge(right = df, on='j', how = 'inner')
@@ -174,4 +175,4 @@ for chunk in pd.read_csv(args.input, sep='\t', chunksize=1000000, dtype=dty):
             offs_y = 0
             offs_x += 1
     df_full = copy.copy(left)
-    logging.info(f"Left over size {df_full.shape[0]}.")
+    logging.info(f"Left over size {df_full.shape[0]} ({df_full[mj].iloc[0] * mu_scale :.0f}, {df_full[mj].iloc[-1] * mu_scale :.0f}).")

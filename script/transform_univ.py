@@ -7,6 +7,7 @@ import sys, os, copy, gzip, time, logging, pickle, argparse
 import numpy as np
 import pandas as pd
 import random as rng
+from sklearn.preprocessing import normalize
 from sklearn.decomposition import LatentDirichletAllocation as LDA
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from pixel_to_unit_loader import PixelToUnit
@@ -31,6 +32,10 @@ parser.add_argument('--hex_radius', type=float, default=-1, help='')
 parser.add_argument('--precision', type=int, default=1, help='Number of digits to store spatial location (in um), 0 for integer.')
 parser.add_argument('--chunksize', type=int, default=1000000, help='Number of lines to read at a time')
 parser.add_argument('--xy_median', action='store_true', help='Output the median of pixel cooredinates inside each hexagon, default is to output hexagon centers exactly as lattice points')
+parser.add_argument('--log_norm', action='store_true', help='')
+parser.add_argument('--log_norm_size_factor', action='store_true', help='')
+parser.add_argument('--scale_const', type=float, default=-1, help='')
+parser.add_argument('--unit_sum_mean', type=float, default=-1, help='')
 parser.add_argument('--debug', type=int, default=0, help='')
 
 args = parser.parse_args()
@@ -98,6 +103,20 @@ radius = args.hex_radius
 if radius < 0:
     radius = args.hex_width / np.sqrt(3)
 b_size = radius * 20
+scale_const = args.scale_const
+unit_sum_mean = args.unit_sum_mean
+if args.log_norm_size_factor:
+    args.log_norm = True
+if args.log_norm:
+    if hasattr(model, 'log_norm_scaling_const_'):
+        scale_const = model.log_norm_scaling_const_
+    if scale_const < 0:
+        sys.exit("ERROR: --log_norm is specified but the normalization constant used in model fitting is unknown.")
+    if args.log_norm_size_factor:
+        if hasattr(model, 'unit_sum_mean_'):
+            unit_sum_mean = model.unit_sum_mean_
+        if unit_sum_mean < 0:
+            sys.exit("ERROR: --log_norm_size_factor is specified but the size constant used in model fitting is unknown.")
 
 # Pixel reader
 batch_obj = PixelToUnit(reader, ft_dict, key, radius,\
@@ -116,7 +135,17 @@ with gzip.open(out_f, 'wt') as wf:
 t0 = time.time()
 last_batch = set()
 while batch_obj.read_chunk(min_size=b_size):
-    theta = model.transform(batch_obj.mtx)
+    if args.log_norm_size_factor:
+        rsum = batch_obj.mtx.sum(axis=1) / unit_sum_mean
+        mtx = batch_obj.mtx / rsum.reshape((-1,1))
+        mtx.data = np.log(mtx.data + 1) / scale_const
+        mtx = mtx.tocsr()
+    elif args.log_norm:
+        mtx = normalize(batch_obj.mtx, norm='l1', axis=1)
+        mtx.data = np.log(mtx.data + 1) / scale_const
+    else:
+        mtx = batch_obj.mtx
+    theta = model.transform(mtx)
     post_count += np.array(theta.T @ batch_obj.mtx)
     n_batch += 1
     n_unit  += theta.shape[0]

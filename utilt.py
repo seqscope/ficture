@@ -7,6 +7,7 @@ import copy, re, os, geojson
 from scipy import sparse
 from scipy.special import gammaln, psi, logsumexp, expit, logit
 from sklearn.preprocessing import normalize
+import scipy.stats
 import scipy.optimize
 import sklearn.cluster
 
@@ -410,3 +411,24 @@ def make_mtx_from_dge(file, min_ct_per_feature = 50, min_ct_per_unit = 100, feat
         return df, feature, brc, mtx, ft_dict, bc_dict
     else:
         return feature, brc, mtx, ft_dict, bc_dict
+
+
+def chisq(k,info,total_k,total_umi):
+    res = []
+    if total_k <= 0:
+        return res
+    for name, v in info.iterrows():
+        if v[k] <= 0:
+            continue
+        tab=np.zeros((2,2))
+        tab[0,0]=v[str(k)]
+        tab[0,1]=v["gene_tot"]-tab[0,0]
+        tab[1,0]=total_k-tab[0,0]
+        tab[1,1]=total_umi-total_k-v["gene_tot"]+tab[0,0]
+        fd=tab[0,0]/total_k/tab[0,1]*(total_umi-total_k)
+        if fd < 1:
+            continue
+        tab = np.around(tab, 0).astype(int) + 1
+        chi2, p, dof, ex = scipy.stats.chi2_contingency(tab, correction=False)
+        res.append([name,k,chi2,p,fd,v["gene_tot"]])
+    return res
