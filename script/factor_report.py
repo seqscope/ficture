@@ -134,6 +134,9 @@ for k, kname in enumerate(factor_header):
         top_gene[k].append(', '.join(v))
 # Top genes by absolute weight
 for k, kname in enumerate(factor_header):
+    if post_umi[k] < 10:
+        top_gene[k].append('.')
+        continue
     v = post.gene.iloc[np.argsort(-post.loc[:, kname].values)[:ntop] ].values
     top_gene[k].append(', '.join(v))
 
@@ -157,7 +160,7 @@ if os.path.exists(anchor_f):
 table.sort_values(by = 'Weight', ascending = False, inplace=True)
 
 f = output_pref+".factor.info.tsv"
-table[oheader].to_csv(f, sep='\t', index=False, header=True, float_format="%.5f")
+table.loc[table.PostUMI.ge(10), oheader].to_csv(f, sep='\t', index=False, header=True, float_format="%.5f")
 
 f = output_pref+".factor.info.tsv"
 with open(f, 'r') as rf:

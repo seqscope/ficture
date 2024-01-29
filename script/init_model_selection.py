@@ -184,6 +184,12 @@ while epoch < args.epoch:
     else:
         epoch += 1
 
+# Relabel factors
+weight = model.components_.sum(axis=1)
+ordered_k = np.argsort(weight)[::-1]
+model.components_ = model.components_[ordered_k,:]
+model.exp_dirichlet_component_ = model.exp_dirichlet_component_[ordered_k,:]
+
 ### Rerun all units once and store results
 oheader = ["unit",key,"x","y","topK","topP"]+factor_header
 dtp = {'topK':int,key:int,"unit":str}
