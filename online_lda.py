@@ -20,7 +20,7 @@ class OnlineLDA:
     """
     Implements online VB for LDA as described in Hoffman et al. 2010.
     """
-    def __init__(self, vocab, K, N, alpha = None, eta = None, tau0=9, kappa=.7, iter_inner = 50, tol = 1e-4, verbose = 0, thread = 1):
+    def __init__(self, vocab, K, N, alpha = None, eta = None, tau0=9, kappa=.7, iter_inner = 50, tol = 1e-4, verbose = 0, thread = 1, fixed_factors = None):
         """
         Arguments:
         vocab: A list of features
@@ -48,6 +48,14 @@ class OnlineLDA:
         self._lambda = None         # K x M
         self._expElog_beta = None   # K x M
         self._sstats = None         # K x M
+        self.K0 = 0
+        self.background = None
+
+        if fixed_factors is not None:
+            assert len(fixed_factors.shape) == 2, "Invalid fixed_factors"
+            assert fixed_factors.shape[1] == self._M and fixed_factors.shape[0] < self._K, "Invalid fixed_factors"
+            self.K0 = fixed_factors.shape[0]
+            self.background = normalize(fixed_factors, axis = 1, norm = 'l1')
 
         self._alpha = alpha # Factor weight prior
         if self._alpha is None:
@@ -78,16 +86,27 @@ class OnlineLDA:
         # Initialize the variational distribution q(beta|lambda)
         if _lambda is None:
             self._lambda = np.random.gamma(100., 1./100., (self._K, self._M))
+            if self.K0:
+                self._lambda[:self.K0, :] = self.background
         else:
-            self._lambda = _lambda
-            assert self._lambda.shape == (self._K, self._M), "Invalid lambda"
+            if self.K0:
+                assert _lambda.shape == (self._K - self.K0, self._M), "Invalid lambda"
+                self._lambda = np.concatenate([self.background * self._N * 500, _lambda], axis = 0)
+            else:
+                assert _lambda.shape == (self._K, self._M), "Invalid lambda"
+                self._lambda = _lambda
         if self._lambda.min() <= 0 :
             warnings.warn("Parameters must be positive, will replace non-positive values with random numbers")
             pseudo = self._lambda[self._lambda > 0].min() * .2
             rdfill = np.random.gamma(100., 1./100., (self._K, self._M)) * pseudo
             self._lambda = np.where(self._lambda > 0, self._lambda, rdfill)
-        self._Elog_beta = _dirichlet_expectation_2d(self._lambda)
-        self._expElog_beta = np.exp(self._Elog_beta)
+        self._Elog_beta = np.zeros((self._K, self._M))
+        self._expElog_beta = np.zeros((self._K, self._M))
+        self._Elog_beta[self.K0:, :] = _dirichlet_expectation_2d(self._lambda[self.K0:, :])
+        self._expElog_beta[self.K0:, :] = np.exp(self._Elog_beta[self.K0:, :])
+        if self.K0:
+            self._Elog_beta[:self.K0, :] = np.log(self.background)
+            self._expElog_beta[:self.K0, :] = self.background
 
     def name_factor(self, factor_names):
         assert len(factor_names) == self._K, "Invalid factor names"
@@ -107,8 +126,8 @@ class OnlineLDA:
                     np.multiply(expElog_theta[j, :], \
                                 (X[[j], :].multiply(1./phi_norm)) @ self._expElog_beta.T) # 1 x K
                 _dirichlet_expectation_1d(gamma[j, :], 0, expElog_theta[j, :])
-                # expElog_theta[j, :] = np.exp(utilt.dirichlet_expectation(gamma[j, :]))
-                maxchange = np.abs(old_gamma/old_gamma.sum() - gamma[j, :]/gamma[j, :].sum()).max()
+                gamma[j, :] /= gamma[j, :].sum()
+                maxchange = np.abs(old_gamma - gamma[j, :]).max()
                 it += 1
                 if self._verbose > 2 or (self._verbose > 1 and it % 10 == 0):
                     print(f"E-step, {j}-th unit, update gamma: {it}-th iteration, max change {maxchange:.4f}")
@@ -159,21 +178,23 @@ class OnlineLDA:
         # Update global parameters
         rhot = pow(self._tau0 + self._updatect, -self._kappa)
         doc_ratio = float(self._N) / batch.n
-        update_ratio = ((self._sstats).sum(axis = 1) / self._lambda.sum(axis = 1)) * (rhot * doc_ratio) / (1-rhot)
-        beta0 = normalize(self._lambda, axis = 1, norm = 'l1')
-        self._lambda = (1-rhot) * self._lambda + \
-                       rhot * (doc_ratio * (self._eta + self._sstats) )
-        self._Elog_beta = _dirichlet_expectation_2d(self._lambda)
-        self._expElog_beta = np.exp(self._Elog_beta)
+        beta0 = normalize(self._lambda[self.K0:, :], axis = 1, norm = 'l1')
+        self._lambda[self.K0:, :] = (1-rhot) * self._lambda[self.K0:, :] + \
+            rhot * (doc_ratio * (self._eta + self._sstats[self.K0:, :]) )
+        self._Elog_beta[self.K0:, :] = _dirichlet_expectation_2d(self._lambda[self.K0:, :])
+        self._expElog_beta[self.K0:, :] = np.exp(self._Elog_beta[self.K0:, :])
 
         if self._verbose > 0:
-            scores = self.approx_score(batch)
-            beta1 = normalize(self._lambda, axis = 1, norm = 'l1')
+            beta1 = normalize(self._lambda[self.K0:, :], axis = 1, norm = 'l1')
             max_rel_change_beta = (2 * np.abs(beta1 - beta0) / (beta1 + beta0)).max()
-            max_change_beta = np.abs(self._expElog_beta - beta0).max()
-            print(f"{self._updatect}-th global update. rho {rhot:.5f}, max change in expElogBeta {max_change_beta:.4f}, max relative change in expElogBeta {max_rel_change_beta:.5f}\nScores: " + ", ".join(['%.2e'%x for x in scores]))
-            print("Update magnitude ratio:")
-            print(", ".join(['%.2e'%x for x in update_ratio]))
+            max_change_beta = np.abs(beta1 - beta0).max()
+            print(f"{self._updatect}-th global update. rho {rhot:.5f}, max change in expElogBeta {max_change_beta:.4f}, max relative change in expElogBeta {max_rel_change_beta:.5f} ")
+            if self._verbose > 1:
+                scores = self.approx_score(batch)
+                print(f"Scores: " + ", ".join(['%.2e'%x for x in scores]))
+                update_ratio = ((self._sstats[self.K0:, :]).sum(axis = 1) / self._lambda[self.K0:, :].sum(axis = 1)) * (rhot * doc_ratio) / (1-rhot)
+                print("Update magnitude ratio:")
+                print(", ".join(['%.2e'%x for x in update_ratio]))
 
         self._updatect += 1
         return batch.ll

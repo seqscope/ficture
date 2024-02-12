@@ -10,14 +10,8 @@ class Minibatch:
         self.gamma = None # n x K: P(k|n)
         self.alpha = None # Prior for gamma
         self.ll = 0       # log likelihood
-        if features is None:
-            self.feature = list(range(self.M))
-        else:
-            self.feature = features
-        if barcodes is None:
-            self.barcode = list(range(self.n))
-        else:
-            self.barcode = barcodes
+        self.feature = features
+        self.barcode = barcodes
 
     def init_from_matrix(self, gamma = None, alpha = None):
         if gamma is not None:
