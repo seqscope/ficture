@@ -2,6 +2,8 @@
 
 *This repository is under active construction*
 
+*This branch, a version of FICTURE that is available from pypi, is lagging behind the stable branch used internally. In the near future we will merge these two branches and choose a consistent interface.*
+
 FICTURE: Scalable segmentation-free analysis of sub-micron resolution spatial transcriptomics
 
 [preprint](https://biorxiv.org/cgi/content/short/2023.11.04.565621v2)
