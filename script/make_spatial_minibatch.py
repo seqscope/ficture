@@ -108,8 +108,9 @@ while not end_of_file:
     x_range = x_max - x_min
     y_range = y_max - y_min
     logging.info(f"Read blocks of pixels: {x_range/args.mu_scale:.2f} x {y_range/args.mu_scale:.2f}")
-    if not end_of_file and (x_range < batch_size or y_range < batch_size):
-        continue
+    if not end_of_file:
+        if x_range < batch_size or y_range < batch_size:
+            continue
     else: # end of file, and the last batch is too small potentially caused by the batch size almost divides the axis lenght
         if (args.major_axis == "X" and x_range <= batch_buff) or (args.major_axis == "Y" and y_range <= batch_buff):
             break

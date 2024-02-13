@@ -1,6 +1,6 @@
 ### Read a batched pixel file, construct slda minibatch
 
-import sys, os, gzip, copy, re
+import sys, os, gzip, copy, re, logging
 import numpy as np
 import pandas as pd
 
@@ -87,7 +87,7 @@ class PixelMinibatch:
             chunk = chunk.loc[chunk.j.isin(pts.loc[kept_pixel, 'j'].values), :]
             batch_ids.update(set(chunk[self.batch_id].unique()))
             self.df_full = pd.concat([self.df_full, chunk], axis=0)
-            # print(f"Read {len(batch_ids)} minibatches")
+            # logging.info(f"Read {len(batch_ids)} minibatches")
 
         left = pd.DataFrame()
         if self.file_is_open:
@@ -101,7 +101,7 @@ class PixelMinibatch:
         self.N0 = self.brc.shape[0]
         self.brc.index = range(self.N0)
         self.df_full = self.df_full.groupby(by = [self.batch_id, "j", "gene"]).agg({self.key:sum}).reset_index()
-        print(f"Read {self.N0} pixels, forming {len(self.batch_index)} batches.")
+        logging.info(f"Read {self.N0} pixels, forming {len(self.batch_index)} batches.")
         self.bt = sklearn.neighbors.BallTree(np.asarray(self.brc[['X','Y']]))
         # Make DGE
         barcode_kept = list(self.brc['j'])

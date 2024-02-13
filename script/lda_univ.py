@@ -91,7 +91,7 @@ if os.path.exists(model_f) and not args.overwrite:
 # Set up model
 fix_scaling = args.fix_scaling
 factor_header = [str(x) for x in range(K)]
-lda = LDA(n_components=K, learning_method='online', batch_size=b_size, total_samples = args.N, n_jobs = args.thread, learning_offset = args.tau, learning_decay = args.kappa, random_state=seed, verbose = args.verbose)
+lda = LDA(n_components=K, learning_method='online', batch_size=b_size, total_samples = args.N, learning_offset = args.tau, learning_decay = args.kappa, doc_topic_prior = args.alpha, n_jobs = args.thread, random_state=seed, verbose = args.verbose)
 lda.shift_log_transform_scale = fix_scaling
 
 # Genes to use

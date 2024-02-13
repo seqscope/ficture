@@ -190,7 +190,6 @@ class PixelToUnit:
                 ct['hex_id'] = ct.hex_id.map(lambda x : '_'.join([str(u) for u in x]))
                 ct.hex_id = offs_iden + '_' + ct.hex_id.values
                 self.brc = pd.concat([self.brc, ct])
-                print(N, self.mtx.shape, self.brc.shape)
         self.df = self.df[self.df[self.mj] >= mj_range[0] - 2 * self.radius]
         self.df.drop(columns = ['hex_id'], inplace = True)
         self.mtx = self.mtx.tocsr()
