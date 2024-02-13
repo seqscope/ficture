@@ -2,7 +2,9 @@
 
 FICTURE: Scalable segmentation-free analysis of sub-micron resolution spatial transcriptomics
 
-[preprint](https://biorxiv.org/cgi/content/short/2023.11.04.565621v2)
+[Preprint](https://biorxiv.org/cgi/content/short/2023.11.04.565621v2) (Real data results in the preprint are [available on Zenodo](https://zenodo.org/records/10070621))
+
+[Slides used for AGBT talk](http://tinyurl.com/47pbktzp)
 
 
 *This repository is under active construction*
