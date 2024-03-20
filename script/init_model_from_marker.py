@@ -22,6 +22,7 @@ parser.add_argument('--init_min_unit', type=int, default=5, help='')
 parser.add_argument('--init_min_ct', type=int, default=100, help='')
 parser.add_argument('--bsize', type=int, default=256, help='')
 parser.add_argument('--epoch', type=int, default=1, help='')
+parser.add_argument('--alpha', type=float, default=1, help='')
 parser.add_argument('--thread', type=int, default=1, help='')
 parser.add_argument('--debug', action='store_true', help='')
 args = parser.parse_args()
@@ -68,7 +69,7 @@ if len(rm_r) > 0:
 feature, brc, mtx, ft_dict, bc_dict = make_mtx_from_dge(args.input,\
     min_ct_per_feature = 50, min_ct_per_unit = args.init_min_ct,\
     feature_white_list = anchors.gene.unique(),\
-    unit = unit, key = key, epoch = args.epoch)
+    unit = unit, key = key)
 
 feature["Weight"] = feature[key] / feature[key].sum()
 N, M = mtx.shape
@@ -111,7 +112,7 @@ for r in Rlist:
         print(k, sub.shape[0], sub.pval.lt(.05).sum() )
         if sub.shape[0] < args.init_min_unit:
             sub = pd.concat([sub, tab.loc[tab.Cluster.eq(k) & tab.Rank.eq(2) & \
-                            (tab.pval_2nd/tab.pval_min).le(2), :]])
+                            (tab.pval/tab.pval_min).le(2), :]])
             if len(sub) < args.init_min_unit:
                 continue
             sub = sub.sort_values(by = "pval")
@@ -139,20 +140,20 @@ for r in Rlist:
     print(nnz)
 
 idx_shuffle = np.random.permutation(N)
-init_N = N//args.epoch
-idx_list = [idx for idx in gen_slices_from_list(idx_shuffle[:init_N], bsize) ] # Does not use all units to pick a model
+idx_list = [idx for idx in gen_slices_from_list(idx_shuffle, bsize) ]
 model_snapshot = {}
 model_score = []
 for r in Rlist:
     prior = np.clip(np.array(models[r]["init_prior"].drop(columns = "gene")).T, 2, np.inf)
     K = prior.shape[0]
     n = models[r]["init_n"].sum()
+    prior *= N/n
 
     w = prior.sum(axis = 1)
     w = w / w.sum()
     print(" ".join( [f"{x:.2e}" for x in w]) )
 
-    lda = LDA(n_components=K, total_samples=n, learning_offset=(n//args.bsize + 1), learning_method='online', batch_size = args.bsize, n_jobs=args.thread, verbose=0)
+    lda = LDA(n_components=K, total_samples=N, learning_offset=(n//args.bsize + 1), learning_method='online', batch_size = args.bsize, doc_topic_prior = args.alpha, n_jobs=args.thread, verbose=0)
     init_latent_vars(lda, n_features = M, gamma = prior)
     logl_rec = []
     for i, idx in enumerate(idx_list):
@@ -186,11 +187,15 @@ pd.DataFrame({"Run":Rlist, "Score":model_score}).to_csv(f, sep='\t', index=False
 
 lda = model_snapshot[r_best]
 if args.epoch > 1:
-    idx_list = [idx for idx in gen_slices_from_list(idx_shuffle[(N//args.epoch):], bsize) ]
+    idx_list = []
+    for i in range(args.epoch-1):
+        idx_shuffle = np.random.permutation(N)
+        idx_list += [idx for idx in gen_slices_from_list(idx_shuffle, bsize) ]
     for i, idx in enumerate(idx_list):
         _ = lda.partial_fit(mtx[idx, :])
-        logl = lda.score(mtx[idx, :])
-        print(i, logl)
+        if i % 5 == 0:
+            logl = lda.score(mtx[idx, :])
+            print(i, logl)
 
 K = lda.n_components
 f = args.output + ".model_matrix.tsv.gz"

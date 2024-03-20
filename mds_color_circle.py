@@ -42,8 +42,9 @@ class circle(pymde.constraints.Constraint):
             return torch.div(Z, torch.norm(Z, dim=1).unsqueeze(-1))
 
 # Map pairwise factor proximity to an unit circle embedding then to RGB colors
-def assign_color_mds_circle(mtx, cmap_name, weight=None, top_color=None):
-
+def assign_color_mds_circle(mtx, cmap_name, weight=None, top_color=None, seed=None):
+    if seed is not None:
+        pymde.seed(seed)
     # mtx is a K by K similarity/proximity matrix
     assert mtx.shape[0] == mtx.shape[1], "mtx must be square"
     K = mtx.shape[0]

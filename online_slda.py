@@ -4,6 +4,7 @@
 import sys, io, os, re, time, copy, subprocess, logging
 
 import numpy as np
+from sklearn.utils import check_random_state
 from scipy.special import gammaln, psi, logsumexp, expit, logit
 from scipy.sparse import *
 from sklearn.preprocessing import normalize
@@ -18,7 +19,7 @@ class OnlineLDA:
     """
     Implements online VB for LDA as described in (Hoffman et al. 2010).
     """
-    def __init__(self, vocab, K, N, alpha = None, eta = None, tau0=9, kappa=.7, zeta = 0, iter_inner = 50, tol = 1e-4, iter_gamma = 10, verbose = 0):
+    def __init__(self, vocab, K, N, alpha = None, eta = None, tau0=9, kappa=.7, zeta = 0, iter_inner = 50, tol = 1e-4, iter_gamma = 10, verbose = 0, seed = None):
         """
         Arguments:
         K: Number of topics
@@ -47,6 +48,7 @@ class OnlineLDA:
         self._verbose = verbose
         self._Elog_beta = None      # K x M
         self._lambda = None         # K x M
+        self.rng_ = check_random_state(seed)
 
         self._alpha = alpha # 1D array
         if self._alpha is None:
@@ -69,7 +71,7 @@ class OnlineLDA:
     def init_global_parameter(self, m_lambda=None):
         # Initialize the variational distribution q(beta|lambda)
         if m_lambda is None:
-            self._lambda = np.random.gamma(100., 1./100., (self._K, self._M))
+            self._lambda = self.rng_.gamma(100., 1./100., (self._K, self._M))
         else:
             self._lambda = m_lambda
         self._Elog_beta = _dirichlet_expectation_2d(self._lambda)

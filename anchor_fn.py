@@ -75,7 +75,7 @@ def simplex_vertices(Q, epsilon, K, verbose = 0, info = None, seed = None, fixed
 
     # Iteratively add the farthest point from the span of S
     scores = []
-    for i in range(fixed+1, K):
+    for i in range(fixed, K):
         far_idx, var_e, rec_e2, rec_e1 = find_farthest_point(Qprj, basis=Qprj[S_indices, :], eval_basis=True)
         scores.append([i, var_e, rec_e2, rec_e1, 0])
         S_indices.append(far_idx)

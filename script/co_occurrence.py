@@ -52,7 +52,10 @@ M = len(feature)
 feature.index = np.arange(M)
 ft_dict = {x:i for i,x in enumerate(feature.gene.values )}
 # dangeraous
-kept_gene_id = set(feature.gene_id.values)
+filter_gene_id = False
+kept_gene_id = set()
+if "gene_id" in feature.columns:
+    kept_gene_id = set(feature.gene_id.values)
 logging.info(f"Load {M} feature from {args.feature}")
 
 mj_max = np.inf
@@ -64,7 +67,16 @@ if os.path.isfile(args.boundary):
     use_boundary = True
     logging.info(f"Load boundary from {args.boundary}")
 
-reader = pd.read_csv(gzip.open(args.input, 'rt'), sep='\t', usecols=["X","Y","gene_id","gene",key], dtype={x:int for x in ["X","Y",key]}, chunksize = 500000)
+with gzip.open(args.input, 'rt') as rf:
+    header = rf.readline().strip().split('\t')
+usecols = ["X","Y","gene",key]
+if "gene_id" in header and len(kept_gene_id) > 0:
+    usecols.append("gene_id")
+    filter_gene_id = True
+
+
+chunksize=500000
+reader = pd.read_csv(gzip.open(args.input, 'rt'), sep='\t', usecols=usecols, chunksize = chunksize)
 
 Q = np.zeros((M,M), dtype=float)
 df = pd.DataFrame()
@@ -73,15 +85,19 @@ ed = -2
 for chunk in reader:
     chunk.X /= args.mu_scale
     chunk.Y /= args.mu_scale
-    chunk.drop(index = chunk.index[(~chunk.gene_id.isin(kept_gene_id))|chunk[key].eq(0)], inplace=True)
-    chunk.drop(columns = ['gene_id'], inplace=True)
+    last_chunk = len(chunk) < chunksize
+    chunk.drop(index = chunk.index[ (~chunk.gene.isin(ft_dict)) | chunk[key].eq(0)], inplace=True)
+    if filter_gene_id:
+        chunk.drop(index = chunk.index[(~chunk.gene_id.isin(kept_gene_id))], inplace=True)
+        chunk.drop(columns = ['gene_id'], inplace=True)
     if len(chunk) == 0:
         continue
     if st > ed:
         st = chunk[mj].iloc[0]
     ed = chunk[mj].iloc[-1]
     df = pd.concat([df, chunk])
-    if ed - st > wsize:
+    print(df.shape[0], st, ed, wsize, last_chunk)
+    if ed - st > wsize or last_chunk:
         logging.info(f"{st:.1f}, {ed:.1f}, {df.shape[0]}")
         df.X = (df.X / resolution).astype(int) * resolution
         df.Y = (df.Y / resolution).astype(int) * resolution
@@ -134,7 +150,9 @@ for chunk in reader:
     if len(df) > 0 and df[mj].iloc[-1] > mj_max:
         break
 
+rsum = np.sum(Q, axis = 1)
 Q = normalize(Q, norm = 'l1', axis = 1)
 with open (args.output, 'wb') as wf:
     np.save(wf, Q)
     np.save(wf, feature.gene.values)
+    np.save(wf, rsum)

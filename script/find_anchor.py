@@ -186,9 +186,6 @@ final_score = pd.DataFrame(final_score, columns = ["Cutoff", "Run", "K", "Varian
 final_score.to_csv(args.output + ".anchor_score.tsv", sep='\t', index=False)
 print(final_score[["Cutoff", "Variance_explained", "Reconstruction_error_l2"]])
 
-if not args.recoverKL:
-    sys.exit(0)
-
 # Pick one best anchor set
 tab = final_score.groupby(by = "Cutoff").agg({"Variance_explained": max}).reset_index()
 tab.sort_values(by = "Cutoff", inplace = True)
@@ -206,6 +203,8 @@ anchor_gene_info = tab.groupby(by = "Cluster").agg({'gene': lambda x : ", ".join
 anchor_gene_info.sort_index(inplace=True)
 anchor_gene_info.to_csv(args.output + ".anchor_picked.list.tsv", sep='\t', index=True, header=False)
 
+if not args.recoverKL:
+    sys.exit(0)
 
 clst = sorted(list(tab.Cluster.unique()))
 k = len(clst)

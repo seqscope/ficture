@@ -9,6 +9,7 @@ from scipy.sparse import coo_array
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utilt import plot_colortable
 from mds_color_circle import assign_color_mds_circle
+from datetime import datetime
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', type=str, help='')
@@ -17,7 +18,14 @@ parser.add_argument('--cmap_name', type=str, default="turbo", help="Name of Matp
 parser.add_argument('--top_color', type=str, default="#fcd217", help="HEX color code for the top factor")
 parser.add_argument('--even_space', action='store_true', help="Evenly space the factors on the circle")
 parser.add_argument('--annotation', type=str, default = '', help='')
+parser.add_argument('--seed', type=int, default=-1, help='')
 args = parser.parse_args()
+
+## obtain seed if not provided
+seed = args.seed
+if seed <= 0:
+    seed = int(datetime.now().timestamp()) % 2147483648
+np.random.seed(seed)
 
 factor_name = {}
 if os.path.isfile(args.annotation):
@@ -72,7 +80,7 @@ mtx /= mtx.sum(axis = 1)
 mtx = mtx + mtx.T
 
 # Assign color using MDS with circular constraint
-c_pos = assign_color_mds_circle(mtx, cmap_name, weight=weight, top_color=args.top_color)
+c_pos = assign_color_mds_circle(mtx, cmap_name, weight=weight, top_color=args.top_color, seed=seed)
 spectral_offset = .05 # avoid extremely dark colors
 c_pos = (c_pos - c_pos.min()) / (c_pos.max() - c_pos.min()) * (1 - spectral_offset) + spectral_offset
 

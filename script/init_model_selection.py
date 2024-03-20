@@ -2,8 +2,10 @@ import sys, io, os, gzip, glob, copy, re, time, warnings, pickle, argparse, logg
 from collections import defaultdict,Counter
 import numpy as np
 import pandas as pd
+from datetime import datetime
 
 from scipy.sparse import *
+from sklearn.utils import check_random_state
 from sklearn.preprocessing import normalize
 from joblib import Parallel, delayed
 from sklearn.decomposition import LatentDirichletAllocation as LDA
@@ -23,6 +25,7 @@ parser.add_argument('--epoch_init', type=int, default=1, help='')
 parser.add_argument('--epoch', type=int, default=1, help='')
 parser.add_argument('--test_split', type=float, default=.5, help='')
 parser.add_argument('--thread', type=int, default=1, help='')
+parser.add_argument('--seed', type=int, default=-1, help='')
 
 parser.add_argument('--log_norm', action='store_true', help='')
 parser.add_argument('--log_norm_size_factor', action='store_true', help='')
@@ -38,6 +41,11 @@ parser.add_argument('--min_ct_per_unit', type=int, default=50, help='')
 parser.add_argument('--min_ct_per_feature', type=int, default=50, help='')
 parser.add_argument('--debug', action='store_true', help='')
 args = parser.parse_args()
+
+seed = int(args.seed)
+if seed <= 0:
+    seed = int(datetime.now().timestamp()) % 2147483648
+rng = check_random_state(seed)
 
 key = args.key
 thread = args.thread
@@ -69,7 +77,7 @@ N, M = mtx_org.shape
 logging.info(f"Read data with {N} units, {M} features")
 Ntrain = int(N*args.test_split)
 Ntest = N - Ntrain
-train_idx = set(np.random.choice(N, Ntrain, replace=False) )
+train_idx = set(rng.choice(N, Ntrain, replace=False) )
 test_idx = set(range(N)) - train_idx
 train_idx = sorted(list(train_idx))
 test_idx = sorted(list(test_idx))
@@ -95,8 +103,9 @@ mtx = mtx_org[test_idx, :].tocsc()
 factor_header = list(np.arange(K).astype(str) )
 for r in range(R):
     t0 = time.time()
-    model = LDA(n_components=K, learning_method='online', batch_size=b_size, total_samples = N, learning_offset = args.tau, learning_decay = args.kappa, doc_topic_prior = args.alpha, n_jobs = thread, verbose = 0)
+    model = LDA(n_components=K, learning_method='online', batch_size=b_size, total_samples = N, learning_offset = args.tau, learning_decay = args.kappa, doc_topic_prior = args.alpha, n_jobs = thread, verbose = 0, random_state=seed)
     for e in range(args.epoch_init):
+        rng.shuffle(train_idx)
         _ = model.partial_fit(mtx_log_norm[train_idx, :])
     score_train = model.score(mtx_log_norm[train_idx, :])/Ntrain
     score_test = model.score(mtx_log_norm[test_idx, :])/Ntest
@@ -145,7 +154,7 @@ for r in range(R):
 
     t1 = time.time() - t0
     t0 = time.time()
-    logging.info(f"R={r}, {np.mean(score):.2f}, {np.median(score):.2f}, {t1:.2f}")
+    logging.info(f"R={r}, {np.mean(score):.2f}, {np.median(score):.2f}, {t1:.2f}s")
     results[r] = {'score_train':score_train, 'score_test':score_test, 'model':model, 'coherence':score}
 
 pickle.dump(results, open(args.output + ".model_selection_candidates.p", 'wb'))
@@ -153,11 +162,12 @@ coh_score = pd.DataFrame(coh_score, columns = ["R","K","Score0","Score"])
 coh_score.to_csv(args.output + ".coherence.tsv", sep='\t', index = False)
 v = coh_score.groupby(by = "R").Score.mean()
 v = v.sort_values(ascending = False)
+print(v)
 
 ### Further update the selected model
 best_r = v.index[0]
 model = results[best_r]['model']
-epoch = .5
+epoch = args.epoch_init * (1 - args.test_split)
 n_unit = 0
 chunksize = 2000000
 with gzip.open(args.input, 'rt') as rf:

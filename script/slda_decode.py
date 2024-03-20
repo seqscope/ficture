@@ -2,6 +2,7 @@ import sys, os, argparse, logging, gzip, copy, re, time, warnings, pickle
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import normalize
+from datetime import datetime
 
 # Add parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -31,6 +32,7 @@ parser.add_argument('--halflife', type=float, default=0.7, help='Control the dec
 parser.add_argument('--theta_init_bound_multiplier', type=float, default=.2, help='')
 parser.add_argument('--inner_max_iter', type=int, default=30, help='')
 parser.add_argument('--model_scale', type=float, default=-1, help='')
+parser.add_argument('--seed', type=int, default=-1, help='')
 
 # Other
 parser.add_argument('--lite_topk_output_pixel', type=int, default=-1)
@@ -54,6 +56,11 @@ if not os.path.exists(args.input):
     sys.exit("ERROR: cannot find input file")
 if not os.path.exists(args.anchor):
     sys.exit("ERROR: cannot find anchor file")
+
+## obtain seed if not provided
+seed = int(args.seed)
+if seed <= 0:
+    seed = int(datetime.now().timestamp()) % 2147483648
 
 ### Basic parameterse
 mu_scale = 1./args.mu_scale
@@ -92,7 +99,7 @@ if args.model_scale > 0:
     model = normalize(model, norm='l1', axis=1) * args.model_scale
 logging.info(f"{M} genes and {K} factors are read from input model")
 
-slda = OnlineLDA(vocab=feature_kept, K=K, N=1e6, iter_inner=args.inner_max_iter, verbose = 1)
+slda = OnlineLDA(vocab=feature_kept, K=K, N=1e6, iter_inner=args.inner_max_iter, verbose = 1, seed = seed)
 slda.init_global_parameter(model)
 init_bound = 1./K * args.theta_init_bound_multiplier
 
