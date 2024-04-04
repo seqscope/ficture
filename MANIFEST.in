@@ -1,0 +1,3 @@
+include ficture/scripts/*html
+include info/*
+include *md
