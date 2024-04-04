@@ -452,6 +452,10 @@
       
         
       
+        
+      
+        
+      
     
     
       
@@ -561,6 +565,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../xenium/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Xenium
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vizgen/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Vizgen MERSCOPE
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -605,7 +651,7 @@
 
 
 <h1 id="process-cosmx-smi-raw-data">Process CosMx SMI raw data<a class="headerlink" href="#process-cosmx-smi-raw-data" title="Permanent link">&para;</a></h1>
-<p>Locate the transcript file from your SMI output, mostly likely it is named <code>*_tx_file.csv.gz</code> with the following columns</p>
+<p>Locate the transcript file from your SMI output, most likely it is named <code>*_tx_file.csv.gz</code> with the following columns</p>
 <div class="highlight"><pre><span></span><code>&quot;fov&quot;,&quot;cell_ID&quot;,&quot;x_global_px&quot;,&quot;y_global_px&quot;,&quot;x_local_px&quot;,&quot;y_local_px&quot;,&quot;z&quot;,&quot;target&quot;,&quot;CellComp&quot;
 1,0,298943.990047619,19493.2809095238,896.371,4433.7571,0,&quot;Snap25&quot;,&quot;None&quot;
 1,0,298685.619047619,19489.3238095238,638,4429.8,0,&quot;Fth1&quot;,&quot;None&quot;
@@ -624,18 +670,18 @@
 </blockquote>
 <p>So in the following commands we set <code>px_to_um=0.168</code>.</p>
 <p>The python script can be found in <code>ficture/misc</code>.</p>
-<div class="highlight"><pre><span></span><code>input=/path/to/input/Tissue5_tx_file.csv.gz # Change it to your transcript file
-path=/path/to/output
-iden=brain # how you identify your files
-dummy=NegPrb # Name of the negative controls
-px_to_um=0.168 # convert the pixel unit in the input to micrometer
+<div class="highlight"><pre><span></span><code><span class="nv">input</span><span class="o">=</span>/path/to/input/Tissue5_tx_file.csv.gz<span class="w"> </span><span class="c1"># Change it to your transcript file</span>
+<span class="nv">path</span><span class="o">=</span>/path/to/output
+<span class="nv">iden</span><span class="o">=</span>brain<span class="w"> </span><span class="c1"># how you identify your files</span>
+<span class="nv">dummy</span><span class="o">=</span>NegPrb<span class="w"> </span><span class="c1"># Name of the negative controls</span>
+<span class="nv">px_to_um</span><span class="o">=</span><span class="m">0</span>.168<span class="w"> </span><span class="c1"># convert the pixel unit in the input to micrometer</span>
 
-output=${path}/filtered.matrix.${iden}.tsv
-feature=${path}/feature.clean.${iden}.tsv.gz
+<span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/filtered.matrix.<span class="si">${</span><span class="nv">iden</span><span class="si">}</span>.tsv
+<span class="nv">feature</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/feature.clean.<span class="si">${</span><span class="nv">iden</span><span class="si">}</span>.tsv.gz
 
-python format_cosmx.py --input ${input} --output ${output} --feature ${feature} --dummy_genes ${dummy} --px_to_um ${px_to_um}
-sort -k2,2g -k1,1g ${output} | gzip -c &gt; ${output}.gz
-rm ${output}
+python<span class="w"> </span>format_cosmx.py<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--feature<span class="w"> </span><span class="si">${</span><span class="nv">feature</span><span class="si">}</span><span class="w"> </span>--dummy_genes<span class="w"> </span><span class="si">${</span><span class="nv">dummy</span><span class="si">}</span><span class="w"> </span>--px_to_um<span class="w"> </span><span class="si">${</span><span class="nv">px_to_um</span><span class="si">}</span>
+sort<span class="w"> </span>-k2,2g<span class="w"> </span>-k1,1g<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>gzip<span class="w"> </span>-c<span class="w"> </span>&gt;<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span>.gz
+rm<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span>
 </code></pre></div>
 
 
