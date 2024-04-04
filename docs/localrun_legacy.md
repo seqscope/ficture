@@ -37,7 +37,7 @@ examples/data/coordinate_minmax.tsv
 
 ### Prepare environment
 
-Suppose you have installed FICTURE and dependencies following [Install](install.md)
+Suppose you have installed dependencies following [Install](install.md)
 
 Activate your virtual environmnet if needed
 ```
@@ -62,7 +62,7 @@ Data specific setup:
 mu_scale=1 # If your data's coordinates are already in micrometer
 key=Count
 major_axis=Y # If your data is sorted by the Y-axis
-# gitpath=path/to/ficture # path to this repository
+gitpath=path/to/ficture # path to this repository
 ```
 
 
@@ -75,9 +75,7 @@ input=${path}/transcripts.tsv.gz
 output=${path}/batched.matrix.tsv.gz
 batch=${path}/batched.matrix.tsv
 
-# python ${gitpath}/script/make_spatial_minibatch.py --input ${input} --output ${batch} --mu_scale ${mu_scale} --batch_size ${batch_size} --batch_buff ${batch_buff} --major_axis ${major_axis}
-
-ficture make_spatial_minibatch --input ${input} --output ${batch} --mu_scale ${mu_scale} --batch_size ${batch_size} --batch_buff ${batch_buff} --major_axis ${major_axis}
+python ${gitpath}/script/make_spatial_minibatch.py --input ${input} --output ${batch} --mu_scale ${mu_scale} --batch_size ${batch_size} --batch_buff ${batch_buff} --major_axis ${major_axis}
 
 sort -S 4G -k2,2n -k1,1g ${batch} | gzip -c > ${batch}.gz
 rm ${batch}
@@ -86,12 +84,12 @@ rm ${batch}
 
 Prepare training minibatches, only need to run once if you plan to fit multiple models (say with different number of factors)
 ```bash
+# Prepare training minibatches, only need to run once if you plan to fit multiple models (say with different number of factors)
 train_width=12 # \sqrt{3} x the side length of the hexagon (um)
 min_ct_per_unit=50
 input=${path}/transcripts.tsv.gz
 out=${path}/hexagon.d_${train_width}.tsv
-
-ficture make_dge --key ${key} --count_header ${key} --input ${input} --output ${out} --hex_width ${train_width} --n_move 2 --min_ct_per_unit ${min_ct_per_unit} --mu_scale ${mu_scale} --precision 2 --major_axis ${major_axis}
+python ${gitpath}/script/make_dge_univ.py --key ${key} --count_header ${key} --input ${input} --output ${out} --hex_width ${train_width} --n_move 2 --min_ct_per_unit ${min_ct_per_unit} --mu_scale ${mu_scale} --precision 2 --major_axis ${major_axis}
 
 sort -S 4G -k1,1n ${out} | gzip -c > ${out}.gz # Shuffle hexagons
 rm ${out}
@@ -116,10 +114,12 @@ Initialize the model
 # parameters
 min_ct_per_unit_fit=20
 cmap_name="turbo"
+fit_nmove=$((fit_width/anchor_res))
 
 # output identifiers
 model_id=nF${nFactor}.d_${train_width}
 output_id=${model_id}
+anchor_info=prj_${fit_width}.r_${anchor_res}
 output_path=${path}/analysis/${model_id}
 figure_path=${output_path}/figure
 if [ ! -d "${figure_path}/sub" ]; then
@@ -136,20 +136,20 @@ output=${output_path}/${output_id}
 model=${output}.model.p
 
 # Fit model
-ficture fit_model --input ${hexagon} --output ${output} --feature ${feature} --nFactor ${nFactor} --epoch ${train_nEpoch} --epoch_id_length 2 --unit_attr X Y --key ${key} --min_ct_per_feature ${min_ct_per_feature} --test_split 0.5 --R ${R} --thread ${thread}
+python ${gitpath}/script/init_model_selection.py --input ${hexagon} --output ${output} --feature ${feature} --nFactor ${nFactor} --epoch ${train_nEpoch} --epoch_id_length 2 --unit_attr X Y --key ${key} --min_ct_per_feature ${min_ct_per_feature} --test_split 0.5 --R ${R} --thread ${thread}
 
 # Choose color
 input=${output_path}/${output_id}.fit_result.tsv.gz
 output=${figure_path}/${output_id}
 cmap=${figure_path}/${output_id}.rgb.tsv
-ficture choose_color --input ${input} --output ${output} --cmap_name ${cmap_name}
+python ${gitpath}/script/choose_color.py --input ${input} --output ${output} --cmap_name ${cmap_name}
 
 # Coarse plot for inspection
 cmap=${figure_path}/${output_id}.rgb.tsv
 input=${output_path}/${output_id}.fit_result.tsv.gz
 output=${figure_path}/${output_id}.coarse
-fillr=$((train_width/2+1))
-ficture plot_base --input ${input} --output ${output} --fill_range ${fillr} --color_table ${cmap} --plot_um_per_pixel 1 --plot_discretized
+fillr=$((fit_width/2+1))
+python ${gitpath}/script/plot_base.py --input ${input} --output ${output} --fill_range ${fillr} --color_table ${cmap} --plot_um_per_pixel 1 --plot_discretized
 ```
 
 
@@ -159,8 +159,6 @@ Parameters for pixel level decoding
 ```bash
 fit_width=12 # Often equal or smaller than train_width (um)
 anchor_res=4 # Distance between adjacent anchor points (um)
-fit_nmove=$((fit_width/anchor_res))
-anchor_info=prj_${fit_width}.r_${anchor_res}
 radius=$(($anchor_res+1))
 anchor_info=prj_${fit_width}.r_${anchor_res} # An identifier
 coor=${path}/coordinate_minmax.tsv
@@ -170,15 +168,16 @@ cmap=${figure_path}/${output_id}.rgb.tsv
 ```bash
 # Transform
 output=${output_path}/${output_id}.${anchor_info}
-ficture transform --input ${pixel} --output_pref ${output} --model ${model} --key ${key} --major_axis ${major_axis} --hex_width ${fit_width} --n_move ${fit_nmove} --min_ct_per_unit ${min_ct_per_unit_fit} --mu_scale ${mu_scale} --thread ${thread} --precision 2
+python ${gitpath}/script/transform_univ.py --input ${pixel} --output_pref ${output} --model ${model} --key ${key} --major_axis ${major_axis} --hex_width ${fit_width} --n_move ${fit_nmove} --min_ct_per_unit ${min_ct_per_unit_fit} --mu_scale ${mu_scale} --thread ${thread} --precision 2
 
 # Pixel level decoding & visualization
 prefix=${output_id}.decode.${anchor_info}_${radius}
 input=${path}/batched.matrix.tsv.gz
 anchor=${output_path}/${output_id}.${anchor_info}.fit_result.tsv.gz
 output=${output_path}/${prefix}
-topk=3 # Output only a few top factors per pixel
-ficture slda_decode --input ${input} --output ${output} --model ${model} --anchor ${anchor} --anchor_in_um --neighbor_radius ${radius} --mu_scale ${mu_scale} --key ${key} --precision 0.1 --lite_topk_output_pixel ${topk} --lite_topk_output_anchor ${topk} --thread ${thread}
+# Output only a few top factors per pixel
+topk=3 # Fix for now
+python ${gitpath}/script/slda_decode.py --input ${input} --output ${output} --model ${model} --anchor ${anchor} --anchor_in_um --neighbor_radius ${radius} --mu_scale ${mu_scale} --key ${key} --precision 0.1 --lite_topk_output_pixel ${topk} --lite_topk_output_anchor ${topk} --thread ${thread}
 ```
 
 ### Optional post-processing
@@ -219,13 +218,14 @@ max_pval_output=1e-3
 min_fold_output=1.5
 input=${output_path}/${prefix}.posterior.count.tsv.gz
 output=${output_path}/${prefix}.bulk_chisq.tsv
-ficture de_bulk --input ${input} --output ${output} --min_ct_per_feature ${min_ct_per_feature} --max_pval_output ${max_pval_output} --min_fold_output ${min_fold_output} --thread ${thread}
+python ${gitpath}/script/de_bulk.py --input ${input} --output ${output} --min_ct_per_feature ${min_ct_per_feature} --max_pval_output ${max_pval_output} --min_fold_output ${min_fold_output} --thread ${thread}
 
 
 # Report (color table and top DE genes)
 cmap=${output_path}/figure/${output_id}.rgb.tsv
 output=${output_path}/${prefix}.factor.info.html
-ficture factor_report --path ${output_path} --pref ${prefix} --color_table ${cmap}
+python ${gitpath}/script/factor_report.py --path ${output_path} --pref ${prefix} --color_table ${cmap}
+
 ```
 
 Generalize pixel level images representing the factorization result
@@ -234,7 +234,7 @@ Generalize pixel level images representing the factorization result
 cmap=${output_path}/figure/${output_id}.rgb.tsv
 input=${output_path}/${prefix}.pixel.sorted.tsv.gz
 output=${figure_path}/${prefix}.pixel.png
-ficture plot_pixel_full --input ${input} --color_table ${cmap} --output ${output} --plot_um_per_pixel 0.5 --full
+python ${gitpath}/script/plot_pixel_full.py --input ${input} --color_table ${cmap} --output ${output} --plot_um_per_pixel 0.5 --full
 ```
 
 Generate heatmaps for individual factors. If the data is very large, making all individual factor maps may take some time.
@@ -244,7 +244,7 @@ Generate everything in one run
 # Make single factor heatmaps, plot_subbatch balances speed and memory ...
 # batch size 8 should be safe for 7 or 14G in most cases
 output=${figure_path}/sub/${prefix}.pixel
-ficture plot_pixel_single --input ${input} --output ${output} --plot_um_per_pixel 0.5 --full --all
+python ${gitpath}/script/plot_pixel_single.py --input ${input} --output ${output} --plot_um_per_pixel 0.5 --full --all
 ```
 
 Alternatively, you can generate by batch
@@ -259,7 +259,7 @@ while [ ${st} -lt ${K} ]; do
     id_list=$( seq ${st} ${ed} )
     echo $id_list
 
-    ficture plot_pixel_single --input ${input} --output ${output} --id_list ${id_list} --plot_um_per_pixel 0.5 --full
+    python ${gitpath}/script/plot_pixel_single.py --input ${input} --output ${output} --id_list ${id_list} --plot_um_per_pixel 0.5 --full
     st=$((ed+1))
     ed=$((plot_subbatch+st-1))
 done

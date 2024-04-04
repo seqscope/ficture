@@ -1,5 +1,11 @@
 # Install
 
+### From pypi
+
+
+
+
+### Legacy
 ```
 git clone -b stable git@github.com:seqscope/ficture.git
 ```
