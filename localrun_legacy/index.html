@@ -8,13 +8,9 @@
       
       
       
-        <link rel="canonical" href="https://Yichen-Si.github.io/ficture/localrun/">
+        <link rel="canonical" href="https://Yichen-Si.github.io/ficture/localrun_legacy/">
       
       
-        <link rel="prev" href="../install/">
-      
-      
-        <link rel="next" href="../run/">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
@@ -22,7 +18,7 @@
     
     
       
-        <title>Small run - ficture</title>
+        <title>Real data process in a local linux machine - ficture</title>
       
     
     
@@ -108,7 +104,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Small run
+              Real data process in a local linux machine
             
           </span>
         </div>
@@ -257,11 +253,9 @@
         
   
   
-    
   
-  
-    <li class="md-tabs__item md-tabs__item--active">
-      <a href="./" class="md-tabs__link">
+    <li class="md-tabs__item">
+      <a href="../localrun/" class="md-tabs__link">
         
   
     
@@ -399,30 +393,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    Small run
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../localrun/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -431,119 +405,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#setup" class="md-nav__link">
-    <span class="md-ellipsis">
-      Setup
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Setup">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#input" class="md-nav__link">
-    <span class="md-ellipsis">
-      Input
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#prepare-environment" class="md-nav__link">
-    <span class="md-ellipsis">
-      Prepare environment
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#process" class="md-nav__link">
-    <span class="md-ellipsis">
-      Process
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Process">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#preprocessing" class="md-nav__link">
-    <span class="md-ellipsis">
-      Preprocessing
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#model-training" class="md-nav__link">
-    <span class="md-ellipsis">
-      Model training
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pixel-level-decoding" class="md-nav__link">
-    <span class="md-ellipsis">
-      Pixel level decoding
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#optional-post-processing" class="md-nav__link">
-    <span class="md-ellipsis">
-      Optional post-processing
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#output" class="md-nav__link">
-    <span class="md-ellipsis">
-      Output
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -890,10 +751,10 @@ examples/data/feature.clean.tsv.gz
 <div class="highlight"><pre><span></span><code>examples/data/coordinate_minmax.tsv
 </code></pre></div></p>
 <h3 id="prepare-environment">Prepare environment<a class="headerlink" href="#prepare-environment" title="Permanent link">&para;</a></h3>
+<p>Suppose you have installed dependencies following <a href="../install/">Install</a>. This document assume you are on the <code>stable</code> branch.</p>
 <p>Activate your virtual environmnet if needed
 <div class="highlight"><pre><span></span><code>source venv/with/requirements/installed/bin/activate
 </code></pre></div></p>
-<p>Suppose you have installed FICTURE and dependencies following <a href="../install/">Install</a> in this environment. Verify FICTURE is sucessfully installed with command <code>ficture</code>.</p>
 <h2 id="process">Process<a class="headerlink" href="#process" title="Permanent link">&para;</a></h2>
 <p>Specify the base directory that contains the input data
 <div class="highlight"><pre><span></span><code><span class="nv">path</span><span class="o">=</span>examples/data
@@ -904,7 +765,7 @@ examples/data/feature.clean.tsv.gz
 <div class="highlight"><pre><span></span><code><span class="nv">mu_scale</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="c1"># If your data&#39;s coordinates are already in micrometer</span>
 <span class="nv">key</span><span class="o">=</span>Count
 <span class="nv">major_axis</span><span class="o">=</span>Y<span class="w"> </span><span class="c1"># If your data is sorted by the Y-axis</span>
-<span class="c1"># gitpath=path/to/ficture # path to this repository</span>
+<span class="nv">gitpath</span><span class="o">=</span>path/to/ficture<span class="w"> </span><span class="c1"># path to this repository</span>
 </code></pre></div>
 <h3 id="preprocessing">Preprocessing<a class="headerlink" href="#preprocessing" title="Permanent link">&para;</a></h3>
 <p>Create pixel minibatches (<code>${path}/batched.matrix.tsv.gz</code>)
@@ -914,20 +775,18 @@ examples/data/feature.clean.tsv.gz
 <span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/batched.matrix.tsv.gz
 <span class="nv">batch</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/batched.matrix.tsv
 
-<span class="c1"># python ${gitpath}/script/make_spatial_minibatch.py --input ${input} --output ${batch} --mu_scale ${mu_scale} --batch_size ${batch_size} --batch_buff ${batch_buff} --major_axis ${major_axis}</span>
-
-ficture<span class="w"> </span>make_spatial_minibatch<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">batch</span><span class="si">}</span><span class="w"> </span>--mu_scale<span class="w"> </span><span class="si">${</span><span class="nv">mu_scale</span><span class="si">}</span><span class="w"> </span>--batch_size<span class="w"> </span><span class="si">${</span><span class="nv">batch_size</span><span class="si">}</span><span class="w"> </span>--batch_buff<span class="w"> </span><span class="si">${</span><span class="nv">batch_buff</span><span class="si">}</span><span class="w"> </span>--major_axis<span class="w"> </span><span class="si">${</span><span class="nv">major_axis</span><span class="si">}</span>
+python<span class="w"> </span><span class="si">${</span><span class="nv">gitpath</span><span class="si">}</span>/script/make_spatial_minibatch.py<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">batch</span><span class="si">}</span><span class="w"> </span>--mu_scale<span class="w"> </span><span class="si">${</span><span class="nv">mu_scale</span><span class="si">}</span><span class="w"> </span>--batch_size<span class="w"> </span><span class="si">${</span><span class="nv">batch_size</span><span class="si">}</span><span class="w"> </span>--batch_buff<span class="w"> </span><span class="si">${</span><span class="nv">batch_buff</span><span class="si">}</span><span class="w"> </span>--major_axis<span class="w"> </span><span class="si">${</span><span class="nv">major_axis</span><span class="si">}</span>
 
 sort<span class="w"> </span>-S<span class="w"> </span>4G<span class="w"> </span>-k2,2n<span class="w"> </span>-k1,1g<span class="w"> </span><span class="si">${</span><span class="nv">batch</span><span class="si">}</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>gzip<span class="w"> </span>-c<span class="w"> </span>&gt;<span class="w"> </span><span class="si">${</span><span class="nv">batch</span><span class="si">}</span>.gz
 rm<span class="w"> </span><span class="si">${</span><span class="nv">batch</span><span class="si">}</span>
 </code></pre></div></p>
 <p>Prepare training minibatches, only need to run once if you plan to fit multiple models (say with different number of factors)
-<div class="highlight"><pre><span></span><code><span class="nv">train_width</span><span class="o">=</span><span class="m">12</span><span class="w"> </span><span class="c1"># \sqrt{3} x the side length of the hexagon (um)</span>
+<div class="highlight"><pre><span></span><code><span class="c1"># Prepare training minibatches, only need to run once if you plan to fit multiple models (say with different number of factors)</span>
+<span class="nv">train_width</span><span class="o">=</span><span class="m">12</span><span class="w"> </span><span class="c1"># \sqrt{3} x the side length of the hexagon (um)</span>
 <span class="nv">min_ct_per_unit</span><span class="o">=</span><span class="m">50</span>
 <span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/transcripts.tsv.gz
 <span class="nv">out</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/hexagon.d_<span class="si">${</span><span class="nv">train_width</span><span class="si">}</span>.tsv
-
-ficture<span class="w"> </span>make_dge<span class="w"> </span>--key<span class="w"> </span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span>--count_header<span class="w"> </span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">out</span><span class="si">}</span><span class="w"> </span>--hex_width<span class="w"> </span><span class="si">${</span><span class="nv">train_width</span><span class="si">}</span><span class="w"> </span>--n_move<span class="w"> </span><span class="m">2</span><span class="w"> </span>--min_ct_per_unit<span class="w"> </span><span class="si">${</span><span class="nv">min_ct_per_unit</span><span class="si">}</span><span class="w"> </span>--mu_scale<span class="w"> </span><span class="si">${</span><span class="nv">mu_scale</span><span class="si">}</span><span class="w"> </span>--precision<span class="w"> </span><span class="m">2</span><span class="w"> </span>--major_axis<span class="w"> </span><span class="si">${</span><span class="nv">major_axis</span><span class="si">}</span>
+python<span class="w"> </span><span class="si">${</span><span class="nv">gitpath</span><span class="si">}</span>/script/make_dge_univ.py<span class="w"> </span>--key<span class="w"> </span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span>--count_header<span class="w"> </span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">out</span><span class="si">}</span><span class="w"> </span>--hex_width<span class="w"> </span><span class="si">${</span><span class="nv">train_width</span><span class="si">}</span><span class="w"> </span>--n_move<span class="w"> </span><span class="m">2</span><span class="w"> </span>--min_ct_per_unit<span class="w"> </span><span class="si">${</span><span class="nv">min_ct_per_unit</span><span class="si">}</span><span class="w"> </span>--mu_scale<span class="w"> </span><span class="si">${</span><span class="nv">mu_scale</span><span class="si">}</span><span class="w"> </span>--precision<span class="w"> </span><span class="m">2</span><span class="w"> </span>--major_axis<span class="w"> </span><span class="si">${</span><span class="nv">major_axis</span><span class="si">}</span>
 
 sort<span class="w"> </span>-S<span class="w"> </span>4G<span class="w"> </span>-k1,1n<span class="w"> </span><span class="si">${</span><span class="nv">out</span><span class="si">}</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>gzip<span class="w"> </span>-c<span class="w"> </span>&gt;<span class="w"> </span><span class="si">${</span><span class="nv">out</span><span class="si">}</span>.gz<span class="w"> </span><span class="c1"># Shuffle hexagons</span>
 rm<span class="w"> </span><span class="si">${</span><span class="nv">out</span><span class="si">}</span>
@@ -947,10 +806,12 @@ rm<span class="w"> </span><span class="si">${</span><span class="nv">out</span><
 <div class="highlight"><pre><span></span><code><span class="c1"># parameters</span>
 <span class="nv">min_ct_per_unit_fit</span><span class="o">=</span><span class="m">20</span>
 <span class="nv">cmap_name</span><span class="o">=</span><span class="s2">&quot;turbo&quot;</span>
+<span class="nv">fit_nmove</span><span class="o">=</span><span class="k">$((</span><span class="nv">fit_width</span><span class="o">/</span><span class="nv">anchor_res</span><span class="k">))</span>
 
 <span class="c1"># output identifiers</span>
 <span class="nv">model_id</span><span class="o">=</span>nF<span class="si">${</span><span class="nv">nFactor</span><span class="si">}</span>.d_<span class="si">${</span><span class="nv">train_width</span><span class="si">}</span>
 <span class="nv">output_id</span><span class="o">=</span><span class="si">${</span><span class="nv">model_id</span><span class="si">}</span>
+<span class="nv">anchor_info</span><span class="o">=</span>prj_<span class="si">${</span><span class="nv">fit_width</span><span class="si">}</span>.r_<span class="si">${</span><span class="nv">anchor_res</span><span class="si">}</span>
 <span class="nv">output_path</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/analysis/<span class="si">${</span><span class="nv">model_id</span><span class="si">}</span>
 <span class="nv">figure_path</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/figure
 <span class="k">if</span><span class="w"> </span><span class="o">[</span><span class="w"> </span>!<span class="w"> </span>-d<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span><span class="s2">/sub&quot;</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
@@ -967,27 +828,25 @@ rm<span class="w"> </span><span class="si">${</span><span class="nv">out</span><
 <span class="nv">model</span><span class="o">=</span><span class="si">${</span><span class="nv">output</span><span class="si">}</span>.model.p
 
 <span class="c1"># Fit model</span>
-ficture<span class="w"> </span>fit_model<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">hexagon</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--feature<span class="w"> </span><span class="si">${</span><span class="nv">feature</span><span class="si">}</span><span class="w"> </span>--nFactor<span class="w"> </span><span class="si">${</span><span class="nv">nFactor</span><span class="si">}</span><span class="w"> </span>--epoch<span class="w"> </span><span class="si">${</span><span class="nv">train_nEpoch</span><span class="si">}</span><span class="w"> </span>--epoch_id_length<span class="w"> </span><span class="m">2</span><span class="w"> </span>--unit_attr<span class="w"> </span>X<span class="w"> </span>Y<span class="w"> </span>--key<span class="w"> </span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span>--min_ct_per_feature<span class="w"> </span><span class="si">${</span><span class="nv">min_ct_per_feature</span><span class="si">}</span><span class="w"> </span>--test_split<span class="w"> </span><span class="m">0</span>.5<span class="w"> </span>--R<span class="w"> </span><span class="si">${</span><span class="nv">R</span><span class="si">}</span><span class="w"> </span>--thread<span class="w"> </span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span>
+python<span class="w"> </span><span class="si">${</span><span class="nv">gitpath</span><span class="si">}</span>/script/init_model_selection.py<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">hexagon</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--feature<span class="w"> </span><span class="si">${</span><span class="nv">feature</span><span class="si">}</span><span class="w"> </span>--nFactor<span class="w"> </span><span class="si">${</span><span class="nv">nFactor</span><span class="si">}</span><span class="w"> </span>--epoch<span class="w"> </span><span class="si">${</span><span class="nv">train_nEpoch</span><span class="si">}</span><span class="w"> </span>--epoch_id_length<span class="w"> </span><span class="m">2</span><span class="w"> </span>--unit_attr<span class="w"> </span>X<span class="w"> </span>Y<span class="w"> </span>--key<span class="w"> </span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span>--min_ct_per_feature<span class="w"> </span><span class="si">${</span><span class="nv">min_ct_per_feature</span><span class="si">}</span><span class="w"> </span>--test_split<span class="w"> </span><span class="m">0</span>.5<span class="w"> </span>--R<span class="w"> </span><span class="si">${</span><span class="nv">R</span><span class="si">}</span><span class="w"> </span>--thread<span class="w"> </span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span>
 
 <span class="c1"># Choose color</span>
 <span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.fit_result.tsv.gz
 <span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>
 <span class="nv">cmap</span><span class="o">=</span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.rgb.tsv
-ficture<span class="w"> </span>choose_color<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--cmap_name<span class="w"> </span><span class="si">${</span><span class="nv">cmap_name</span><span class="si">}</span>
+python<span class="w"> </span><span class="si">${</span><span class="nv">gitpath</span><span class="si">}</span>/script/choose_color.py<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--cmap_name<span class="w"> </span><span class="si">${</span><span class="nv">cmap_name</span><span class="si">}</span>
 
 <span class="c1"># Coarse plot for inspection</span>
 <span class="nv">cmap</span><span class="o">=</span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.rgb.tsv
 <span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.fit_result.tsv.gz
 <span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.coarse
-<span class="nv">fillr</span><span class="o">=</span><span class="k">$((</span><span class="nv">train_width</span><span class="o">/</span><span class="m">2</span><span class="o">+</span><span class="m">1</span><span class="k">))</span>
-ficture<span class="w"> </span>plot_base<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--fill_range<span class="w"> </span><span class="si">${</span><span class="nv">fillr</span><span class="si">}</span><span class="w"> </span>--color_table<span class="w"> </span><span class="si">${</span><span class="nv">cmap</span><span class="si">}</span><span class="w"> </span>--plot_um_per_pixel<span class="w"> </span><span class="m">1</span><span class="w"> </span>--plot_discretized
+<span class="nv">fillr</span><span class="o">=</span><span class="k">$((</span><span class="nv">fit_width</span><span class="o">/</span><span class="m">2</span><span class="o">+</span><span class="m">1</span><span class="k">))</span>
+python<span class="w"> </span><span class="si">${</span><span class="nv">gitpath</span><span class="si">}</span>/script/plot_base.py<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--fill_range<span class="w"> </span><span class="si">${</span><span class="nv">fillr</span><span class="si">}</span><span class="w"> </span>--color_table<span class="w"> </span><span class="si">${</span><span class="nv">cmap</span><span class="si">}</span><span class="w"> </span>--plot_um_per_pixel<span class="w"> </span><span class="m">1</span><span class="w"> </span>--plot_discretized
 </code></pre></div></p>
 <h3 id="pixel-level-decoding">Pixel level decoding<a class="headerlink" href="#pixel-level-decoding" title="Permanent link">&para;</a></h3>
 <p>Parameters for pixel level decoding
 <div class="highlight"><pre><span></span><code><span class="nv">fit_width</span><span class="o">=</span><span class="m">12</span><span class="w"> </span><span class="c1"># Often equal or smaller than train_width (um)</span>
 <span class="nv">anchor_res</span><span class="o">=</span><span class="m">4</span><span class="w"> </span><span class="c1"># Distance between adjacent anchor points (um)</span>
-<span class="nv">fit_nmove</span><span class="o">=</span><span class="k">$((</span><span class="nv">fit_width</span><span class="o">/</span><span class="nv">anchor_res</span><span class="k">))</span>
-<span class="nv">anchor_info</span><span class="o">=</span>prj_<span class="si">${</span><span class="nv">fit_width</span><span class="si">}</span>.r_<span class="si">${</span><span class="nv">anchor_res</span><span class="si">}</span>
 <span class="nv">radius</span><span class="o">=</span><span class="k">$((</span><span class="nv">$anchor_res</span><span class="o">+</span><span class="m">1</span><span class="k">))</span>
 <span class="nv">anchor_info</span><span class="o">=</span>prj_<span class="si">${</span><span class="nv">fit_width</span><span class="si">}</span>.r_<span class="si">${</span><span class="nv">anchor_res</span><span class="si">}</span><span class="w"> </span><span class="c1"># An identifier</span>
 <span class="nv">coor</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/coordinate_minmax.tsv
@@ -995,15 +854,16 @@ ficture<span class="w"> </span>plot_base<span class="w"> </span>--input<span cla
 </code></pre></div></p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Transform</span>
 <span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.<span class="si">${</span><span class="nv">anchor_info</span><span class="si">}</span>
-ficture<span class="w"> </span>transform<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">pixel</span><span class="si">}</span><span class="w"> </span>--output_pref<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--model<span class="w"> </span><span class="si">${</span><span class="nv">model</span><span class="si">}</span><span class="w"> </span>--key<span class="w"> </span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span>--major_axis<span class="w"> </span><span class="si">${</span><span class="nv">major_axis</span><span class="si">}</span><span class="w"> </span>--hex_width<span class="w"> </span><span class="si">${</span><span class="nv">fit_width</span><span class="si">}</span><span class="w"> </span>--n_move<span class="w"> </span><span class="si">${</span><span class="nv">fit_nmove</span><span class="si">}</span><span class="w"> </span>--min_ct_per_unit<span class="w"> </span><span class="si">${</span><span class="nv">min_ct_per_unit_fit</span><span class="si">}</span><span class="w"> </span>--mu_scale<span class="w"> </span><span class="si">${</span><span class="nv">mu_scale</span><span class="si">}</span><span class="w"> </span>--thread<span class="w"> </span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span><span class="w"> </span>--precision<span class="w"> </span><span class="m">2</span>
+python<span class="w"> </span><span class="si">${</span><span class="nv">gitpath</span><span class="si">}</span>/script/transform_univ.py<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">pixel</span><span class="si">}</span><span class="w"> </span>--output_pref<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--model<span class="w"> </span><span class="si">${</span><span class="nv">model</span><span class="si">}</span><span class="w"> </span>--key<span class="w"> </span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span>--major_axis<span class="w"> </span><span class="si">${</span><span class="nv">major_axis</span><span class="si">}</span><span class="w"> </span>--hex_width<span class="w"> </span><span class="si">${</span><span class="nv">fit_width</span><span class="si">}</span><span class="w"> </span>--n_move<span class="w"> </span><span class="si">${</span><span class="nv">fit_nmove</span><span class="si">}</span><span class="w"> </span>--min_ct_per_unit<span class="w"> </span><span class="si">${</span><span class="nv">min_ct_per_unit_fit</span><span class="si">}</span><span class="w"> </span>--mu_scale<span class="w"> </span><span class="si">${</span><span class="nv">mu_scale</span><span class="si">}</span><span class="w"> </span>--thread<span class="w"> </span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span><span class="w"> </span>--precision<span class="w"> </span><span class="m">2</span>
 
 <span class="c1"># Pixel level decoding &amp; visualization</span>
 <span class="nv">prefix</span><span class="o">=</span><span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.decode.<span class="si">${</span><span class="nv">anchor_info</span><span class="si">}</span>_<span class="si">${</span><span class="nv">radius</span><span class="si">}</span>
 <span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/batched.matrix.tsv.gz
 <span class="nv">anchor</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.<span class="si">${</span><span class="nv">anchor_info</span><span class="si">}</span>.fit_result.tsv.gz
 <span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>
-<span class="nv">topk</span><span class="o">=</span><span class="m">3</span><span class="w"> </span><span class="c1"># Output only a few top factors per pixel</span>
-ficture<span class="w"> </span>slda_decode<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--model<span class="w"> </span><span class="si">${</span><span class="nv">model</span><span class="si">}</span><span class="w"> </span>--anchor<span class="w"> </span><span class="si">${</span><span class="nv">anchor</span><span class="si">}</span><span class="w"> </span>--anchor_in_um<span class="w"> </span>--neighbor_radius<span class="w"> </span><span class="si">${</span><span class="nv">radius</span><span class="si">}</span><span class="w"> </span>--mu_scale<span class="w"> </span><span class="si">${</span><span class="nv">mu_scale</span><span class="si">}</span><span class="w"> </span>--key<span class="w"> </span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span>--precision<span class="w"> </span><span class="m">0</span>.1<span class="w"> </span>--lite_topk_output_pixel<span class="w"> </span><span class="si">${</span><span class="nv">topk</span><span class="si">}</span><span class="w"> </span>--lite_topk_output_anchor<span class="w"> </span><span class="si">${</span><span class="nv">topk</span><span class="si">}</span><span class="w"> </span>--thread<span class="w"> </span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span>
+<span class="c1"># Output only a few top factors per pixel</span>
+<span class="nv">topk</span><span class="o">=</span><span class="m">3</span><span class="w"> </span><span class="c1"># Fix for now</span>
+python<span class="w"> </span><span class="si">${</span><span class="nv">gitpath</span><span class="si">}</span>/script/slda_decode.py<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--model<span class="w"> </span><span class="si">${</span><span class="nv">model</span><span class="si">}</span><span class="w"> </span>--anchor<span class="w"> </span><span class="si">${</span><span class="nv">anchor</span><span class="si">}</span><span class="w"> </span>--anchor_in_um<span class="w"> </span>--neighbor_radius<span class="w"> </span><span class="si">${</span><span class="nv">radius</span><span class="si">}</span><span class="w"> </span>--mu_scale<span class="w"> </span><span class="si">${</span><span class="nv">mu_scale</span><span class="si">}</span><span class="w"> </span>--key<span class="w"> </span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span>--precision<span class="w"> </span><span class="m">0</span>.1<span class="w"> </span>--lite_topk_output_pixel<span class="w"> </span><span class="si">${</span><span class="nv">topk</span><span class="si">}</span><span class="w"> </span>--lite_topk_output_anchor<span class="w"> </span><span class="si">${</span><span class="nv">topk</span><span class="si">}</span><span class="w"> </span>--thread<span class="w"> </span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span>
 </code></pre></div>
 <h3 id="optional-post-processing">Optional post-processing<a class="headerlink" href="#optional-post-processing" title="Permanent link">&para;</a></h3>
 <p>The following is not strictly necessary but it generates summary statistics and helps visualization.</p>
@@ -1036,27 +896,27 @@ rm<span class="w"> </span><span class="si">${</span><span class="nv">input</span
 <span class="nv">min_fold_output</span><span class="o">=</span><span class="m">1</span>.5
 <span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>.posterior.count.tsv.gz
 <span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>.bulk_chisq.tsv
-ficture<span class="w"> </span>de_bulk<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--min_ct_per_feature<span class="w"> </span><span class="si">${</span><span class="nv">min_ct_per_feature</span><span class="si">}</span><span class="w"> </span>--max_pval_output<span class="w"> </span><span class="si">${</span><span class="nv">max_pval_output</span><span class="si">}</span><span class="w"> </span>--min_fold_output<span class="w"> </span><span class="si">${</span><span class="nv">min_fold_output</span><span class="si">}</span><span class="w"> </span>--thread<span class="w"> </span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span>
+python<span class="w"> </span><span class="si">${</span><span class="nv">gitpath</span><span class="si">}</span>/script/de_bulk.py<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--min_ct_per_feature<span class="w"> </span><span class="si">${</span><span class="nv">min_ct_per_feature</span><span class="si">}</span><span class="w"> </span>--max_pval_output<span class="w"> </span><span class="si">${</span><span class="nv">max_pval_output</span><span class="si">}</span><span class="w"> </span>--min_fold_output<span class="w"> </span><span class="si">${</span><span class="nv">min_fold_output</span><span class="si">}</span><span class="w"> </span>--thread<span class="w"> </span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span>
 
 
 <span class="c1"># Report (color table and top DE genes)</span>
 <span class="nv">cmap</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/figure/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.rgb.tsv
 <span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>.factor.info.html
-ficture<span class="w"> </span>factor_report<span class="w"> </span>--path<span class="w"> </span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span><span class="w"> </span>--pref<span class="w"> </span><span class="si">${</span><span class="nv">prefix</span><span class="si">}</span><span class="w"> </span>--color_table<span class="w"> </span><span class="si">${</span><span class="nv">cmap</span><span class="si">}</span>
+python<span class="w"> </span><span class="si">${</span><span class="nv">gitpath</span><span class="si">}</span>/script/factor_report.py<span class="w"> </span>--path<span class="w"> </span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span><span class="w"> </span>--pref<span class="w"> </span><span class="si">${</span><span class="nv">prefix</span><span class="si">}</span><span class="w"> </span>--color_table<span class="w"> </span><span class="si">${</span><span class="nv">cmap</span><span class="si">}</span>
 </code></pre></div></p>
 <p>Generalize pixel level images representing the factorization result
 <div class="highlight"><pre><span></span><code><span class="c1"># Make pixel level figures</span>
 <span class="nv">cmap</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/figure/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.rgb.tsv
 <span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>.pixel.sorted.tsv.gz
 <span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>.pixel.png
-ficture<span class="w"> </span>plot_pixel_full<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--color_table<span class="w"> </span><span class="si">${</span><span class="nv">cmap</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--plot_um_per_pixel<span class="w"> </span><span class="m">0</span>.5<span class="w"> </span>--full
+python<span class="w"> </span><span class="si">${</span><span class="nv">gitpath</span><span class="si">}</span>/script/plot_pixel_full.py<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--color_table<span class="w"> </span><span class="si">${</span><span class="nv">cmap</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--plot_um_per_pixel<span class="w"> </span><span class="m">0</span>.5<span class="w"> </span>--full
 </code></pre></div></p>
 <p>Generate heatmaps for individual factors. If the data is very large, making all individual factor maps may take some time.</p>
 <p>Generate everything in one run
 <div class="highlight"><pre><span></span><code><span class="c1"># Make single factor heatmaps, plot_subbatch balances speed and memory ...</span>
 <span class="c1"># batch size 8 should be safe for 7 or 14G in most cases</span>
 <span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span>/sub/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>.pixel
-ficture<span class="w"> </span>plot_pixel_single<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--plot_um_per_pixel<span class="w"> </span><span class="m">0</span>.5<span class="w"> </span>--full<span class="w"> </span>--all
+python<span class="w"> </span><span class="si">${</span><span class="nv">gitpath</span><span class="si">}</span>/script/plot_pixel_single.py<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--plot_um_per_pixel<span class="w"> </span><span class="m">0</span>.5<span class="w"> </span>--full<span class="w"> </span>--all
 </code></pre></div></p>
 <p>Alternatively, you can generate by batch
 <div class="highlight"><pre><span></span><code><span class="nv">plot_subbatch</span><span class="o">=</span><span class="m">8</span>
@@ -1069,7 +929,7 @@ ficture<span class="w"> </span>plot_pixel_single<span class="w"> </span>--input<
 <span class="w">    </span><span class="nv">id_list</span><span class="o">=</span><span class="k">$(</span><span class="w"> </span>seq<span class="w"> </span><span class="si">${</span><span class="nv">st</span><span class="si">}</span><span class="w"> </span><span class="si">${</span><span class="nv">ed</span><span class="si">}</span><span class="w"> </span><span class="k">)</span>
 <span class="w">    </span><span class="nb">echo</span><span class="w"> </span><span class="nv">$id_list</span>
 
-<span class="w">    </span>ficture<span class="w"> </span>plot_pixel_single<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--id_list<span class="w"> </span><span class="si">${</span><span class="nv">id_list</span><span class="si">}</span><span class="w"> </span>--plot_um_per_pixel<span class="w"> </span><span class="m">0</span>.5<span class="w"> </span>--full
+<span class="w">    </span>python<span class="w"> </span><span class="si">${</span><span class="nv">gitpath</span><span class="si">}</span>/script/plot_pixel_single.py<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--id_list<span class="w"> </span><span class="si">${</span><span class="nv">id_list</span><span class="si">}</span><span class="w"> </span>--plot_um_per_pixel<span class="w"> </span><span class="m">0</span>.5<span class="w"> </span>--full
 <span class="w">    </span><span class="nv">st</span><span class="o">=</span><span class="k">$((</span><span class="nv">ed</span><span class="o">+</span><span class="m">1</span><span class="k">))</span>
 <span class="w">    </span><span class="nv">ed</span><span class="o">=</span><span class="k">$((</span><span class="nv">plot_subbatch</span><span class="o">+</span><span class="nv">st</span><span class="o">-</span><span class="m">1</span><span class="k">))</span>
 <span class="k">done</span>

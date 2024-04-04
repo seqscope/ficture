@@ -646,7 +646,7 @@
 
 
 <h1 id="install">Install<a class="headerlink" href="#install" title="Permanent link">&para;</a></h1>
-<div class="highlight"><pre><span></span><code>git clone -b stable git@github.com:seqscope/ficture.git
+<div class="highlight"><pre><span></span><code>git clone git@github.com:seqscope/ficture.git
 </code></pre></div>
 <p>It is recommended to create a virtual environment and install FICTURE and its dependencies.</p>
 <p>FICTURE is tested with python 3.11 and 3.9, there might be problems with different python versions, but the required packages are farely standard.</p>
@@ -657,7 +657,13 @@ source /path/to/venv/name/bin/activate
 
 pip install -r requirements.txt
 </code></pre></div>
-<p>For this branch (<code>stable</code>), we run FICTURE as individual python scripts, so no installation is needed.</p>
+<p>Install from pypi
+<div class="highlight"><pre><span></span><code>pip install ficture
+</code></pre></div></p>
+<p>Or build locally (need to install <code>build</code>) from the foot of the cloned repository.
+<div class="highlight"><pre><span></span><code>python -m build
+pip install ./dist/ficture-0.0.2-py3-none-any.whl
+</code></pre></div></p>
 
 
 

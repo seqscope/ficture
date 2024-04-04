@@ -739,6 +739,7 @@
 
 <h1 id="real-data-process">Real data process<a class="headerlink" href="#real-data-process" title="Permanent link">&para;</a></h1>
 <p>We take a small sub-region of Vizgen MERSCOPE mouse liver data as an example. (The same region we showed in supplementary figure X)</p>
+<p>Temporary: the current document assume you are on the <code>stable</code> branch of FICTURE.</p>
 <h3 id="input">Input<a class="headerlink" href="#input" title="Permanent link">&para;</a></h3>
 <p><div class="highlight"><pre><span></span><code>examples/data/transcripts.tsv.gz
 examples/data/feature.clean.tsv.gz
@@ -766,7 +767,7 @@ examples/data/feature.clean.tsv.gz
 <span class="nv">key</span><span class="o">=</span>Count
 <span class="nv">MJ</span><span class="o">=</span>Y<span class="w"> </span><span class="c1"># If your data is sorted by the Y-axis</span>
 <span class="nv">env</span><span class="o">=</span>venv/with/ficture/installed/bin/activate
-<span class="nv">gitpath</span><span class="o">=</span>path/to/ficture<span class="w"> </span><span class="c1"># path to this repository</span>
+<span class="nv">gitpath</span><span class="o">=</span>path/to/ficture<span class="w"> </span><span class="c1"># path to where you have installed ficture</span>
 <span class="c1">#SLURM_ACCOUNT= # For submitting jobs to slurm</span>
 </code></pre></div>
 <p>Example bash scripts are in <code>examples/script/</code>, you will need to modify them to work on your system.</p>
