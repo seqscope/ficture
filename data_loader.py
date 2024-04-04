@@ -209,7 +209,7 @@ class StreamUnit:
             left = copy.copy(chunk[chunk.j.eq(last_indx)])
             chunk = chunk.loc[~chunk.j.eq(last_indx), :]
 
-            ct = chunk.groupby(by = ['j']).agg({self._key: sum}).reset_index()
+            ct = chunk.groupby(by = ['j']).agg({self._key: "sum"}).reset_index()
             kept_unit = set(ct.loc[ct[self._key] > self._min_c, "j"].values)
             self.df = pd.concat([self.df, chunk[chunk.j.isin(kept_unit)]])
             if len(self.df.j.unique()) < self._min_n: # Wait until more data
@@ -217,7 +217,7 @@ class StreamUnit:
                 continue
 
             # Total molecule count per unit
-            brc = self.df.groupby(by = ['j']).agg({self._key: sum}).reset_index()
+            brc = self.df.groupby(by = ['j']).agg({self._key: "sum"}).reset_index()
             brc = brc[brc[self._key] > self._min_c]
             brc.index = range(brc.shape[0])
             self.df = self.df[self.df.j.isin(brc.j.values)]
@@ -232,7 +232,7 @@ class StreamUnit:
             self.df = copy.copy(left)
 
         if len(self.df.j.unique()) > 1:
-            brc = self.df.groupby(by = ['j']).agg({self._key: sum}).reset_index()
+            brc = self.df.groupby(by = ['j']).agg({self._key: "sum"}).reset_index()
             brc = brc[brc[self._key] > self._min_c]
             brc.index = range(brc.shape[0])
             self.df = self.df[self.df.j.isin(brc.j.values)]

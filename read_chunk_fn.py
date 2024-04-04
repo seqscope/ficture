@@ -128,8 +128,8 @@ class SlidingPosteriorCount:
         df.X = (df.X / self.precision).astype(int)
         df.Y = (df.Y / self.precision).astype(int)
         df['j'] = list(zip(df.X, df.Y))
-        df = df.groupby(by = ['j', 'gene']).agg({self.key: sum}).reset_index()
-        brc = df.groupby(by = ['j']).agg({self.key: sum}).reset_index()
+        df = df.groupby(by = ['j', 'gene']).agg({self.key: "sum"}).reset_index()
+        brc = df.groupby(by = ['j']).agg({self.key: "sum"}).reset_index()
         brc['X'] = brc.j.map(lambda x: x[0]) * self.precision
         brc['Y'] = brc.j.map(lambda x: x[1]) * self.precision
         x = (brc.X / self.block_size).astype(int).values
@@ -137,7 +137,7 @@ class SlidingPosteriorCount:
         brc['w_id'] = list(zip(x, y))
 
         # count total reads per block
-        w_ct = brc.groupby(by = ['w_id']).agg({self.key: sum}).reset_index()
+        w_ct = brc.groupby(by = ['w_id']).agg({self.key: "sum"}).reset_index()
         # keep only blocks with more than 100 reads
         w_id = set(w_ct.loc[w_ct[self.key] > self.block_ct_min, 'w_id'].values)
         w_id = {x : np.array([x[0],x[0]+1,x[1],x[1]+1]) * self.block_size for x in w_id}

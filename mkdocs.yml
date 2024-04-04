@@ -71,13 +71,15 @@ plugins:
 
 nav:
   - Home: index.md
+  - Install: install.md
+  - Small run: localrun.md
   - Run: run.md
   - Format input:
     - Introduction: format_input.md
     - CosMx SMI: format_input/cosmx.md
     - Visium HD: format_input/visiumHD.md
-  - Visualize: visual.md
-  - Miscellaneous: misc.md
+  # - Visualize: visual.md
+  # - Miscellaneous: misc.md
 
 markdown_extensions:
   # - abbr

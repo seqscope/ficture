@@ -71,7 +71,7 @@ class PixelMinibatch:
                               (chunk[self.key] > 0), :]
             chunk.X = (chunk.X * self.mu_scale / self.precision).astype(int)
             chunk.Y = (chunk.Y * self.mu_scale / self.precision).astype(int)
-            chunk = chunk.groupby(by=[self.batch_id,"gene","X","Y"]).agg({self.key:np.sum}).reset_index()
+            chunk = chunk.groupby(by=[self.batch_id,"gene","X","Y"]).agg({self.key: "sum"}).reset_index()
             random_pref = chunk[self.batch_id].map(lambda x : x[-5:]).values
             chunk['j'] = random_pref + '_' + chunk.X.astype(str) + '_' + chunk.Y.astype(str)
             chunk.X *= self.precision

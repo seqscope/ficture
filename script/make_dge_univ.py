@@ -79,7 +79,7 @@ else:
 area = radius * diam * 3 / 2
 min_ct_per_unit = max(args.min_ct_per_unit, args.min_density_per_unit * area)
 
-adt = {x:np.sum for x in ct_header}
+adt = {x:"sum" for x in ct_header}
 dty = {x:int for x in ct_header}
 dty.update({x:str for x in ['X','Y','gene'] + args.group_within})
 
@@ -136,7 +136,7 @@ for chunk in pd.read_csv(args.input, sep='\t', chunksize=1000000, dtype=dty):
                 prefix  = str(offs_x)+str(offs_y)
                 x,y = pixel_to_hex(pts, radius, offs_x/n_move, offs_y/n_move)
                 hex_crd = list(zip(x,y))
-                ct = pd.DataFrame({'hex_id':hex_crd, 'tot':brc[key].values, 'X':pts[:, 0], 'Y':pts[:,1]}).groupby(by = 'hex_id').agg({'tot': sum, 'X':np.min, 'Y':np.min}).reset_index()
+                ct = pd.DataFrame({'hex_id':hex_crd, 'tot':brc[key].values, 'X':pts[:, 0], 'Y':pts[:,1]}).groupby(by = 'hex_id').agg({'tot': "sum", 'X':np.min, 'Y':np.min}).reset_index()
                 mid_ct = np.median(ct.loc[ct.tot >= min_ct_per_unit, 'tot'].values)
                 ct = set(ct.loc[(ct.tot >= min_ct_per_unit) & (ct[mj] > st + diam/2) & (ct[mj] < ed - diam/2), 'hex_id'].values)
                 ct = ct - last_batch[(offs_x,offs_y,l)]

@@ -101,13 +101,13 @@ class PixelToUnit:
                     offs_iden = str(offs_x) + '_' + str(offs_y)
                     x, y = pixel_to_hex(self.df.loc[indx, ['X', 'Y']].values, self.radius, offs_x/self.n_move, offs_y/self.n_move)
                     self.df.loc[indx, "hex_id"] = list(zip(x, y))
-                    ct = self.df[indx].groupby('hex_id').agg({self.key: sum}).reset_index()
+                    ct = self.df[indx].groupby('hex_id').agg({self.key: "sum"}).reset_index()
                     ct.drop(index = ct.index[ct[self.key] < self.min_ct_per_unit], inplace=True)
                     if len(ct) < 1:
                         continue
                     bt_dict = {x:i for i,x in enumerate(ct.hex_id.values)}
                     N = len(bt_dict)
-                    brc = self.df[indx & self.df.hex_id.isin(bt_dict)].groupby(by = ['hex_id', 'gene']).agg({self.key: sum}).reset_index()
+                    brc = self.df[indx & self.df.hex_id.isin(bt_dict)].groupby(by = ['hex_id', 'gene']).agg({self.key: "sum"}).reset_index()
                     self.mtx = vstack([self.mtx, coo_array((brc[self.key].values, (brc.hex_id.map(bt_dict).values, brc.gene.map(self.ft_dict).values) ), shape = (N, self.M))])
                     if self.lattice:
                         ct['x'], ct['y'] = \
@@ -166,7 +166,7 @@ class PixelToUnit:
                 offs_iden = str(offs_x) + '_' + str(offs_y)
                 x, y = pixel_to_hex(self.df[['X', 'Y']].values, self.radius, offs_x/self.n_move, offs_y/self.n_move)
                 self.df.hex_id = list(zip(x, y))
-                ct = self.df.groupby('hex_id').agg({self.key: sum}).reset_index()
+                ct = self.df.groupby('hex_id').agg({self.key: "sum"}).reset_index()
                 ct['X'], ct['Y'] = \
                         hex_to_pixel([v[0] for v in ct.hex_id.values],\
                                      [v[1] for v in ct.hex_id.values],\
@@ -180,7 +180,7 @@ class PixelToUnit:
                     continue
                 bt_dict = {x:i for i,x in enumerate(ct.hex_id.values)}
                 N = len(bt_dict)
-                brc = self.df[self.df.hex_id.isin(bt_dict)].groupby(by = ['hex_id', 'gene']).agg({self.key: sum}).reset_index()
+                brc = self.df[self.df.hex_id.isin(bt_dict)].groupby(by = ['hex_id', 'gene']).agg({self.key: "sum"}).reset_index()
                 self.mtx = vstack([self.mtx, coo_array((brc[self.key].values, (brc.hex_id.map(bt_dict).values, brc.gene.map(self.ft_dict).values) ), shape = (N, self.M))])
                 if not self.lattice:
                     ct = brc.groupby(by = ['hex_id']).agg({self.key: sum, 'X': np.median, 'Y':np.median}).reset_index()
