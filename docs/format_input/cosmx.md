@@ -1,6 +1,6 @@
 # Process CosMx SMI raw data
 
-Locate the transcript file from your SMI output, mostly likely it is named `*_tx_file.csv.gz` with the following columns
+Locate the transcript file from your SMI output, most likely it is named `*_tx_file.csv.gz` with the following columns
 
 ```
 "fov","cell_ID","x_global_px","y_global_px","x_local_px","y_local_px","z","target","CellComp"
@@ -21,7 +21,7 @@ So in the following commands we set `px_to_um=0.168`.
 
 The python script can be found in `ficture/misc`.
 
-```
+```bash
 input=/path/to/input/Tissue5_tx_file.csv.gz # Change it to your transcript file
 path=/path/to/output
 iden=brain # how you identify your files

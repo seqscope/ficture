@@ -2,23 +2,17 @@ import sys, os, re, copy, gzip, time, logging, pickle, argparse
 import numpy as np
 import pandas as pd
 
-def format_cosmx():
+def format_xenium():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input', type=str, help='Input transcript file from CosMx SMI raw output')
-    parser.add_argument('--px_to_um', type=float, help='Convert pixel unit as used in x_local_px and x_global_px to micrometer, this number should be found in the README of your SMI output, it is likely 0.12~0.18')
-    parser.add_argument('--output', type=str, help='Full path of the output tsv file')
-    parser.add_argument('--feature', type=str, default="", help='Full path to store an output gene list')
-    parser.add_argument('--gcol', type=str, default="target", help='The column name used as the gene/probe identifier')
-    parser.add_argument('--annotation', type=str, nargs='*', default=["cell_ID","CellComp"], help='Additional information to carry over in the output file')
-    parser.add_argument('--dummy_genes', type=str, default='NegPrb', help='A single name or a regex describing the names of negative control probes')
+    parser.add_argument('--input', type=str, help='Input transcript file from Xenium output, likely named transcripts.csv.gz')
+    parser.add_argument('--output', type=str, help='Output file (tsv)')
+    parser.add_argument('--feature', type=str, default='', help='Output gene list')
+    parser.add_argument('--min_phred_score', type=float, default=13, help='Quality score cutoff')
+    parser.add_argument('--dummy_genes', type=str, default='', help='A single name or a regex describing the names of negative control probes')
     args = parser.parse_args()
 
-    xcol="x_global_px"
-    ycol="y_global_px"
-    gcol=args.gcol
-
-    unit_info=['X','Y','gene']+args.annotation
+    unit_info=['X','Y','gene','cell_id','overlaps_nucleus']
     oheader = unit_info + ['Count']
 
     feature=pd.DataFrame()
@@ -30,11 +24,11 @@ def format_cosmx():
     with open(args.output, 'w') as wf:
         _ = wf.write('\t'.join(oheader)+'\n')
     for chunk in pd.read_csv(args.input,header=0,chunksize=500000):
-        chunk.rename(columns = {gcol:'gene'}, inplace=True)
+        chunk = chunk.loc[(chunk.qv > args.min_phred_score)]
+        chunk.rename(columns = {'feature_name':'gene'}, inplace=True)
         if args.dummy_genes != '':
             chunk = chunk[~chunk.gene.str.contains(args.dummy_genes, flags=re.IGNORECASE, regex=True)]
-        chunk['X'] = chunk[xcol] * args.px_to_um
-        chunk['Y'] = chunk[ycol] * args.px_to_um
+        chunk.rename(columns = {'x_location':'X', 'y_location':'Y'}, inplace=True)
         chunk['Count'] = 1
         chunk[oheader].to_csv(args.output,sep='\t',mode='a',index=False,header=False,float_format="%.2f")
         logging.info(f"{chunk.shape[0]}")
@@ -60,4 +54,4 @@ def format_cosmx():
         wf.write(f"ymax\t{ymax:.2f}\n")
 
 if __name__ == '__main__':
-    format_cosmx()
+    format_xenium()

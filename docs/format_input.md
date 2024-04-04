@@ -11,4 +11,8 @@ examples/data/feature.clean.tsv.gz
 
 [CosMx SMI](format_input/cosmx.md)
 
-[Visium HD](format_input/visiumHD.md)
+[10X Xenium](format_input/xenium.md)
+
+[10X Visium HD](format_input/visiumHD.md)
+
+[Vizgen MERSCOPE](format_input/vizgen.md)

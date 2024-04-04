@@ -78,6 +78,8 @@ nav:
     - Introduction: format_input.md
     - CosMx SMI: format_input/cosmx.md
     - Visium HD: format_input/visiumHD.md
+    - Xenium: format_input/xenium.md
+    - Vizgen MERSCOPE: format_input/vizgen.md
   # - Visualize: visual.md
   # - Miscellaneous: misc.md
 
