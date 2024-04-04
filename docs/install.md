@@ -1,13 +1,7 @@
 # Install
 
-### From pypi
-
-
-
-
-### Legacy
 ```
-git clone -b stable git@github.com:seqscope/ficture.git
+git clone git@github.com:seqscope/ficture.git
 ```
 
 It is recommended to create a virtual environment and install FICTURE and its dependencies.
@@ -25,4 +19,13 @@ source /path/to/venv/name/bin/activate
 pip install -r requirements.txt
 ```
 
-For this branch (`stable`), we run FICTURE as individual python scripts, so no installation is needed.
+Install from pypi
+```
+pip install ficture
+```
+
+Or build locally (need to install `build`) from the foot of the cloned repository.
+```
+python -m build
+pip install ./dist/ficture-0.0.2-py3-none-any.whl
+```

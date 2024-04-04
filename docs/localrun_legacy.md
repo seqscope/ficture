@@ -37,7 +37,7 @@ examples/data/coordinate_minmax.tsv
 
 ### Prepare environment
 
-Suppose you have installed dependencies following [Install](install.md)
+Suppose you have installed dependencies following [Install](install.md). This document assume you are on the `stable` branch.
 
 Activate your virtual environmnet if needed
 ```

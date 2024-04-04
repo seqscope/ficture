@@ -2,6 +2,8 @@
 
 We take a small sub-region of Vizgen MERSCOPE mouse liver data as an example. (The same region we showed in supplementary figure X)
 
+Temporary: the current document assume you are on the `stable` branch of FICTURE.
+
 ### Input
 
 ```
@@ -45,12 +47,13 @@ Data specific setup:
 
 `key` is the column name in the transcripts file corresponding to the gene counts (`Count` in our example). `MJ` specify which axis the transcript file is sorted by.
 
+
 ```bash
 mu_scale=1 # If your data's coordinates are already in micrometer
 key=Count
 MJ=Y # If your data is sorted by the Y-axis
 env=venv/with/ficture/installed/bin/activate
-gitpath=path/to/ficture # path to this repository
+gitpath=path/to/ficture # path to where you have installed ficture
 #SLURM_ACCOUNT= # For submitting jobs to slurm
 ```
 

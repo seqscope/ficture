@@ -37,12 +37,12 @@ examples/data/coordinate_minmax.tsv
 
 ### Prepare environment
 
-Suppose you have installed FICTURE and dependencies following [Install](install.md)
-
 Activate your virtual environmnet if needed
 ```
 source venv/with/requirements/installed/bin/activate
 ```
+
+Suppose you have installed FICTURE and dependencies following [Install](install.md) in this environment. Verify FICTURE is sucessfully installed with command `ficture`.
 
 
 ## Process
