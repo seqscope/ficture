@@ -16,6 +16,7 @@ parser.add_argument('--output', type=str, help='')
 
 # Basic parameter
 parser.add_argument('--major_axis', type=str, default="Y", help='X or Y')
+parser.add_argument('--major_axis_max', type=float, default=-1, help='')
 parser.add_argument('--batch_size', type=float, default=500, help='Length of the side (um) of square minibatches')
 parser.add_argument('--batch_buff', type=float, default=50, help='Overlap between minibatches')
 parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
@@ -111,6 +112,11 @@ while not end_of_file:
     if not end_of_file:
         if x_range < batch_size or y_range < batch_size:
             continue
+        if args.major_axis_max > 0:
+            if args.major_axis == "X" and x_max > args.major_axis_max - batch_size / 2:
+                continue
+            if args.major_axis == "Y" and y_max > args.major_axis_max - batch_size / 2:
+                continue
     else: # end of file, and the last batch is too small potentially caused by the batch size almost divides the axis lenght
         if (args.major_axis == "X" and x_range <= batch_buff) or (args.major_axis == "Y" and y_range <= batch_buff):
             break
