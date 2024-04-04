@@ -8,9 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://Yichen-Si.github.io/ficture/misc/">
+        <link rel="canonical" href="https://Yichen-Si.github.io/ficture/install/">
       
       
+        <link rel="prev" href="..">
+      
+      
+        <link rel="next" href="../localrun/">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
@@ -18,7 +22,7 @@
     
     
       
-        <title>Misc - ficture</title>
+        <title>Install - ficture</title>
       
     
     
@@ -69,6 +73,11 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
+        
+        <a href="#install" class="md-skip">
+          Skip to content
+        </a>
+      
     </div>
     <div data-md-component="announce">
       
@@ -99,7 +108,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Misc
+              Install
             
           </span>
         </div>
@@ -231,9 +240,11 @@
         
   
   
+    
   
-    <li class="md-tabs__item">
-      <a href="../install/" class="md-tabs__link">
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
         
   
     
@@ -368,10 +379,19 @@
       
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../install/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -380,6 +400,7 @@
   
 
       </a>
+      
     </li>
   
 
@@ -559,6 +580,8 @@
   
   
   
+    
+  
   
 </nav>
                   </div>
@@ -576,9 +599,19 @@
   
 
 
-  <h1>Misc</h1>
+<h1 id="install">Install<a class="headerlink" href="#install" title="Permanent link">&para;</a></h1>
+<div class="highlight"><pre><span></span><code>git clone -b stable git@github.com:seqscope/ficture.git
+</code></pre></div>
+<p>It is recommended to create a virtual environment and install FICTURE and its dependencies.</p>
+<p>FICTURE is tested with python 3.11 and 3.9, there might be problems with different python versions, but the required packages are farely standard.</p>
+<p>It is recommented to use python 3.11 and update pip to the newest version.</p>
+<p>(<code>requirements.txt</code> is at the root directory of FICTURE)</p>
+<div class="highlight"><pre><span></span><code>python -m venv /path/to/venv/name
+source /path/to/venv/name/bin/activate
 
-
+pip install -r requirements.txt
+</code></pre></div>
+<p>For this branch (<code>stable</code>), we run FICTURE as individual python scripts, so no installation is needed.</p>
 
 
 
