@@ -6,11 +6,12 @@ def format_cosmx():
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--input', type=str, help='Input transcript file from CosMx SMI raw output')
-    parser.add_argument('--px_to_um', type=float, help='Convert pixel unit as used in x_local_px and x_global_px to micrometer, this number should be found in the README of your SMI output, it is likely 0.12~0.18')
     parser.add_argument('--output', type=str, help='Full path of the output tsv file')
     parser.add_argument('--feature', type=str, default="", help='Full path to store an output gene list')
     parser.add_argument('--gcol', type=str, default="target", help='The column name used as the gene/probe identifier')
-    parser.add_argument('--annotation', type=str, nargs='*', default=["cell_ID","CellComp"], help='Additional information to carry over in the output file')
+    parser.add_argument('--annotation', type=str, nargs='*', default=[], help='Additional information to carry over in the output file, such as "cell_ID", "CellComp"')
+    parser.add_argument('--px_to_um', type=float, help='Convert pixel unit as used in x_local_px and x_global_px to micrometer, this number should be found in the README of your SMI output, it is likely 0.12~0.18', default=1)
+    parser.add_argument('--precision', type=int, default=-1, help='Number of digits to store the transcript coordinates (only if --px_to_um is in use). Set it to 0 to round to integer. Default is -1, without rounding.')
     parser.add_argument('--dummy_genes', type=str, default='NegPrb', help='A single name or a regex describing the names of negative control probes')
     args = parser.parse_args()
 
@@ -18,8 +19,11 @@ def format_cosmx():
     ycol="y_global_px"
     gcol=args.gcol
 
-    unit_info=['X','Y','gene']+args.annotation
-    oheader = unit_info + ['Count']
+    unit_info=[xcol,ycol,'gene']+args.annotation
+    oheader = ['X','Y','gene']+args.annotation + ['Count']
+    float_format="%.2f"
+    if args.precision >= 0:
+        float_format = f"%.{args.precision}f"
 
     feature=pd.DataFrame()
     xmin=sys.maxsize
@@ -33,10 +37,13 @@ def format_cosmx():
         chunk.rename(columns = {gcol:'gene'}, inplace=True)
         if args.dummy_genes != '':
             chunk = chunk[~chunk.gene.str.contains(args.dummy_genes, flags=re.IGNORECASE, regex=True)]
-        chunk['X'] = chunk[xcol] * args.px_to_um
-        chunk['Y'] = chunk[ycol] * args.px_to_um
         chunk['Count'] = 1
-        chunk[oheader].to_csv(args.output,sep='\t',mode='a',index=False,header=False,float_format="%.2f")
+        chunk = chunk.groupby(by = unit_info).agg({'Count':'sum'}).reset_index()
+        if args.px_to_um != 1:
+            chunk[xcol] *= args.px_to_um
+            chunk[ycol] *= args.px_to_um
+        chunk.rename(columns = {xcol:'X', ycol:'Y'}, inplace=True)
+        chunk[oheader].to_csv(args.output,sep='\t',mode='a',index=False,header=False,float_format=float_format)
         logging.info(f"{chunk.shape[0]}")
         feature = pd.concat([feature, chunk.groupby(by='gene').agg({'Count':"sum"}).reset_index()])
         x0 = chunk.X.min()

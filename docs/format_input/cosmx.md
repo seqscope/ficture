@@ -10,16 +10,18 @@ Locate the transcript file from your SMI output, most likely it is named `*_tx_f
 1,0,298943.890047619,19478.7667095238,896.271,4419.2429,0,"Pbx1","Nuclear"
 ```
 
-What we need are `x_global_px`, `y_global_px`, and `target`.
+What we need are `x_global_px`, `y_global_px`, and `target`. Optionally, we could carry over some pixel level annotations to the output file by specifying `--annotation`, see the following example.
 
-We would also like to translate the pixel unit into micrometer, the ratio can be found in a SMI Data File ReadMe come with your raw data. For example, for the public mouse brain dataset the README says
+We may also like to translate the pixel unit into micrometer, the ratio can be found in a SMI Data File ReadMe come with your raw data. For example, for the public mouse brain dataset the README says
 
 > - x_local_px
     - The x position of this transcript within the FOV, measured in pixels. To convert to microns multiply the pixel value by 0.168 um per pixel.
 
-So in the following commands we set `px_to_um=0.168`.
+So in the following commands we set `px_to_um=0.168`, then for all later analysis we would use `mu_scale=1`
 
-The python script can be found in `ficture/misc`.
+Alternatively, we can preferve the integer pixel coordinates for now and specify `mu_scale=5.95` (1/0.168) when we later process the data and run FICTURE.
+
+The python script can be found in `ficture/misc`. use `python format_cosmx.py -h` to see the full options.
 
 ```bash
 input=/path/to/input/Tissue5_tx_file.csv.gz # Change it to your transcript file
@@ -31,7 +33,29 @@ px_to_um=0.168 # convert the pixel unit in the input to micrometer
 output=${path}/filtered.matrix.${iden}.tsv
 feature=${path}/feature.clean.${iden}.tsv.gz
 
-python format_cosmx.py --input ${input} --output ${output} --feature ${feature} --dummy_genes ${dummy} --px_to_um ${px_to_um}
+python mist/format_cosmx.py --input ${input} --output ${output} --feature ${feature} --dummy_genes ${dummy} --px_to_um ${px_to_um} --annotation cell_ID --precision 2
 sort -k2,2g -k1,1g ${output} | gzip -c > ${output}.gz
 rm ${output}
 ```
+
+If we would like to merge pixels with (almost?) identical coordinates, replace the last two lines by
+```bash
+sort -k2,2g -k1,1g ${output} |
+awk 'BEGIN { OFS="\t"; print "X", "Y", "gene", "cell_ID", "Count" }
+     NR > 1 {
+       if ($1 == prevX && $2 == prevY) {
+         sumCount += $5;
+       } else {
+         if (NR > 2) {
+           print prevX, prevY, prevGene, firstCellID, sumCount;
+         }
+         prevX = $1; prevY = $2; prevGene = $3; firstCellID = $4; sumCount = $5;
+       }
+     }
+     END { print prevX, prevY, prevGene, firstCellID, sumCount; }' | gzip -c > ${output}.gz
+
+rm ${output}
+```
+You might need to asjust the column numbers depending on what annotation columns you have chosen to retain in the output.
+
+(If your data is very dense it may be nicer to collapse, but it would not affect the analysis much.)
