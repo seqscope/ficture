@@ -669,7 +669,7 @@
 </ul>
 </blockquote>
 <p>So in the following commands we set <code>px_to_um=0.168</code>, then for all later analysis we would use <code>mu_scale=1</code></p>
-<p>Alternatively, we can preferve the integer pixel coordinates for now and specify <code>mu_scale=5.95</code> (1/0.168) when we later process the data and run FICTURE.</p>
+<p>(Alternatively, we can preferve the integer pixel coordinates for now by not setting <code>--px_to_um</code> (or set it to 1) then specify <code>mu_scale=5.95</code> (1/0.168) when we later process the data and run FICTURE.)</p>
 <p>The python script can be found in <code>ficture/misc</code>. use <code>python format_cosmx.py -h</code> to see the full options.</p>
 <div class="highlight"><pre><span></span><code><span class="nv">input</span><span class="o">=</span>/path/to/input/Tissue5_tx_file.csv.gz<span class="w"> </span><span class="c1"># Change it to your transcript file</span>
 <span class="nv">path</span><span class="o">=</span>/path/to/output

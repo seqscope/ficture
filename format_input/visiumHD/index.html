@@ -663,6 +663,18 @@ s_002um_00000_00000-1   0   0   0   44.189527   21030.743288
 s_002um_00000_00001-1   0   0   1   44.302100   21023.440349
 </code></pre></div>
 (but stored in the parquet format)</p>
+<p><code>pxl_row_in_fullres</code> and <code>pxl_col_in_fullres</code> are in the unit of "pixel", we need to look at the <code>scalefactors_json.json</code> file (should be in the same folder as <code>tissue_positions.parquet</code>) to get its ratio to micrometer. In our example the json file looks like</p>
+<p><div class="highlight"><pre><span></span><code>{
+    &quot;spot_diameter_fullres&quot;: 7.303953797779634,
+    &quot;bin_size_um&quot;: 2.0,
+    &quot;microns_per_pixel&quot;: 0.2738242950835738,
+    &quot;regist_target_img_scalef&quot;: 0.2505533,
+    &quot;tissue_lowres_scalef&quot;: 0.02505533,
+    &quot;fiducial_diameter_fullres&quot;: 1205.1523766336395,
+    &quot;tissue_hires_scalef&quot;: 0.2505533
+}
+</code></pre></div>
+Record the number <code>microns_per_pixel</code> and later set <code>mu_scale=1/microns_per_pixel</code> for your analysis.</p>
 <p>The matrix directory looks like
 <div class="highlight"><pre><span></span><code>ls<span class="w"> </span><span class="si">${</span><span class="nv">mtx_path</span><span class="si">}</span>
 </code></pre></div></p>
