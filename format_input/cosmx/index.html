@@ -658,8 +658,8 @@
 1,0,298688.648047619,19487.8095095238,641.029,4428.2857,0,&quot;Dnm1&quot;,&quot;None&quot;
 1,0,298943.890047619,19478.7667095238,896.271,4419.2429,0,&quot;Pbx1&quot;,&quot;Nuclear&quot;
 </code></pre></div>
-<p>What we need are <code>x_global_px</code>, <code>y_global_px</code>, and <code>target</code>.</p>
-<p>We would also like to translate the pixel unit into micrometer, the ratio can be found in a SMI Data File ReadMe come with your raw data. For example, for the public mouse brain dataset the README says</p>
+<p>What we need are <code>x_global_px</code>, <code>y_global_px</code>, and <code>target</code>. Optionally, we could carry over some pixel level annotations to the output file by specifying <code>--annotation</code>, see the following example.</p>
+<p>We may also like to translate the pixel unit into micrometer, the ratio can be found in a SMI Data File ReadMe come with your raw data. For example, for the public mouse brain dataset the README says</p>
 <blockquote>
 <ul>
 <li>x_local_px<ul>
@@ -668,8 +668,9 @@
 </li>
 </ul>
 </blockquote>
-<p>So in the following commands we set <code>px_to_um=0.168</code>.</p>
-<p>The python script can be found in <code>ficture/misc</code>.</p>
+<p>So in the following commands we set <code>px_to_um=0.168</code>, then for all later analysis we would use <code>mu_scale=1</code></p>
+<p>Alternatively, we can preferve the integer pixel coordinates for now and specify <code>mu_scale=5.95</code> (1/0.168) when we later process the data and run FICTURE.</p>
+<p>The python script can be found in <code>ficture/misc</code>. use <code>python format_cosmx.py -h</code> to see the full options.</p>
 <div class="highlight"><pre><span></span><code><span class="nv">input</span><span class="o">=</span>/path/to/input/Tissue5_tx_file.csv.gz<span class="w"> </span><span class="c1"># Change it to your transcript file</span>
 <span class="nv">path</span><span class="o">=</span>/path/to/output
 <span class="nv">iden</span><span class="o">=</span>brain<span class="w"> </span><span class="c1"># how you identify your files</span>
@@ -679,10 +680,29 @@
 <span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/filtered.matrix.<span class="si">${</span><span class="nv">iden</span><span class="si">}</span>.tsv
 <span class="nv">feature</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/feature.clean.<span class="si">${</span><span class="nv">iden</span><span class="si">}</span>.tsv.gz
 
-python<span class="w"> </span>format_cosmx.py<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--feature<span class="w"> </span><span class="si">${</span><span class="nv">feature</span><span class="si">}</span><span class="w"> </span>--dummy_genes<span class="w"> </span><span class="si">${</span><span class="nv">dummy</span><span class="si">}</span><span class="w"> </span>--px_to_um<span class="w"> </span><span class="si">${</span><span class="nv">px_to_um</span><span class="si">}</span>
+python<span class="w"> </span>mist/format_cosmx.py<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--feature<span class="w"> </span><span class="si">${</span><span class="nv">feature</span><span class="si">}</span><span class="w"> </span>--dummy_genes<span class="w"> </span><span class="si">${</span><span class="nv">dummy</span><span class="si">}</span><span class="w"> </span>--px_to_um<span class="w"> </span><span class="si">${</span><span class="nv">px_to_um</span><span class="si">}</span><span class="w"> </span>--annotation<span class="w"> </span>cell_ID<span class="w"> </span>--precision<span class="w"> </span><span class="m">2</span>
 sort<span class="w"> </span>-k2,2g<span class="w"> </span>-k1,1g<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>gzip<span class="w"> </span>-c<span class="w"> </span>&gt;<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span>.gz
 rm<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span>
 </code></pre></div>
+<p>If we would like to merge pixels with (almost?) identical coordinates, replace the last two lines by
+<div class="highlight"><pre><span></span><code>sort<span class="w"> </span>-k2,2g<span class="w"> </span>-k1,1g<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span><span class="p">|</span>
+awk<span class="w"> </span><span class="s1">&#39;BEGIN { OFS=&quot;\t&quot;; print &quot;X&quot;, &quot;Y&quot;, &quot;gene&quot;, &quot;cell_ID&quot;, &quot;Count&quot; }</span>
+<span class="s1">     NR &gt; 1 {</span>
+<span class="s1">       if ($1 == prevX &amp;&amp; $2 == prevY) {</span>
+<span class="s1">         sumCount += $5;</span>
+<span class="s1">       } else {</span>
+<span class="s1">         if (NR &gt; 2) {</span>
+<span class="s1">           print prevX, prevY, prevGene, firstCellID, sumCount;</span>
+<span class="s1">         }</span>
+<span class="s1">         prevX = $1; prevY = $2; prevGene = $3; firstCellID = $4; sumCount = $5;</span>
+<span class="s1">       }</span>
+<span class="s1">     }</span>
+<span class="s1">     END { print prevX, prevY, prevGene, firstCellID, sumCount; }&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>gzip<span class="w"> </span>-c<span class="w"> </span>&gt;<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span>.gz
+
+rm<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span>
+</code></pre></div>
+You might need to asjust the column numbers depending on what annotation columns you have chosen to retain in the output.</p>
+<p>(If your data is very dense it may be nicer to collapse, but it would not affect the analysis much.)</p>
 
 
 

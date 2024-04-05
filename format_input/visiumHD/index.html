@@ -651,45 +651,49 @@
 
 
 <h1 id="process-visium-hd-raw-data">Process Visium HD raw data<a class="headerlink" href="#process-visium-hd-raw-data" title="Permanent link">&para;</a></h1>
-<p>Visium HD output contains a sparse count matrix and a separate file defining pixels' spatial locations. The following is how to combine these two pieces of information with command lines.</p>
+<p>Visium HD output contains a sparse count matrix and a separate parquet file defining pixels' spatial locations. The following is how to combine these two pieces of information before analysis. The following is test on</p>
 <p>Visium HD outputs
-<div class="highlight"><pre><span></span><code>brc_pos=/path/to/tissue_positions.csv
-mtx_path=/path/to/count/matrix/filtered_feature_bc_matrix
-opath=/output/directory
+<div class="highlight"><pre><span></span><code><span class="nv">brc_parq</span><span class="o">=</span>/path/to/spatial/tissue_positions.parquet
+<span class="nv">mtx_path</span><span class="o">=</span>/path/to/filtered_feature_bc_matrix<span class="w"> </span><span class="c1"># or raw_feature_bc_matrix</span>
+<span class="nv">opath</span><span class="o">=</span>/output/directory
 </code></pre></div></p>
-<p>The <code>brc_pos</code>, (<code>tissue_positions.csv</code>) file looks like
-<div class="highlight"><pre><span></span><code>barcode,in_tissue,array_row,array_col,pxl_row_in_fullres,pxl_col_in_fullres
-CGAGGATATTCAGAGC-1,0,0,0,45641,6872
-TCTGGTACTAATGCGG-1,0,0,2,45641,7238
-</code></pre></div></p>
+<p>The barcode (<code>tissue_positions.parquet</code>) file looks like
+<div class="highlight"><pre><span></span><code>barcode     in_tissue   array_row   array_col   pxl_row_in_fullres  pxl_col_in_fullres
+s_002um_00000_00000-1   0   0   0   44.189527   21030.743288
+s_002um_00000_00001-1   0   0   1   44.302100   21023.440349
+</code></pre></div>
+(but stored in the parquet format)</p>
 <p>The matrix directory looks like
-<div class="highlight"><pre><span></span><code>ls ${mtx_path}
+<div class="highlight"><pre><span></span><code>ls<span class="w"> </span><span class="si">${</span><span class="nv">mtx_path</span><span class="si">}</span>
 </code></pre></div></p>
 <div class="highlight"><pre><span></span><code>barcodes.tsv.gz  features.tsv.gz  matrix.mtx.gz
 </code></pre></div>
-<p>The following command does the following steps
-1 Match the barcode indices in the sparse matrix (<code>matrix.mtx.gz</code>) with their global spatial locations, here would be the 5<sup>th</sup> and 6<sup>th</sup> columns, <code>pxl_row_in_fullres,pxl_col_in_fullres</code>, in <code>tissue_positions.csv</code>
-2 Match gene ids with gene indices (this is trivial)
-3 Combine all the information into one file, sort by coordinate on one axis (here is the X-axis).</p>
-<p><div class="highlight"><pre><span></span><code>bfile=${mtx_path}/barcodes.tsv.gz
-mfile=${mtx_path}/matrix.mtx.gz
-ffile=${mtx_path}/features.tsv.gz
+<p>We need to annotate the sparse matrix <code>matrix.mtx.gz</code> with barcode locations from <code>tissue_positions.parquet</code> by getting the barcode ID from <code>barcodes.tsv.gz</code> then lookuping its spatial coordinate. Unfortunately barcodes in <code>tissue_positions.parquet</code> and in <code>barcodes.tsv.gz</code> are stored in different orders and the parquet file contains a single row group (why??) based on the few public datasets we've inspected, making this process uglier. Although one could read all four files fully in memory and match them, the following is a slower alternative.</p>
+<p>Given the current data formats, we first match barcodes integer indices in the matrix and their spatial locations.</p>
+<p>You may need to install a tool to read parquet file, one option is <code>pip install parquet-tools</code>. The following command takes ~8.5 min for the public <a href="https://www.10xgenomics.com/datasets/visium-hd-cytassist-gene-expression-libraries-of-mouse-brain-he">Visium HD mouse brain</a> dataset.</p>
+<div class="highlight"><pre><span></span><code><span class="nv">bfile</span><span class="o">=</span><span class="si">${</span><span class="nv">mtx_path</span><span class="si">}</span>/barcodes.tsv.gz
+<span class="nv">mfile</span><span class="o">=</span><span class="si">${</span><span class="nv">mtx_path</span><span class="si">}</span>/matrix.mtx.gz
+<span class="nv">ffile</span><span class="o">=</span><span class="si">${</span><span class="nv">mtx_path</span><span class="si">}</span>/features.tsv.gz
+<span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">opath</span><span class="si">}</span>/transcripts.tsv.gz
 
-output=${opath}/transcripts.tsv.gz
-
-awk &#39;BEGIN{FS=OFS=&quot;\t&quot;} NR==FNR{ft[NR]=$1 FS $2; next} ($5 in ft) {print $1 FS $3 FS $4 FS ft[$5] FS $6 }&#39; &lt;(zcat $ffile) &lt;(join -t $&#39;\t&#39; -1 4 -2 2 &lt;(join -t $&#39;\t&#39; -1 1 -2 1 &lt;(cut -d&#39;,&#39; -f 1,5,6 ${brc_pos} | sed &#39;s/,/\t/g&#39; | sort -k1,1 ) &lt;(zcat ${mtx_path}/barcodes.tsv.gz | cat -n | tr -s &#39; &#39; | awk &#39; {print $2 &quot;\t&quot; $1} &#39; ) ) &lt;(zcat $mfile | tail -n +4 | sed &#39;s/ /\t/g&#39;) ) | sort -S 1G -k2,2n -k3,3n | sed &#39;1 s/^/#barcode_idx\tX\tY\tgene_id\tgene\tCount\n/&#39; | gzip -c &gt; ${output}
+awk<span class="w"> </span><span class="s1">&#39;BEGIN{FS=OFS=&quot;\t&quot;} NR==FNR{ft[NR]=$1 FS $2; next} ($4 in ft) {print $1, $2, $3, ft[$4], $5 }&#39;</span><span class="w"> </span><span class="se">\</span>
+&lt;<span class="o">(</span>zcat<span class="w"> </span><span class="nv">$ffile</span><span class="o">)</span><span class="w"> </span><span class="se">\</span>
+&lt;<span class="o">(</span><span class="se">\</span>
+<span class="w">  </span>join<span class="w"> </span>-t<span class="w"> </span><span class="s1">$&#39;\t&#39;</span><span class="w"> </span>-1<span class="w"> </span><span class="m">1</span><span class="w"> </span>-2<span class="w"> </span><span class="m">2</span><span class="w"> </span>&lt;<span class="o">(</span>awk<span class="w"> </span>-v<span class="w"> </span><span class="nv">FS</span><span class="o">=</span><span class="s1">&#39;,&#39;</span><span class="w"> </span>-v<span class="w"> </span><span class="nv">OFS</span><span class="o">=</span><span class="s1">&#39;\t&#39;</span><span class="w"> </span><span class="s1">&#39;NR==FNR{bcd[$1]=NR; next} ($1 in bcd){ printf &quot;%d\t%.2f\t%.2f\n&quot;, bcd[$1], $2, $3 } &#39;</span><span class="w"> </span>&lt;<span class="o">(</span>zcat<span class="w"> </span><span class="nv">$bfile</span><span class="o">)</span><span class="w"> </span>&lt;<span class="o">(</span>parquet-tools<span class="w"> </span>csv<span class="w"> </span><span class="si">${</span><span class="nv">brc_parq</span><span class="si">}</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d<span class="s1">&#39;,&#39;</span><span class="w"> </span>-f<span class="w"> </span><span class="m">1</span>,5,6<span class="o">)</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-k1,1n<span class="o">)</span><span class="w"> </span>&lt;<span class="o">(</span>zcat<span class="w"> </span><span class="nv">$mfile</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>tail<span class="w"> </span>-n<span class="w"> </span>+4<span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span><span class="s1">&#39;s/ /\t/g&#39;</span><span class="o">)</span>
+<span class="o">)</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-k2,2n<span class="w"> </span>-k3,3n<span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span><span class="s1">&#39;1 s/^/#barcode_idx\tX\tY\tgene_id\tgene\tCount\n/&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>gzip<span class="w"> </span>-c<span class="w"> </span>&gt;<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span>
 </code></pre></div>
-(The sorting by coordinates part can take some time for large data, you could check the unsorted output from the above command up to right before <code>sort -S 1G -k2,2n -k3,3n</code>  first to see if it makes sense)</p>
+<p>The sorting by coordinates part can take some time for large data, you could check intermediate results first to see if it makes sense.</p>
 <p>Output looks like
-<div class="highlight"><pre><span></span><code>zcat $output | head
+<div class="highlight"><pre><span></span><code>zcat<span class="w"> </span><span class="nv">$output</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>head
 </code></pre></div></p>
 <p><div class="highlight"><pre><span></span><code>#barcode_idx    X       Y       gene_id gene    Count
-1       13089   15433   ENSMUSG00000000001      Gnai3   13
-1       13089   15433   ENSMUSG00000000028      Cdc45   8
-1       13089   15433   ENSMUSG00000000056      Narf    12
-1       13089   15433   ENSMUSG00000000058      Cav2    13
+5680891 329.31  15798.08        ENSMUSG00000019790      Stxbp5  1
+4885554 329.65  15776.17        ENSMUSG00000037343      Taf2    1
+665018  329.76  15768.87        ENSMUSG00000032870      Smap2   1
+665018  329.76  15768.87        ENSMUSG00000034832      Tet3    1
+665018  329.76  15768.87        ENSMUSG00000064354      mt-Co2  1
 </code></pre></div>
-(The first column is just to retain the original barcode index in <code>matrix.mtx.gz</code>, it will be ignored in analysis)</p>
+(The first column is just to retain the original barcode index in <code>matrix.mtx.gz</code> (the row number in <code>barcodes.tsv.gz</code>), it will be ignored in analysis)</p>
 
 
 
