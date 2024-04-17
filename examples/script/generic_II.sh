@@ -32,7 +32,7 @@ set -o pipefail
 
 out=$(echo $output | sed 's/\.gz$//g')
 
-command time -v python ${gitpath}/script/make_dge_univ.py --key ${key} --count_header ${key} --input ${input} --output ${out} --hex_width ${width} --n_move ${sliding_step} --min_ct_per_unit ${min_ct_per_unit} --mu_scale ${mu_scale} --precision 2 --major_axis ${major_axis}
+ficture make_dge --key ${key} --count_header ${key} --input ${input} --output ${out} --hex_width ${width} --n_move ${sliding_step} --min_ct_per_unit ${min_ct_per_unit} --mu_scale ${mu_scale} --precision 2 --major_axis ${major_axis}
 
 sort -S 4G -k1,1n ${out} | gzip -c > ${output} # Shuffle hexagons
 rm ${out}

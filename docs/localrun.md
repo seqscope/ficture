@@ -62,7 +62,6 @@ Data specific setup:
 mu_scale=1 # If your data's coordinates are already in micrometer
 key=Count
 major_axis=Y # If your data is sorted by the Y-axis
-# gitpath=path/to/ficture # path to this repository
 ```
 
 
@@ -74,8 +73,6 @@ batch_buff=30
 input=${path}/transcripts.tsv.gz
 output=${path}/batched.matrix.tsv.gz
 batch=${path}/batched.matrix.tsv
-
-# python ${gitpath}/script/make_spatial_minibatch.py --input ${input} --output ${batch} --mu_scale ${mu_scale} --batch_size ${batch_size} --batch_buff ${batch_buff} --major_axis ${major_axis}
 
 ficture make_spatial_minibatch --input ${input} --output ${batch} --mu_scale ${mu_scale} --batch_size ${batch_size} --batch_buff ${batch_buff} --major_axis ${major_axis}
 

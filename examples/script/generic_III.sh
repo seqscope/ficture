@@ -8,7 +8,7 @@
 #SBATCH --mem-per-cpu=7g
 
 ### Model fitting
-# Minimal required input: path, feature, nFactor
+# Minimal required input: path, nFactor
 # Alternative - path, nFactor, hexagon, pixel, model_id, output_id
 
 key=Count
@@ -48,7 +48,6 @@ model_id=${model_id:-nF${nFactor}.d_${train_width}}
 output_id=${output_id:-${model_id}}
 hexagon=${hexagon:-${path}/hexagon.d_${train_width}.tsv.gz}
 pixel=${pixel:-${path}/filtered.matrix.tsv.gz}
-feature=${feature:-${path}/feature.clean.tsv.gz}
 
 anchor_info=prj_${fit_width}.r_${anchor_res}
 
@@ -62,21 +61,21 @@ fi
 output=${output_path}/${output_id}
 model=${output}.model.p
 # Fit model
-python ${gitpath}/script/init_model_selection.py --input ${hexagon} --output ${output} --feature ${feature} --nFactor ${nFactor} --epoch ${train_nEpoch} --epoch_id_length 2 --unit_attr X Y --key ${key} --min_ct_per_unit ${min_ct_per_unit}  --min_ct_per_feature ${min_ct_per_feature} --test_split 0.5 --R ${R} --thread ${thread}
+ficture fit_model --input ${hexagon} --output ${output} --nFactor ${nFactor} --epoch ${train_nEpoch} --epoch_id_length 2 --unit_attr X Y --key ${key} --min_ct_per_unit ${min_ct_per_unit}  --min_ct_per_feature ${min_ct_per_feature} --test_split 0.5 --R ${R} --thread ${thread}
 
 # Choose color
 input=${output_path}/${output_id}.fit_result.tsv.gz
 output=${figure_path}/${output_id}
 cmap=${figure_path}/${output_id}.rgb.tsv
-python ${gitpath}/script/choose_color.py --input ${input} --output ${output} --cmap_name ${cmap_name}
+ficture choose_color --input ${input} --output ${output} --cmap_name ${cmap_name}
 
 # Coarse plot for inspection
 cmap=${figure_path}/${output_id}.rgb.tsv
 input=${output_path}/${output_id}.fit_result.tsv.gz
 output=${figure_path}/${output_id}.coarse
 fillr=$((fit_width/2+1))
-python ${gitpath}/script/plot_base.py --input ${input} --output ${output} --fill_range ${fillr} --color_table ${cmap} --plot_um_per_pixel 1 --plot_discretized
+ficture plot_base --input ${input} --output ${output} --fill_range ${fillr} --color_table ${cmap} --plot_um_per_pixel 1 --plot_discretized
 
 # Transform
 output=${output_path}/${output_id}.${anchor_info}
-python ${gitpath}/script/transform_univ.py --input ${pixel} --output_pref ${output} --model ${model} --key ${key} --major_axis ${major_axis} --hex_width ${fit_width} --n_move ${fit_nmove} --min_ct_per_unit ${min_ct_per_unit_fit} --mu_scale ${mu_scale} --thread ${thread} --precision 2
+ficture transform --input ${pixel} --output_pref ${output} --model ${model} --key ${key} --major_axis ${major_axis} --hex_width ${fit_width} --n_move ${fit_nmove} --min_ct_per_unit ${min_ct_per_unit_fit} --mu_scale ${mu_scale} --thread ${thread} --precision 2

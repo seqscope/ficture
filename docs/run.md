@@ -2,13 +2,12 @@
 
 We take a small sub-region of Vizgen MERSCOPE mouse liver data as an example. (The same region we showed in supplementary figure X)
 
-Temporary: the current document assume you are on the `stable` branch of FICTURE.
+This document assume you have intalled FICTURE.
 
 ### Input
 
 ```
 examples/data/transcripts.tsv.gz
-examples/data/feature.clean.tsv.gz
 ```
 (All filese are tab-delimited text files unless specified otherwise.)
 
@@ -22,9 +21,9 @@ The file has to be **sorted** by one of the coordinates. (Usually it is the long
 
 `Count` (could be any other name) is the number of transcripts for the specified `gene` observed at the coordinate. For imaging based technologies where each molecule has its unique coordinates, `Count` could be always 1.
 
-**Gene list**
+<!-- **Gene list**
 
-Another file contains the (unique) names of genes that should be used in analysis. The required columns is just `gene` (including the header), the naming of genes should match the `gene` column in the transcript file. If your data contain negative control probes or if you would like to remove certain genes this is where you can specify. (If you would like to use all genes present in your input transcript file the gene list is not necessary, but you would need to modify the command in `generic_III.sh` to remove the argument `--feature` )
+Another file contains the (unique) names of genes that should be used in analysis. The required columns is just `gene` (including the header), the naming of genes should match the `gene` column in the transcript file. If your data contain negative control probes or if you would like to remove certain genes this is where you can specify. (If you would like to use all genes present in your input transcript file the gene list is not necessary, but you would need to modify the command in `generic_III.sh` to remove the argument `--feature` ) -->
 
 **Meta data**
 
@@ -53,7 +52,6 @@ mu_scale=1 # If your data's coordinates are already in micrometer
 key=Count
 MJ=Y # If your data is sorted by the Y-axis
 env=venv/with/ficture/installed/bin/activate
-gitpath=path/to/ficture # path to where you have installed ficture
 #SLURM_ACCOUNT= # For submitting jobs to slurm
 ```
 
@@ -63,7 +61,7 @@ Create pixel minibatches (`${path}/batched.matrix.tsv.gz`)
 ```bash
 input=${path}/transcripts.tsv.gz
 output=${path}/batched.matrix.tsv.gz
-rec=$(sbatch --job-name=vz1 --account=${SLURM_ACCOUNT} --partition=standard --cpus-per-task=1 examples/script/generic_I.sh input=${input} output=${output} MJ=${MJ} env=${env} gitpath=${gitpath})
+rec=$(sbatch --job-name=vz1 --account=${SLURM_ACCOUNT} --partition=standard --cpus-per-task=1 examples/script/generic_I.sh input=${input} output=${output} MJ=${MJ} env=${env} )
 IFS=' ' read -ra ADDR <<< "$rec"
 jobid1=${ADDR[3]}
 ```
@@ -79,7 +77,6 @@ model_id=nF${nFactor}.d_${train_width} # An identifier kept in output file names
 min_ct_per_feature=20 # Ignore genes with total count \< 20
 R=10 # We use R random initializations and pick one to fit the full model
 thread=4 # Number of threads to use
-feature=${path}/feature.clean.tsv.gz
 ```
 
 Parameters for pixel level decoding
@@ -97,17 +94,17 @@ Model fitting
 # Prepare training minibatches, only need to run once if you plan to fit multiple models (say with different number of factors)
 input=${path}/transcripts.tsv.gz
 hexagon=${path}/hexagon.d_${train_width}.tsv.gz
-rec=$(sbatch --job-name=vz2 --account=${SLURM_ACCOUNT} --partition=standard --cpus-per-task=1 examples/script/generic_II.sh env=${env} gitpath=${gitpath} key=${key} mu_scale=${mu_scale} major_axis=${MJ} path=${path} input=${input} output=${hexagon} width=${train_width} sliding_step=${sliding_step})
+rec=$(sbatch --job-name=vz2 --account=${SLURM_ACCOUNT} --partition=standard --cpus-per-task=1 examples/script/generic_II.sh env=${env} key=${key} mu_scale=${mu_scale} major_axis=${MJ} path=${path} input=${input} output=${hexagon} width=${train_width} sliding_step=${sliding_step})
 IFS=' ' read -ra ADDR <<< "$rec"
 jobid2=${ADDR[3]}
 
 # Model training
-rec=$(sbatch --job-name=vz3 --account=${SLURM_ACCOUNT} --partition=standard --cpus-per-task=${thread} --dependency=afterok:${jobid2} examples/script/generic_III.sh env=${env} gitpath=${gitpath} key=${key} mu_scale=${mu_scale} major_axis=${MJ} path=${path} pixel=${input} hexagon=${hexagon} feature=${feature} model_id=${model_id} train_width=${train_width} nFactor=${nFactor} R=${R} train_nEpoch=${train_nEpoch} fit_width=${fit_width} anchor_res=${anchor_res} min_ct_per_feature=${min_ct_per_feature} thread=${thread})
+rec=$(sbatch --job-name=vz3 --account=${SLURM_ACCOUNT} --partition=standard --cpus-per-task=${thread} --dependency=afterok:${jobid2} examples/script/generic_III.sh env=${env} key=${key} mu_scale=${mu_scale} major_axis=${MJ} path=${path} pixel=${input} hexagon=${hexagon} model_id=${model_id} train_width=${train_width} nFactor=${nFactor} R=${R} train_nEpoch=${train_nEpoch} fit_width=${fit_width} anchor_res=${anchor_res} min_ct_per_feature=${min_ct_per_feature} thread=${thread})
 IFS=' ' read -ra ADDR <<< "$rec"
 jobid3=${ADDR[3]}
 
 # Pixel level decoding & visualization
-rec=$(sbatch --job-name=vz4 --account=${SLURM_ACCOUNT} --partition=standard --cpus-per-task=${thread} --dependency=afterok:${jobid3},${jobid1} examples/script/generic_V.sh env=${env} gitpath=${gitpath} key=${key} mu_scale=${mu_scale} path=${path} model_id=${model_id} anchor_info=${anchor_info} radius=${radius} coor=${coor} thread=${thread})
+rec=$(sbatch --job-name=vz4 --account=${SLURM_ACCOUNT} --partition=standard --cpus-per-task=${thread} --dependency=afterok:${jobid3},${jobid1} examples/script/generic_V.sh env=${env} key=${key} mu_scale=${mu_scale} path=${path} model_id=${model_id} anchor_info=${anchor_info} radius=${radius} coor=${coor} thread=${thread})
 IFS=' ' read -ra ADDR <<< "$rec"
 jobid4=${ADDR[3]}
 ```

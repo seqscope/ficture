@@ -9,7 +9,7 @@
 #SBATCH --mem-per-cpu=7g
 
 ### Pixel to hexagon
-# Minimal required input: input output MJ env gitpath
+# Minimal required input: input output MJ env
 
 mu_scale=1
 batch_size=500
@@ -31,11 +31,11 @@ set -o pipefail
 
 # pixel minibatch
 batch=$(echo $output | sed 's/\.gz$//g')
-python ${gitpath}/script/make_spatial_minibatch.py --input ${input} --output ${batch} --mu_scale ${mu_scale} --batch_size ${batch_size} --batch_buff ${batch_buff} --major_axis ${MJ}
+ficture make_spatial_minibatch --input ${input} --output ${batch} --mu_scale ${mu_scale} --batch_size ${batch_size} --batch_buff ${batch_buff} --major_axis ${MJ}
 
 if [ "${skipshuffle}" == "0" ]; then
    # shuffle minibatches
-    sort -S 4G -k2,2n -k1,1g ${batch} | gzip -c > ${batch}.gz
+    sort -S 4G -k2,2g ${batch} | gzip -c > ${batch}.gz
     rm ${batch}
 else
    gzip -f ${batch}

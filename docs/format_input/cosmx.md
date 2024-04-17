@@ -18,8 +18,9 @@ We may also like to translate the pixel unit into micrometer, the ratio can be f
     - The x position of this transcript within the FOV, measured in pixels. To convert to microns multiply the pixel value by 0.168 um per pixel.
 
 So in the following commands we set `px_to_um=0.168`, then for all later analysis we would use `mu_scale=1`
+The output is sorted first along the Y-axis, so later you would set `major_axis=Y`.
 
-Alternatively, we can preferve the integer pixel coordinates for now and specify `mu_scale=5.95` (1/0.168) when we later process the data and run FICTURE.
+(Alternatively, we can preferve the integer pixel coordinates for now by not setting `--px_to_um` (or set it to 1) then specify `mu_scale=5.95` (1/0.168) when we later process the data and run FICTURE.)
 
 The python script can be found in `ficture/misc`. use `python format_cosmx.py -h` to see the full options.
 
@@ -27,7 +28,7 @@ The python script can be found in `ficture/misc`. use `python format_cosmx.py -h
 input=/path/to/input/Tissue5_tx_file.csv.gz # Change it to your transcript file
 path=/path/to/output
 iden=brain # how you identify your files
-dummy=NegPrb # Name of the negative controls
+dummy=NegPrb # Name of the negative controls, could pass regex to match multiple prob names
 px_to_um=0.168 # convert the pixel unit in the input to micrometer
 
 output=${path}/filtered.matrix.${iden}.tsv

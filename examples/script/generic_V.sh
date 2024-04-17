@@ -66,7 +66,7 @@ prefix=${output_id}.decode.${anchor_info}_${radius}
 output=${output_path}/${prefix}
 # Output only a few top factors per pixel
 topk=3 # Fix for now
-python ${gitpath}/script/slda_decode.py --input ${pixel} --output ${output} --model ${model} --anchor ${anchor} --anchor_in_um --neighbor_radius ${radius} --mu_scale ${mu_scale} --key ${key} --precision ${analysis_resolution} --lite_topk_output_pixel ${topk} --lite_topk_output_anchor ${topk} --thread ${thread}
+ficture slda_decode --input ${pixel} --output ${output} --model ${model} --anchor ${anchor} --anchor_in_um --neighbor_radius ${radius} --mu_scale ${mu_scale} --key ${key} --precision ${analysis_resolution} --lite_topk_output_pixel ${topk} --lite_topk_output_anchor ${topk} --thread ${thread}
 
 
 # Sort and index pixel level result
@@ -92,20 +92,20 @@ rm ${input}
 # DE
 input=${output_path}/${prefix}.posterior.count.tsv.gz
 output=${output_path}/DE/${prefix}.bulk_chisq.tsv
-python ${gitpath}/script/de_bulk.py --input ${input} --output ${output} --min_ct_per_feature ${min_ct_per_feature} --max_pval_output ${max_pval_output} --min_fold_output ${min_fold_output} --thread ${thread}
+ficture de_bulk --input ${input} --output ${output} --min_ct_per_feature ${min_ct_per_feature} --max_pval_output ${max_pval_output} --min_fold_output ${min_fold_output} --thread ${thread}
 
 
 # Report (color table and top DE genes)
 cmap=${output_path}/figure/${output_id}.rgb.tsv
 output=${output_path}/${prefix}.factor.info.html
-python ${gitpath}/script/factor_report.py --path ${output_path} --pref ${prefix} --color_table ${cmap}
+ficture factor_report --path ${output_path} --pref ${prefix} --color_table ${cmap}
 
 
 # Make pixel level figures
 cmap=${output_path}/figure/${output_id}.rgb.tsv
 input=${output_path}/${prefix}.pixel.sorted.tsv.gz
 output=${figure_path}/${prefix}.pixel.png
-python ${gitpath}/script/plot_pixel_full.py --input ${input} --color_table ${cmap} --output ${output} --plot_um_per_pixel ${pixel_resolution} --full
+ficture plot_pixel_full --input ${input} --color_table ${cmap} --output ${output} --plot_um_per_pixel ${pixel_resolution} --full
 
 
 if [ "${plot_individual_factor}" -eq 0 ]; then
@@ -117,7 +117,7 @@ fi
 # batch size 8 should be safe for 7 or 14G in most cases
 output=${figure_path}/sub/${prefix}.pixel
 if [ "${plot_subbatch}" -lt 1 ] || [ "${plot_subbatch}" -gt ${K} ]; then
-    python ${gitpath}/script/plot_pixel_single.py --input ${input} --output ${output} --plot_um_per_pixel ${pixel_resolution} --full --all
+    ficture plot_pixel_single --input ${input} --output ${output} --plot_um_per_pixel ${pixel_resolution} --full --all
 else
     st=0
     ed=$((plot_subbatch+st-1))
@@ -128,7 +128,7 @@ else
         id_list=$( seq ${st} ${ed} )
         echo $id_list
 
-        python ${gitpath}/script/plot_pixel_single.py --input ${input} --output ${output} --id_list ${id_list} --plot_um_per_pixel ${pixel_resolution} --full
+        ficture plot_pixel_single --input ${input} --output ${output} --id_list ${id_list} --plot_um_per_pixel ${pixel_resolution} --full
 
         st=$((ed+1))
         ed=$((plot_subbatch+st-1))
