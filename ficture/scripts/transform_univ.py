@@ -177,5 +177,5 @@ def transform(_args):
                             columns = factor_header)],\
                 axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.2f', compression={"method":"gzip"})
 
-if __name__ is '__main__':
+if __name__ == '__main__':
     transform(sys.argv[1:])

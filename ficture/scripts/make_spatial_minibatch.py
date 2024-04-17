@@ -77,7 +77,7 @@ def make_spatial_minibatch(_args):
             reg_list.append(l+':'+'-'.join([st,ed]) )
         cmd = ["tabix", args.input] + reg_list
     if len(cmd) == 0:
-        p0 = sp.Popen(["zcat", args.input], stdout=sp.PIPE)
+        p0 = sp.Popen(["gzip", "-cd", args.input], stdout=sp.PIPE)
         process = sp.Popen(["tail", "-n", "+2"], stdin=p0.stdout, stdout=sp.PIPE)
     else:
         process = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.STDOUT)

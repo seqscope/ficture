@@ -1,7 +1,7 @@
 # Install
 
 ```
-git clone git@github.com:seqscope/ficture.git
+https://github.com/seqscope/ficture.git
 ```
 
 It is recommended to create a virtual environment and install FICTURE and its dependencies.

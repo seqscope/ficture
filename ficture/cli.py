@@ -23,6 +23,7 @@ def main():
         "plot_pixel_multi": "plot_pixel_multi", \
         "plot_pixel_full": "plot_pixel_full", \
         "plot_pixel_single": "plot_pixel_single", \
+        "run_together": "run_together", \
     }
 
     if len(sys.argv) < 2:

@@ -72,6 +72,7 @@ plugins:
 nav:
   - Home: index.md
   - Install: install.md
+  - Quickstart: quickstart.md
   - Small run: localrun.md
   - Run: run.md
   - Format input:
