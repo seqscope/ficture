@@ -259,6 +259,23 @@
   
   
     <li class="md-tabs__item">
+      <a href="../../quickstart/" class="md-tabs__link">
+        
+  
+    
+  
+  Quickstart
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
       <a href="../../localrun/" class="md-tabs__link">
         
   
@@ -402,6 +419,26 @@
   
   
     <li class="md-nav__item">
+      <a href="../../quickstart/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../localrun/" class="md-nav__link">
         
   
@@ -471,10 +508,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -485,8 +522,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_5">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             Format input
           </label>
@@ -668,13 +705,14 @@
 </li>
 </ul>
 </blockquote>
-<p>So in the following commands we set <code>px_to_um=0.168</code>, then for all later analysis we would use <code>mu_scale=1</code></p>
+<p>So in the following commands we set <code>px_to_um=0.168</code>, then for all later analysis we would use <code>mu_scale=1</code>
+The output is sorted first along the Y-axis, so later you would set <code>major_axis=Y</code>.</p>
 <p>(Alternatively, we can preferve the integer pixel coordinates for now by not setting <code>--px_to_um</code> (or set it to 1) then specify <code>mu_scale=5.95</code> (1/0.168) when we later process the data and run FICTURE.)</p>
 <p>The python script can be found in <code>ficture/misc</code>. use <code>python format_cosmx.py -h</code> to see the full options.</p>
 <div class="highlight"><pre><span></span><code><span class="nv">input</span><span class="o">=</span>/path/to/input/Tissue5_tx_file.csv.gz<span class="w"> </span><span class="c1"># Change it to your transcript file</span>
 <span class="nv">path</span><span class="o">=</span>/path/to/output
 <span class="nv">iden</span><span class="o">=</span>brain<span class="w"> </span><span class="c1"># how you identify your files</span>
-<span class="nv">dummy</span><span class="o">=</span>NegPrb<span class="w"> </span><span class="c1"># Name of the negative controls</span>
+<span class="nv">dummy</span><span class="o">=</span>NegPrb<span class="w"> </span><span class="c1"># Name of the negative controls, could pass regex to match multiple prob names</span>
 <span class="nv">px_to_um</span><span class="o">=</span><span class="m">0</span>.168<span class="w"> </span><span class="c1"># convert the pixel unit in the input to micrometer</span>
 
 <span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/filtered.matrix.<span class="si">${</span><span class="nv">iden</span><span class="si">}</span>.tsv

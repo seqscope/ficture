@@ -259,6 +259,23 @@
   
   
     <li class="md-tabs__item">
+      <a href="../quickstart/" class="md-tabs__link">
+        
+  
+    
+  
+  Quickstart
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
       <a href="../localrun/" class="md-tabs__link">
         
   
@@ -387,6 +404,26 @@
   
   <span class="md-ellipsis">
     Install
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quickstart
   </span>
   
 
@@ -533,10 +570,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
             
   
   <span class="md-ellipsis">
@@ -547,8 +584,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             Format input
           </label>
@@ -739,10 +776,9 @@
 
 <h1 id="real-data-process">Real data process<a class="headerlink" href="#real-data-process" title="Permanent link">&para;</a></h1>
 <p>We take a small sub-region of Vizgen MERSCOPE mouse liver data as an example. (The same region we showed in supplementary figure X)</p>
-<p>Temporary: the current document assume you are on the <code>stable</code> branch of FICTURE.</p>
+<p>This document assume you have intalled FICTURE.</p>
 <h3 id="input">Input<a class="headerlink" href="#input" title="Permanent link">&para;</a></h3>
 <p><div class="highlight"><pre><span></span><code>examples/data/transcripts.tsv.gz
-examples/data/feature.clean.tsv.gz
 </code></pre></div>
 (All filese are tab-delimited text files unless specified otherwise.)</p>
 <p><strong>Transcripts</strong></p>
@@ -750,8 +786,10 @@ examples/data/feature.clean.tsv.gz
 <p>The coordinates <code>(X, Y)</code> can be float or integer numbers in arbitrary units, but if it is not in the unit of <span class="arithmatex">\(\mu m\)</span> we would need to specify the translation ratio later.</p>
 <p>The file has to be <strong>sorted</strong> by one of the coordinates. (Usually it is the longer axis, but it does not matter if the tissue area is not super asymmetric.)</p>
 <p><code>Count</code> (could be any other name) is the number of transcripts for the specified <code>gene</code> observed at the coordinate. For imaging based technologies where each molecule has its unique coordinates, <code>Count</code> could be always 1.</p>
-<p><strong>Gene list</strong></p>
-<p>Another file contains the (unique) names of genes that should be used in analysis. The required columns is just <code>gene</code> (including the header), the naming of genes should match the <code>gene</code> column in the transcript file. If your data contain negative control probes or if you would like to remove certain genes this is where you can specify. (If you would like to use all genes present in your input transcript file the gene list is not necessary, but you would need to modify the command in <code>generic_III.sh</code> to remove the argument <code>--feature</code> )</p>
+<!-- **Gene list**
+
+Another file contains the (unique) names of genes that should be used in analysis. The required columns is just `gene` (including the header), the naming of genes should match the `gene` column in the transcript file. If your data contain negative control probes or if you would like to remove certain genes this is where you can specify. (If you would like to use all genes present in your input transcript file the gene list is not necessary, but you would need to modify the command in `generic_III.sh` to remove the argument `--feature` ) -->
+
 <p><strong>Meta data</strong></p>
 <p>We also prefer to keep a file listing the min and max of the coordinates (this is primarily for visuaizing very big tissue region where we do not read all data at once but would want to know the image dimension). The unit of the coordinates is micrometer.
 <div class="highlight"><pre><span></span><code>examples/data/coordinate_minmax.tsv
@@ -767,14 +805,13 @@ examples/data/feature.clean.tsv.gz
 <span class="nv">key</span><span class="o">=</span>Count
 <span class="nv">MJ</span><span class="o">=</span>Y<span class="w"> </span><span class="c1"># If your data is sorted by the Y-axis</span>
 <span class="nv">env</span><span class="o">=</span>venv/with/ficture/installed/bin/activate
-<span class="nv">gitpath</span><span class="o">=</span>path/to/ficture<span class="w"> </span><span class="c1"># path to where you have installed ficture</span>
 <span class="c1">#SLURM_ACCOUNT= # For submitting jobs to slurm</span>
 </code></pre></div>
 <p>Example bash scripts are in <code>examples/script/</code>, you will need to modify them to work on your system.</p>
 <p>Create pixel minibatches (<code>${path}/batched.matrix.tsv.gz</code>)
 <div class="highlight"><pre><span></span><code><span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/transcripts.tsv.gz
 <span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/batched.matrix.tsv.gz
-<span class="nv">rec</span><span class="o">=</span><span class="k">$(</span>sbatch<span class="w"> </span>--job-name<span class="o">=</span>vz1<span class="w"> </span>--account<span class="o">=</span><span class="si">${</span><span class="nv">SLURM_ACCOUNT</span><span class="si">}</span><span class="w"> </span>--partition<span class="o">=</span>standard<span class="w"> </span>--cpus-per-task<span class="o">=</span><span class="m">1</span><span class="w"> </span>examples/script/generic_I.sh<span class="w"> </span><span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span><span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span><span class="nv">MJ</span><span class="o">=</span><span class="si">${</span><span class="nv">MJ</span><span class="si">}</span><span class="w"> </span><span class="nv">env</span><span class="o">=</span><span class="si">${</span><span class="nv">env</span><span class="si">}</span><span class="w"> </span><span class="nv">gitpath</span><span class="o">=</span><span class="si">${</span><span class="nv">gitpath</span><span class="si">}</span><span class="k">)</span>
+<span class="nv">rec</span><span class="o">=</span><span class="k">$(</span>sbatch<span class="w"> </span>--job-name<span class="o">=</span>vz1<span class="w"> </span>--account<span class="o">=</span><span class="si">${</span><span class="nv">SLURM_ACCOUNT</span><span class="si">}</span><span class="w"> </span>--partition<span class="o">=</span>standard<span class="w"> </span>--cpus-per-task<span class="o">=</span><span class="m">1</span><span class="w"> </span>examples/script/generic_I.sh<span class="w"> </span><span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span><span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span><span class="nv">MJ</span><span class="o">=</span><span class="si">${</span><span class="nv">MJ</span><span class="si">}</span><span class="w"> </span><span class="nv">env</span><span class="o">=</span><span class="si">${</span><span class="nv">env</span><span class="si">}</span><span class="w"> </span><span class="k">)</span>
 <span class="nv">IFS</span><span class="o">=</span><span class="s1">&#39; &#39;</span><span class="w"> </span><span class="nb">read</span><span class="w"> </span>-ra<span class="w"> </span>ADDR<span class="w"> </span><span class="o">&lt;&lt;&lt;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$rec</span><span class="s2">&quot;</span>
 <span class="nv">jobid1</span><span class="o">=</span><span class="si">${</span><span class="nv">ADDR</span><span class="p">[3]</span><span class="si">}</span>
 </code></pre></div></p>
@@ -787,7 +824,6 @@ examples/data/feature.clean.tsv.gz
 <span class="nv">min_ct_per_feature</span><span class="o">=</span><span class="m">20</span><span class="w"> </span><span class="c1"># Ignore genes with total count \&lt; 20</span>
 <span class="nv">R</span><span class="o">=</span><span class="m">10</span><span class="w"> </span><span class="c1"># We use R random initializations and pick one to fit the full model</span>
 <span class="nv">thread</span><span class="o">=</span><span class="m">4</span><span class="w"> </span><span class="c1"># Number of threads to use</span>
-<span class="nv">feature</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/feature.clean.tsv.gz
 </code></pre></div></p>
 <p>Parameters for pixel level decoding
 <div class="highlight"><pre><span></span><code><span class="nv">fit_width</span><span class="o">=</span><span class="m">12</span><span class="w"> </span><span class="c1"># Often equal or smaller than train_width (um)</span>
@@ -800,17 +836,17 @@ examples/data/feature.clean.tsv.gz
 <div class="highlight"><pre><span></span><code><span class="c1"># Prepare training minibatches, only need to run once if you plan to fit multiple models (say with different number of factors)</span>
 <span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/transcripts.tsv.gz
 <span class="nv">hexagon</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/hexagon.d_<span class="si">${</span><span class="nv">train_width</span><span class="si">}</span>.tsv.gz
-<span class="nv">rec</span><span class="o">=</span><span class="k">$(</span>sbatch<span class="w"> </span>--job-name<span class="o">=</span>vz2<span class="w"> </span>--account<span class="o">=</span><span class="si">${</span><span class="nv">SLURM_ACCOUNT</span><span class="si">}</span><span class="w"> </span>--partition<span class="o">=</span>standard<span class="w"> </span>--cpus-per-task<span class="o">=</span><span class="m">1</span><span class="w"> </span>examples/script/generic_II.sh<span class="w"> </span><span class="nv">env</span><span class="o">=</span><span class="si">${</span><span class="nv">env</span><span class="si">}</span><span class="w"> </span><span class="nv">gitpath</span><span class="o">=</span><span class="si">${</span><span class="nv">gitpath</span><span class="si">}</span><span class="w"> </span><span class="nv">key</span><span class="o">=</span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span><span class="nv">mu_scale</span><span class="o">=</span><span class="si">${</span><span class="nv">mu_scale</span><span class="si">}</span><span class="w"> </span><span class="nv">major_axis</span><span class="o">=</span><span class="si">${</span><span class="nv">MJ</span><span class="si">}</span><span class="w"> </span><span class="nv">path</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span><span class="w"> </span><span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span><span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">hexagon</span><span class="si">}</span><span class="w"> </span><span class="nv">width</span><span class="o">=</span><span class="si">${</span><span class="nv">train_width</span><span class="si">}</span><span class="w"> </span><span class="nv">sliding_step</span><span class="o">=</span><span class="si">${</span><span class="nv">sliding_step</span><span class="si">}</span><span class="k">)</span>
+<span class="nv">rec</span><span class="o">=</span><span class="k">$(</span>sbatch<span class="w"> </span>--job-name<span class="o">=</span>vz2<span class="w"> </span>--account<span class="o">=</span><span class="si">${</span><span class="nv">SLURM_ACCOUNT</span><span class="si">}</span><span class="w"> </span>--partition<span class="o">=</span>standard<span class="w"> </span>--cpus-per-task<span class="o">=</span><span class="m">1</span><span class="w"> </span>examples/script/generic_II.sh<span class="w"> </span><span class="nv">env</span><span class="o">=</span><span class="si">${</span><span class="nv">env</span><span class="si">}</span><span class="w"> </span><span class="nv">key</span><span class="o">=</span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span><span class="nv">mu_scale</span><span class="o">=</span><span class="si">${</span><span class="nv">mu_scale</span><span class="si">}</span><span class="w"> </span><span class="nv">major_axis</span><span class="o">=</span><span class="si">${</span><span class="nv">MJ</span><span class="si">}</span><span class="w"> </span><span class="nv">path</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span><span class="w"> </span><span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span><span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">hexagon</span><span class="si">}</span><span class="w"> </span><span class="nv">width</span><span class="o">=</span><span class="si">${</span><span class="nv">train_width</span><span class="si">}</span><span class="w"> </span><span class="nv">sliding_step</span><span class="o">=</span><span class="si">${</span><span class="nv">sliding_step</span><span class="si">}</span><span class="k">)</span>
 <span class="nv">IFS</span><span class="o">=</span><span class="s1">&#39; &#39;</span><span class="w"> </span><span class="nb">read</span><span class="w"> </span>-ra<span class="w"> </span>ADDR<span class="w"> </span><span class="o">&lt;&lt;&lt;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$rec</span><span class="s2">&quot;</span>
 <span class="nv">jobid2</span><span class="o">=</span><span class="si">${</span><span class="nv">ADDR</span><span class="p">[3]</span><span class="si">}</span>
 
 <span class="c1"># Model training</span>
-<span class="nv">rec</span><span class="o">=</span><span class="k">$(</span>sbatch<span class="w"> </span>--job-name<span class="o">=</span>vz3<span class="w"> </span>--account<span class="o">=</span><span class="si">${</span><span class="nv">SLURM_ACCOUNT</span><span class="si">}</span><span class="w"> </span>--partition<span class="o">=</span>standard<span class="w"> </span>--cpus-per-task<span class="o">=</span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span><span class="w"> </span>--dependency<span class="o">=</span>afterok:<span class="si">${</span><span class="nv">jobid2</span><span class="si">}</span><span class="w"> </span>examples/script/generic_III.sh<span class="w"> </span><span class="nv">env</span><span class="o">=</span><span class="si">${</span><span class="nv">env</span><span class="si">}</span><span class="w"> </span><span class="nv">gitpath</span><span class="o">=</span><span class="si">${</span><span class="nv">gitpath</span><span class="si">}</span><span class="w"> </span><span class="nv">key</span><span class="o">=</span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span><span class="nv">mu_scale</span><span class="o">=</span><span class="si">${</span><span class="nv">mu_scale</span><span class="si">}</span><span class="w"> </span><span class="nv">major_axis</span><span class="o">=</span><span class="si">${</span><span class="nv">MJ</span><span class="si">}</span><span class="w"> </span><span class="nv">path</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span><span class="w"> </span><span class="nv">pixel</span><span class="o">=</span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span><span class="nv">hexagon</span><span class="o">=</span><span class="si">${</span><span class="nv">hexagon</span><span class="si">}</span><span class="w"> </span><span class="nv">feature</span><span class="o">=</span><span class="si">${</span><span class="nv">feature</span><span class="si">}</span><span class="w"> </span><span class="nv">model_id</span><span class="o">=</span><span class="si">${</span><span class="nv">model_id</span><span class="si">}</span><span class="w"> </span><span class="nv">train_width</span><span class="o">=</span><span class="si">${</span><span class="nv">train_width</span><span class="si">}</span><span class="w"> </span><span class="nv">nFactor</span><span class="o">=</span><span class="si">${</span><span class="nv">nFactor</span><span class="si">}</span><span class="w"> </span><span class="nv">R</span><span class="o">=</span><span class="si">${</span><span class="nv">R</span><span class="si">}</span><span class="w"> </span><span class="nv">train_nEpoch</span><span class="o">=</span><span class="si">${</span><span class="nv">train_nEpoch</span><span class="si">}</span><span class="w"> </span><span class="nv">fit_width</span><span class="o">=</span><span class="si">${</span><span class="nv">fit_width</span><span class="si">}</span><span class="w"> </span><span class="nv">anchor_res</span><span class="o">=</span><span class="si">${</span><span class="nv">anchor_res</span><span class="si">}</span><span class="w"> </span><span class="nv">min_ct_per_feature</span><span class="o">=</span><span class="si">${</span><span class="nv">min_ct_per_feature</span><span class="si">}</span><span class="w"> </span><span class="nv">thread</span><span class="o">=</span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span><span class="k">)</span>
+<span class="nv">rec</span><span class="o">=</span><span class="k">$(</span>sbatch<span class="w"> </span>--job-name<span class="o">=</span>vz3<span class="w"> </span>--account<span class="o">=</span><span class="si">${</span><span class="nv">SLURM_ACCOUNT</span><span class="si">}</span><span class="w"> </span>--partition<span class="o">=</span>standard<span class="w"> </span>--cpus-per-task<span class="o">=</span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span><span class="w"> </span>--dependency<span class="o">=</span>afterok:<span class="si">${</span><span class="nv">jobid2</span><span class="si">}</span><span class="w"> </span>examples/script/generic_III.sh<span class="w"> </span><span class="nv">env</span><span class="o">=</span><span class="si">${</span><span class="nv">env</span><span class="si">}</span><span class="w"> </span><span class="nv">key</span><span class="o">=</span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span><span class="nv">mu_scale</span><span class="o">=</span><span class="si">${</span><span class="nv">mu_scale</span><span class="si">}</span><span class="w"> </span><span class="nv">major_axis</span><span class="o">=</span><span class="si">${</span><span class="nv">MJ</span><span class="si">}</span><span class="w"> </span><span class="nv">path</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span><span class="w"> </span><span class="nv">pixel</span><span class="o">=</span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span><span class="nv">hexagon</span><span class="o">=</span><span class="si">${</span><span class="nv">hexagon</span><span class="si">}</span><span class="w"> </span><span class="nv">model_id</span><span class="o">=</span><span class="si">${</span><span class="nv">model_id</span><span class="si">}</span><span class="w"> </span><span class="nv">train_width</span><span class="o">=</span><span class="si">${</span><span class="nv">train_width</span><span class="si">}</span><span class="w"> </span><span class="nv">nFactor</span><span class="o">=</span><span class="si">${</span><span class="nv">nFactor</span><span class="si">}</span><span class="w"> </span><span class="nv">R</span><span class="o">=</span><span class="si">${</span><span class="nv">R</span><span class="si">}</span><span class="w"> </span><span class="nv">train_nEpoch</span><span class="o">=</span><span class="si">${</span><span class="nv">train_nEpoch</span><span class="si">}</span><span class="w"> </span><span class="nv">fit_width</span><span class="o">=</span><span class="si">${</span><span class="nv">fit_width</span><span class="si">}</span><span class="w"> </span><span class="nv">anchor_res</span><span class="o">=</span><span class="si">${</span><span class="nv">anchor_res</span><span class="si">}</span><span class="w"> </span><span class="nv">min_ct_per_feature</span><span class="o">=</span><span class="si">${</span><span class="nv">min_ct_per_feature</span><span class="si">}</span><span class="w"> </span><span class="nv">thread</span><span class="o">=</span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span><span class="k">)</span>
 <span class="nv">IFS</span><span class="o">=</span><span class="s1">&#39; &#39;</span><span class="w"> </span><span class="nb">read</span><span class="w"> </span>-ra<span class="w"> </span>ADDR<span class="w"> </span><span class="o">&lt;&lt;&lt;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$rec</span><span class="s2">&quot;</span>
 <span class="nv">jobid3</span><span class="o">=</span><span class="si">${</span><span class="nv">ADDR</span><span class="p">[3]</span><span class="si">}</span>
 
 <span class="c1"># Pixel level decoding &amp; visualization</span>
-<span class="nv">rec</span><span class="o">=</span><span class="k">$(</span>sbatch<span class="w"> </span>--job-name<span class="o">=</span>vz4<span class="w"> </span>--account<span class="o">=</span><span class="si">${</span><span class="nv">SLURM_ACCOUNT</span><span class="si">}</span><span class="w"> </span>--partition<span class="o">=</span>standard<span class="w"> </span>--cpus-per-task<span class="o">=</span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span><span class="w"> </span>--dependency<span class="o">=</span>afterok:<span class="si">${</span><span class="nv">jobid3</span><span class="si">}</span>,<span class="si">${</span><span class="nv">jobid1</span><span class="si">}</span><span class="w"> </span>examples/script/generic_V.sh<span class="w"> </span><span class="nv">env</span><span class="o">=</span><span class="si">${</span><span class="nv">env</span><span class="si">}</span><span class="w"> </span><span class="nv">gitpath</span><span class="o">=</span><span class="si">${</span><span class="nv">gitpath</span><span class="si">}</span><span class="w"> </span><span class="nv">key</span><span class="o">=</span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span><span class="nv">mu_scale</span><span class="o">=</span><span class="si">${</span><span class="nv">mu_scale</span><span class="si">}</span><span class="w"> </span><span class="nv">path</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span><span class="w"> </span><span class="nv">model_id</span><span class="o">=</span><span class="si">${</span><span class="nv">model_id</span><span class="si">}</span><span class="w"> </span><span class="nv">anchor_info</span><span class="o">=</span><span class="si">${</span><span class="nv">anchor_info</span><span class="si">}</span><span class="w"> </span><span class="nv">radius</span><span class="o">=</span><span class="si">${</span><span class="nv">radius</span><span class="si">}</span><span class="w"> </span><span class="nv">coor</span><span class="o">=</span><span class="si">${</span><span class="nv">coor</span><span class="si">}</span><span class="w"> </span><span class="nv">thread</span><span class="o">=</span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span><span class="k">)</span>
+<span class="nv">rec</span><span class="o">=</span><span class="k">$(</span>sbatch<span class="w"> </span>--job-name<span class="o">=</span>vz4<span class="w"> </span>--account<span class="o">=</span><span class="si">${</span><span class="nv">SLURM_ACCOUNT</span><span class="si">}</span><span class="w"> </span>--partition<span class="o">=</span>standard<span class="w"> </span>--cpus-per-task<span class="o">=</span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span><span class="w"> </span>--dependency<span class="o">=</span>afterok:<span class="si">${</span><span class="nv">jobid3</span><span class="si">}</span>,<span class="si">${</span><span class="nv">jobid1</span><span class="si">}</span><span class="w"> </span>examples/script/generic_V.sh<span class="w"> </span><span class="nv">env</span><span class="o">=</span><span class="si">${</span><span class="nv">env</span><span class="si">}</span><span class="w"> </span><span class="nv">key</span><span class="o">=</span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span><span class="nv">mu_scale</span><span class="o">=</span><span class="si">${</span><span class="nv">mu_scale</span><span class="si">}</span><span class="w"> </span><span class="nv">path</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span><span class="w"> </span><span class="nv">model_id</span><span class="o">=</span><span class="si">${</span><span class="nv">model_id</span><span class="si">}</span><span class="w"> </span><span class="nv">anchor_info</span><span class="o">=</span><span class="si">${</span><span class="nv">anchor_info</span><span class="si">}</span><span class="w"> </span><span class="nv">radius</span><span class="o">=</span><span class="si">${</span><span class="nv">radius</span><span class="si">}</span><span class="w"> </span><span class="nv">coor</span><span class="o">=</span><span class="si">${</span><span class="nv">coor</span><span class="si">}</span><span class="w"> </span><span class="nv">thread</span><span class="o">=</span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span><span class="k">)</span>
 <span class="nv">IFS</span><span class="o">=</span><span class="s1">&#39; &#39;</span><span class="w"> </span><span class="nb">read</span><span class="w"> </span>-ra<span class="w"> </span>ADDR<span class="w"> </span><span class="o">&lt;&lt;&lt;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$rec</span><span class="s2">&quot;</span>
 <span class="nv">jobid4</span><span class="o">=</span><span class="si">${</span><span class="nv">ADDR</span><span class="p">[3]</span><span class="si">}</span>
 </code></pre></div></p>

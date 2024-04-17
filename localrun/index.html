@@ -11,7 +11,7 @@
         <link rel="canonical" href="https://Yichen-Si.github.io/ficture/localrun/">
       
       
-        <link rel="prev" href="../install/">
+        <link rel="prev" href="../quickstart/">
       
       
         <link rel="next" href="../run/">
@@ -257,6 +257,23 @@
         
   
   
+  
+    <li class="md-tabs__item">
+      <a href="../quickstart/" class="md-tabs__link">
+        
+  
+    
+  
+  Quickstart
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
     
   
   
@@ -387,6 +404,26 @@
   
   <span class="md-ellipsis">
     Install
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quickstart
   </span>
   
 
@@ -599,10 +636,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
             
   
   <span class="md-ellipsis">
@@ -613,8 +650,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             Format input
           </label>
@@ -904,7 +941,6 @@ examples/data/feature.clean.tsv.gz
 <div class="highlight"><pre><span></span><code><span class="nv">mu_scale</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="c1"># If your data&#39;s coordinates are already in micrometer</span>
 <span class="nv">key</span><span class="o">=</span>Count
 <span class="nv">major_axis</span><span class="o">=</span>Y<span class="w"> </span><span class="c1"># If your data is sorted by the Y-axis</span>
-<span class="c1"># gitpath=path/to/ficture # path to this repository</span>
 </code></pre></div>
 <h3 id="preprocessing">Preprocessing<a class="headerlink" href="#preprocessing" title="Permanent link">&para;</a></h3>
 <p>Create pixel minibatches (<code>${path}/batched.matrix.tsv.gz</code>)
@@ -913,8 +949,6 @@ examples/data/feature.clean.tsv.gz
 <span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/transcripts.tsv.gz
 <span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/batched.matrix.tsv.gz
 <span class="nv">batch</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/batched.matrix.tsv
-
-<span class="c1"># python ${gitpath}/script/make_spatial_minibatch.py --input ${input} --output ${batch} --mu_scale ${mu_scale} --batch_size ${batch_size} --batch_buff ${batch_buff} --major_axis ${major_axis}</span>
 
 ficture<span class="w"> </span>make_spatial_minibatch<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">batch</span><span class="si">}</span><span class="w"> </span>--mu_scale<span class="w"> </span><span class="si">${</span><span class="nv">mu_scale</span><span class="si">}</span><span class="w"> </span>--batch_size<span class="w"> </span><span class="si">${</span><span class="nv">batch_size</span><span class="si">}</span><span class="w"> </span>--batch_buff<span class="w"> </span><span class="si">${</span><span class="nv">batch_buff</span><span class="si">}</span><span class="w"> </span>--major_axis<span class="w"> </span><span class="si">${</span><span class="nv">major_axis</span><span class="si">}</span>
 
