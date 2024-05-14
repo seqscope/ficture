@@ -34,6 +34,10 @@ def make_sge_by_hexagon(_args):
     parser.add_argument('--transfer_gene_prefix', action="store_true", help='')
     args = parser.parse_args(_args)
 
+    if len(_args) == 0:
+        parser.print_help()
+        return
+
     if not os.path.exists(args.input):
         sys.exit(f"ERROR: cannot find input file \n {args.input}")
     logging.basicConfig(level= getattr(logging, "INFO", None))
