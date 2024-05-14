@@ -9,6 +9,7 @@ def main():
         "filter_by_boundary": "filter_boundary", \
         "make_spatial_minibatch": "make_spatial_minibatch",\
         "make_dge": "make_dge_univ", \
+        "make_sge_by_hexagon": "make_sge_by_hexagon", \
         "fit_model": "init_model_selection", \
         # "lda": "lda_univ", \
         "transform": "transform_univ", \
@@ -17,7 +18,6 @@ def main():
         "de_bulk": "de_bulk", \
         "factor_report": "factor_report", \
         "slda_decode": "slda_decode", \
-
         "plot_base": "plot_base", \
         "plot_hexagon": "plot_hexagon", \
         "plot_pixel_multi": "plot_pixel_multi", \
