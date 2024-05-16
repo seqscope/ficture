@@ -22,7 +22,6 @@ def transform(_args):
     parser.add_argument('--output', '--output_pref', type=str, help='')
     parser.add_argument('--model', type=str, help='')
     parser.add_argument('--feature', type=str, default='', help='')
-
     parser.add_argument('--key', type=str, default = 'gn', help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced')
     parser.add_argument('--major_axis', type=str, default=None, help='X or Y')
     parser.add_argument('--region_id', type=str, default=None, help='')

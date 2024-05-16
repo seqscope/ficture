@@ -18,6 +18,7 @@ def run_together(_args):
     cmd_params.add_argument('--all', action='store_true', default=False, help='Run all FICTURE commands (preprocess, segment, lda, decode)')
     cmd_params.add_argument('--preprocess', action='store_true', default=False, help='Perform preprocess step')
     cmd_params.add_argument('--segment', action='store_true', default=False, help='Perform hexagonal segmentation')
+    cmd_params.add_argument('--sge', action='store_true', default=False, help='Create hexagonal SGEs')
     cmd_params.add_argument('--lda', action='store_true', default=False, help='Perform LDA model training')
     cmd_params.add_argument('--decode', action='store_true', default=False, help='Perform pixel-level decoding')
 
@@ -39,16 +40,17 @@ def run_together(_args):
     key_params.add_argument('--anchor-res', type=float, default=4, help='Anchor resolution for decoding')
     key_params.add_argument('--plot-each-factor', action='store_true', default=False, help='Plot individual factors in pixel-level decoding')
 
-
     aux_params = parser.add_argument_group("Auxiliary Parameters", "Auxiliary parameters (using default is recommended)")
     aux_params.add_argument('--train-epoch', type=int, default=3, help='Training epoch for LDA model')
     aux_params.add_argument('--train-epoch-id-len', type=int, default=2, help='Training epoch ID length')
     aux_params.add_argument('--train-n-move', type=int, default=2, help='Level of hexagonal sliding during training')
+    aux_params.add_argument('--sge-n-move', type=int, default=1, help='Level of hexagonal sliding during SGE generation')
     aux_params.add_argument('--fit-width', type=float, help='Hexagon flat-to-flat width (in um) during model fitting (default: same to train-width)')
     aux_params.add_argument('--key-col', type=str, default="Count", help='Columns from the input file to be used as key')
     aux_params.add_argument('--minibatch-size', type=int, default=500, help='Batch size used in minibatch processing')
     aux_params.add_argument('--minibatch-buffer', type=int, default=30, help='Batch buffer used in minibatch processing')
     aux_params.add_argument('--min-ct-unit-dge', type=int, default=50, help='Minimum count per hexagon in DGE generation')
+    aux_params.add_argument('--min-ct-unit-sge', type=int, default=1, help='Minimum count per hexagon in SGE generation')
     aux_params.add_argument('--min-ct-feature', type=int, default=20, help='Minimum count per feature during LDA training')
     aux_params.add_argument('--min-ct-unit-fit', type=int, default=20, help='Minimum count per hexagon unit during model fitting')
     aux_params.add_argument('--lda-rand-init', type=int, default=10, help='Number of random initialization during model training')
@@ -78,6 +80,7 @@ def run_together(_args):
     if args.all:
         args.preprocess = True
         args.segment = True
+        args.sge = True
         args.lda = True
         args.decode = True
 
@@ -138,10 +141,20 @@ gzip -cd ${input} | awk 'BEGIN{FS=OFS="\t"} NR==1{for(i=1;i<=NF;i++){if($i=="X")
             cmds.append(rf"$(info --------------------------------------------------------------)") 
             cmds.append(rf"$(info Creating DGE for {train_width}um...)") 
             cmds.append(rf"$(info --------------------------------------------------------------)") 
-            cmds.append(f"ficture make_dge --key {args.key_col} --count_header {args.key_col} --input {args.in_tsv} --output {dge_out} --hex_width {train_width} --n_move {args.train_n_move} --min_ct_per_unit {args.min_ct_unit_dge} --mu_scale {args.mu_scale} --precision {args.dge_precision} --major_axis {args.major_axis}")
+            cmds.append(f"ficture make_dge --key {args.key_col} --input {args.in_tsv} --output {dge_out} --hex_width {train_width} --n_move {args.train_n_move} --min_ct_per_unit {args.min_ct_unit_dge} --mu_scale {args.mu_scale} --precision {args.dge_precision} --major_axis {args.major_axis}")
             cmds.append(f"{args.sort} -k 1,1n {dge_out} | {args.gzip} -c > {dge_out}.gz")
             cmds.append(f"rm {dge_out}")
             mm.add_target(f"{dge_out}.gz", [args.in_tsv], cmds)
+
+    if args.sge:
+        for train_width in train_widths:
+            sge_out_dir = f"{args.out_dir}/segment/sge.d_{train_width}"
+            cmds = []
+            cmds.append(rf"$(info --------------------------------------------------------------)") 
+            cmds.append(rf"$(info Creating SGE for {train_width}um...)") 
+            cmds.append(rf"$(info --------------------------------------------------------------)") 
+            cmds.append(f"ficture make_sge_by_hexagon --key {args.key_col} --input {args.in_tsv} --feature {args.in_feature} --output_path {sge_out_dir} --hex_width {train_width} --n_move {args.sge_n_move} --min_ct_per_unit {args.min_ct_unit_sge} --mu_scale {args.mu_scale} --precision {args.dge_precision} --major_axis {args.major_axis} --transfer_gene_prefix")
+            mm.add_target(f"{sge_out_dir}/barcodes.tsv.gz", [args.in_tsv], cmds)
     
     if args.lda:
         for train_width in train_widths:
