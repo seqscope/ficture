@@ -51,11 +51,12 @@ class BlockIndexedLoader:
             self.reader = pd.read_csv(input,sep='\t',skiprows=nheader,chunksize=chunksize,names=self.header, dtype=dty)
         else:
             # Translate target region to index
-            block = [int(x / self.meta['BLOCK_SIZE']) for x in [self.xmin, self.xmax - 1] ]
-            pos_range = [int(x*self.meta['SCALE']) for x in [self.ymin, self.ymax]]
             if self.meta['BLOCK_AXIS'] == "Y":
                 block = [int(x / self.meta['BLOCK_SIZE']) for x in [self.ymin, self.ymax - 1] ]
                 pos_range = [int(x*self.meta['SCALE']) for x in [self.xmin, self.xmax]]
+            else:
+                block = [int(x / self.meta['BLOCK_SIZE']) for x in [self.xmin, self.xmax - 1] ]
+                pos_range = [int(x*self.meta['SCALE']) for x in [self.ymin, self.ymax]]
             block = np.arange(block[0], block[1]+1) * self.meta['BLOCK_SIZE']
             query = []
             pos_range = '-'.join([str(x) for x in pos_range])

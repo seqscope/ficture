@@ -24,7 +24,7 @@ class PixelMinibatch:
         self.ft_dict = ft_dict
         self.M = len(self.ft_dict)
         self.key = key
-        self.precision = np.clip(precision, 0.1, np.inf)
+        self.precision = precision
         self.radius = radius
         self.adj_penal = adj_penal
         self.nu = np.log(.5) / np.log(halflife)
@@ -68,13 +68,16 @@ class PixelMinibatch:
                 break
             chunk = chunk.loc[chunk.gene.isin(self.ft_dict) & \
                               (chunk[self.key] > 0), :]
-            chunk.X = (chunk.X * self.mu_scale / self.precision).astype(int)
-            chunk.Y = (chunk.Y * self.mu_scale / self.precision).astype(int)
-            chunk = chunk.groupby(by=[self.batch_id,"gene","X","Y"]).agg({self.key: "sum"}).reset_index()
+            chunk.X *= self.mu_scale
+            chunk.Y *= self.mu_scale
+            if self.precision > 0:
+                chunk.X = (chunk.X / self.precision).astype(int)
+                chunk.Y = (chunk.Y / self.precision).astype(int)
+                chunk = chunk.groupby(by=[self.batch_id,"gene","X","Y"]).agg({self.key: "sum"}).reset_index()
+                chunk.X *= self.precision
+                chunk.Y *= self.precision
             random_pref = chunk[self.batch_id].map(lambda x : x[-5:]).values
-            chunk['j'] = random_pref + '_' + chunk.X.astype(str) + '_' + chunk.Y.astype(str)
-            chunk.X *= self.precision
-            chunk.Y *= self.precision
+            chunk['j'] = random_pref + '_' + (chunk.X*100).astype(int).astype(str) + '_' + (chunk.Y*100).astype(int).astype(str)
             # Keep pixels close enough to at least one anchor
             pts = chunk[["j", "X", "Y"]].drop_duplicates(subset="j")
             dist, indx = self.ref.query(X = np.array(pts[['X','Y']]), k = 1, return_distance = True)

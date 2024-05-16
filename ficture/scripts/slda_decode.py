@@ -22,7 +22,7 @@ def slda_decode(_args):
     parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
     parser.add_argument('--key', type=str, default = 'gn', help='gt: genetotal, gn: gene, spl: velo-spliced, unspl: velo-unspliced')
     parser.add_argument('--batch_id', type=str, default = 'random_index', help='Input has to have a column with this name indicating the minibatch id')
-    parser.add_argument('--precision', type=float, default=.25, help='If positive, collapse pixels within X um.')
+    parser.add_argument('--precision', type=float, default=.1, help='If positive, collapse pixels within X um.')
 
     # Learning related parameters
     parser.add_argument('--thread', type=int, default=1, help='')

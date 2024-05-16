@@ -68,6 +68,7 @@ def fit_model(_args):
     feature_list = None
     if os.path.isfile(args.feature):
         feature_list = pd.read_csv(args.feature, sep='\t', dtype={gene_key:str})[gene_key].tolist()
+        feature_list = list(set(feature_list))
 
     feature, brc, mtx_org, ft_dict, bc_dict = make_mtx_from_dge(args.input,\
         min_ct_per_unit = args.min_ct_per_unit, \

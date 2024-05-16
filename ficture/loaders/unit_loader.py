@@ -43,7 +43,7 @@ class UnitLoaderAugmented:
             left = self.df[self.df.unit == last_indx]
             self.df = self.df[self.df.unit != last_indx]
         self.brc = self.df[['unit']+self.unit_attr].drop_duplicates(subset=['unit'])
-        self.brc = self.brc.merge(right = self.df.groupby(by='unit').agg({self.key:sum, self.bkey:sum}).reset_index(), on = 'unit', how = 'inner' )
+        self.brc = self.brc.merge(right = self.df.groupby(by='unit').agg({self.key:"sum", self.bkey:"sum"}).reset_index(), on = 'unit', how = 'inner' )
         self.brc = self.brc[self.brc[self.key] >= self.min_ct_per_unit]
         buffer_weight = self.brc[self.bkey].values / (self.brc[self.bkey].values + self.brc[self.key].values)
         barcode_kept=list(self.brc.unit)
@@ -94,9 +94,9 @@ class UnitLoader:
         if self.prefix > 0:
             lab = self.brc.unit.str[:self.prefix].unique()
             self.batch_id_list += [x for x in lab if x not in self.batch_id_list]
-        self.brc = self.brc.merge(right = self.df.groupby(by='unit').agg({self.train_key:sum}).reset_index(), on = 'unit', how = 'inner' )
+        self.brc = self.brc.merge(right = self.df.groupby(by='unit').agg({self.train_key:"sum"}).reset_index(), on = 'unit', how = 'inner' )
         if self.key != self.train_key:
-            self.brc = self.brc.merge(right = self.df.groupby(by='unit').agg({self.key:sum}).reset_index(), on = 'unit', how = 'inner' )
+            self.brc = self.brc.merge(right = self.df.groupby(by='unit').agg({self.key:"sum"}).reset_index(), on = 'unit', how = 'inner' )
         self.brc = self.brc[self.brc[self.key] >= self.min_ct_per_unit]
         barcode_kept=list(self.brc.unit)
         bt_dict={x:i for i,x in enumerate(barcode_kept)}
