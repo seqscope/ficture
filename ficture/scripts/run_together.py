@@ -35,7 +35,7 @@ def run_together(_args):
     key_params.add_argument('--in-feature', type=str, help='Input TSV file (e.g. feature.clean.tsv.gz) that specify which genes to use as input. If absent, it will be use all genes')
     key_params.add_argument('--major-axis', type=str, default='Y', help='Axis where transcripts.tsv.gz are sorted')
     key_params.add_argument('--mu-scale', type=float, default=1.0, help='Scale factor for mu (pixels per um)')
-    key_params.add_argument('--train-width', type=str, default="18", help='Hexagon flat-to-flat width (in um) during training. Use comma to specify multiple values')
+    key_params.add_argument('--train-width', type=str, default="12", help='Hexagon flat-to-flat width (in um) during training. Use comma to specify multiple values')
     key_params.add_argument('--n-factor', type=str, default="12", help='Number of factors to train. Use comma to specify multiple values')
     key_params.add_argument('--anchor-res', type=float, default=4, help='Anchor resolution for decoding')
     key_params.add_argument('--plot-each-factor', action='store_true', default=False, help='Plot individual factors in pixel-level decoding')
@@ -76,11 +76,11 @@ def run_together(_args):
     if len(_args) == 0:
         parser.print_help()
         return
-    
+
     if args.all:
         args.preprocess = True
         args.segment = True
-        args.sge = True
+        args.sge = False
         args.lda = True
         args.decode = True
 
@@ -109,13 +109,13 @@ def run_together(_args):
     if args.preprocess:
         ## create output directory if needed
         cmds = []
-        cmds.append(rf"$(info --------------------------------------------------------------)") 
-        cmds.append(rf"$(info Creating minibatch from {args.in_tsv}...)") 
-        cmds.append(rf"$(info --------------------------------------------------------------)") 
+        cmds.append(rf"$(info --------------------------------------------------------------)")
+        cmds.append(rf"$(info Creating minibatch from {args.in_tsv}...)")
+        cmds.append(rf"$(info --------------------------------------------------------------)")
         ## create minibatch
         cmds.append(f"ficture make_spatial_minibatch --input {args.in_tsv} --output {batch_tsv} --mu_scale {args.mu_scale} --batch_size {args.minibatch_size} --batch_buff {args.minibatch_buffer} --major_axis {args.major_axis}")
         cmds.append(f"{args.sort} -k 2,2n -k 1,1g {batch_tsv} | {args.gzip} -c > {batch_out}")
-        cmds.append(f"rm {batch_tsv}") 
+        cmds.append(f"rm {batch_tsv}")
         mm.add_target(batch_out, [args.in_tsv], cmds)
 
         if args.in_minmax is None:
@@ -124,13 +124,13 @@ def run_together(_args):
                 f.write(r"""#!/bin/bash
 input=$1
 output=$2
-mu_scale=$3                        
+mu_scale=$3
 gzip -cd ${input} | awk 'BEGIN{FS=OFS="\t"} NR==1{for(i=1;i<=NF;i++){if($i=="X")x=i;if($i=="Y")y=i}print $x,$y;next}{print $x,$y}' | perl -slane 'print join("\t",$F[0]/${mu_scale},$F[1]/${mu_scale})' -- -mu_scale="${mu_scale}" | awk -F'\t' ' BEGIN { min1 = "undef"; max1 = "undef"; min2 = "undef"; max2 = "undef"; } { if (NR == 2 || $1 < min1) min1 = $1; if (NR == 2 || $1 > max1) max1 = $1; if (NR == 2 || $2 < min2) min2 = $2; if (NR == 2 || $2 > max2) max2 = $2; } END { print "xmin\t", min1; print "xmax\t", max1; print "ymin\t", min2; print "ymax\t", max2; }' > ${output}
 """)
             cmds = []
-            cmds.append(rf"$(info --------------------------------------------------------------)") 
-            cmds.append(rf"$(info Obtaining boundary coordinates to {minmax_out}...)") 
-            cmds.append(rf"$(info --------------------------------------------------------------)") 
+            cmds.append(rf"$(info --------------------------------------------------------------)")
+            cmds.append(rf"$(info Obtaining boundary coordinates to {minmax_out}...)")
+            cmds.append(rf"$(info --------------------------------------------------------------)")
             cmds.append(f"bash {script_path} {args.in_tsv} {minmax_out} {args.mu_scale}")
             mm.add_target(minmax_out, [args.in_tsv], cmds)
 
@@ -138,9 +138,9 @@ gzip -cd ${input} | awk 'BEGIN{FS=OFS="\t"} NR==1{for(i=1;i<=NF;i++){if($i=="X")
         for train_width in train_widths:
             dge_out = f"{args.out_dir}/hexagon.d_{train_width}.tsv"
             cmds = []
-            cmds.append(rf"$(info --------------------------------------------------------------)") 
-            cmds.append(rf"$(info Creating DGE for {train_width}um...)") 
-            cmds.append(rf"$(info --------------------------------------------------------------)") 
+            cmds.append(rf"$(info --------------------------------------------------------------)")
+            cmds.append(rf"$(info Creating DGE for {train_width}um...)")
+            cmds.append(rf"$(info --------------------------------------------------------------)")
             cmds.append(f"ficture make_dge --key {args.key_col} --input {args.in_tsv} --output {dge_out} --hex_width {train_width} --n_move {args.train_n_move} --min_ct_per_unit {args.min_ct_unit_dge} --mu_scale {args.mu_scale} --precision {args.dge_precision} --major_axis {args.major_axis}")
             cmds.append(f"{args.sort} -k 1,1n {dge_out} | {args.gzip} -c > {dge_out}.gz")
             cmds.append(f"rm {dge_out}")
@@ -150,12 +150,12 @@ gzip -cd ${input} | awk 'BEGIN{FS=OFS="\t"} NR==1{for(i=1;i<=NF;i++){if($i=="X")
         for train_width in train_widths:
             sge_out_dir = f"{args.out_dir}/segment/sge.d_{train_width}"
             cmds = []
-            cmds.append(rf"$(info --------------------------------------------------------------)") 
-            cmds.append(rf"$(info Creating SGE for {train_width}um...)") 
-            cmds.append(rf"$(info --------------------------------------------------------------)") 
+            cmds.append(rf"$(info --------------------------------------------------------------)")
+            cmds.append(rf"$(info Creating SGE for {train_width}um...)")
+            cmds.append(rf"$(info --------------------------------------------------------------)")
             cmds.append(f"ficture make_sge_by_hexagon --key {args.key_col} --input {args.in_tsv} --feature {args.in_feature} --output_path {sge_out_dir} --hex_width {train_width} --n_move {args.sge_n_move} --min_ct_per_unit {args.min_ct_unit_sge} --mu_scale {args.mu_scale} --precision {args.dge_precision} --major_axis {args.major_axis} --transfer_gene_prefix")
             mm.add_target(f"{sge_out_dir}/barcodes.tsv.gz", [args.in_tsv], cmds)
-    
+
     if args.lda:
         for train_width in train_widths:
             for n_factor in n_factors:
@@ -168,11 +168,11 @@ gzip -cd ${input} | awk 'BEGIN{FS=OFS="\t"} NR==1{for(i=1;i<=NF;i++){if($i=="X")
                 feature_arg = f"--feature {args.in_feature}" if args.in_feature is not None else ""
 
                 cmds = []
-                cmds.append(rf"$(info --------------------------------------------------------------)") 
-                cmds.append(rf"$(info Creating LDA for {train_width}um and {n_factor} factors...)") 
-                cmds.append(rf"$(info --------------------------------------------------------------)") 
+                cmds.append(rf"$(info --------------------------------------------------------------)")
+                cmds.append(rf"$(info Creating LDA for {train_width}um and {n_factor} factors...)")
+                cmds.append(rf"$(info --------------------------------------------------------------)")
                 cmds.append(f"mkdir -p {model_path}/figure")
-                cmds.append(f"ficture fit_model --input {hexagon} --output {model_prefix} {feature_arg} --nFactor {n_factor} --epoch {args.train_epoch} --epoch_id_length {args.train_epoch_id_len} --unit_attr X Y --key {args.key_col} --min_ct_per_feature {args.min_ct_feature} --test_split 0.5 --R {args.lda_rand_init} --thread {args.threads}")              
+                cmds.append(f"ficture fit_model --input {hexagon} --output {model_prefix} {feature_arg} --nFactor {n_factor} --epoch {args.train_epoch} --epoch_id_length {args.train_epoch_id_len} --unit_attr X Y --key {args.key_col} --min_ct_per_feature {args.min_ct_feature} --test_split 0.5 --R {args.lda_rand_init} --thread {args.threads}")
 
                 fit_tsv=f"{model_path}/{model_id}.fit_result.tsv.gz"
                 fig_prefix=f"{figure_path}/{model_id}"
@@ -184,12 +184,12 @@ gzip -cd ${input} | awk 'BEGIN{FS=OFS="\t"} NR==1{for(i=1;i<=NF;i++){if($i=="X")
                 cmds.append(f"touch {model_prefix}.done")
 
                 mm.add_target(f"{model_prefix}.done", [args.in_tsv, hexagon], cmds)
-    
+
     if args.decode:
         if not shutil.which(args.bgzip.split(" ")[0]):
             logging.error(f"Cannot find {args.bgzip}. Please make sure that the path to --bgzip is correct")
             sys.exit(1)
-        
+
         if not shutil.which(args.tabix.split(" ")[0]):
             logging.error(f"Cannot find {args.tabix}. Please make sure that the path to --tabix is correct")
             sys.exit(1)
@@ -207,7 +207,7 @@ scale=$6
 topk=$7
 bgzip=$8
 tabix=$9
-                    
+
 K=$( echo $model_id | sed 's/nF\([0-9]\{1,\}\)\..*/\1/' )
 while IFS=$'\t' read -r r_key r_val; do
     export "${r_key}"="${r_val}"
@@ -249,32 +249,32 @@ rm ${input}
                     radius = args.anchor_res + 1
 
                     prj_prefix = f"{model_path}/{model_id}.{anchor_info}"
-                    cmds.append(rf"$(info --------------------------------------------------------------)") 
-                    cmds.append(rf"$(info Creating projection for {train_width}um and {n_factor} factors, at {fit_width}um)") 
-                    cmds.append(rf"$(info --------------------------------------------------------------)") 
+                    cmds.append(rf"$(info --------------------------------------------------------------)")
+                    cmds.append(rf"$(info Creating projection for {train_width}um and {n_factor} factors, at {fit_width}um)")
+                    cmds.append(rf"$(info --------------------------------------------------------------)")
                     cmds.append(f"ficture transform --input {args.in_tsv} --output_pref {prj_prefix} --model {model} --key {args.key_col} --major_axis {args.major_axis} --hex_width {fit_width} --n_move {fit_nmove} --min_ct_per_unit {args.min_ct_unit_fit} --mu_scale {args.mu_scale} --thread {args.threads} --precision {args.fit_precision}")
 
                     batch_input=f"{args.out_dir}/batched.matrix.tsv.gz"
                     anchor=f"{prj_prefix}.fit_result.tsv.gz"
                     decode_basename=f"{model_id}.decode.{anchor_info}_{radius}"
                     decode_prefix=f"{model_path}/{decode_basename}"
-                    
-                    cmds.append(rf"$(info --------------------------------------------------------------)") 
-                    cmds.append(rf"$(info Performing pixel-level decoding..)") 
-                    cmds.append(rf"$(info --------------------------------------------------------------)") 
+
+                    cmds.append(rf"$(info --------------------------------------------------------------)")
+                    cmds.append(rf"$(info Performing pixel-level decoding..)")
+                    cmds.append(rf"$(info --------------------------------------------------------------)")
                     cmds.append(f"ficture slda_decode --input {batch_in} --output {decode_prefix} --model {model} --anchor {anchor} --anchor_in_um --neighbor_radius {radius} --mu_scale {args.mu_scale} --key {args.key_col} --precision {args.decode_precision} --lite_topk_output_pixel {args.decode_top_k} --lite_topk_output_anchor {args.decode_top_k} --thread {args.threads}")
 
-                    cmds.append(rf"$(info --------------------------------------------------------------)") 
-                    cmds.append(rf"$(info Sorting and reformatting the pixel-level output..)") 
-                    cmds.append(rf"$(info --------------------------------------------------------------)") 
+                    cmds.append(rf"$(info --------------------------------------------------------------)")
+                    cmds.append(rf"$(info Sorting and reformatting the pixel-level output..)")
+                    cmds.append(rf"$(info --------------------------------------------------------------)")
                     cmds.append(f"bash {script_path} {decode_prefix}.pixel.tsv.gz {decode_prefix}.pixel.sorted.tsv.gz {minmax_out} {model_id} {args.decode_block_size} {args.decode_scale} {args.decode_top_k} {args.bgzip} {args.tabix}")
 
                     de_input=f"{decode_prefix}.posterior.count.tsv.gz"
                     de_output=f"{decode_prefix}.bulk_chisq.tsv"
 
-                    cmds.append(rf"$(info --------------------------------------------------------------)") 
-                    cmds.append(rf"$(info Performing pseudo-bulk differential expression analysis..)") 
-                    cmds.append(rf"$(info --------------------------------------------------------------)") 
+                    cmds.append(rf"$(info --------------------------------------------------------------)")
+                    cmds.append(rf"$(info Performing pseudo-bulk differential expression analysis..)")
+                    cmds.append(rf"$(info --------------------------------------------------------------)")
                     cmds.append(f"ficture de_bulk --input {de_input} --output {de_output} --min_ct_per_feature {args.min_ct_feature} --max_pval_output {args.de_max_pval} --min_fold_output {args.de_min_fold} --thread {args.threads}")
 
                     cmap=f"{figure_path}/{model_id}.rgb.tsv"
@@ -283,9 +283,9 @@ rm ${input}
                     decode_tsv=f"{decode_prefix}.pixel.sorted.tsv.gz"
                     decode_png=f"{model_path}/figure/{decode_basename}.pixel.png"
 
-                    cmds.append(rf"$(info --------------------------------------------------------------)") 
-                    cmds.append(rf"$(info Drawing pixel-level output image...)") 
-                    cmds.append(rf"$(info --------------------------------------------------------------)") 
+                    cmds.append(rf"$(info --------------------------------------------------------------)")
+                    cmds.append(rf"$(info Drawing pixel-level output image...)")
+                    cmds.append(rf"$(info --------------------------------------------------------------)")
                     cmds.append(f"ficture plot_pixel_full --input {decode_tsv} --color_table {cmap} --output {decode_png} --plot_um_per_pixel {args.decode_plot_um_per_pixel} --full")
 
                     if args.plot_each_factor:
@@ -295,7 +295,7 @@ rm ${input}
 
                     cmds.append(f"touch {decode_prefix}.done")
                     mm.add_target(f"{decode_prefix}.done", [batch_in, hexagon,f"{model_prefix}.done"], cmds)
-    
+
 
     if len(mm.targets) == 0:
         logging.error("There is no target to run. Please make sure that at least on run option was turned on")

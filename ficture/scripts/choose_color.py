@@ -60,7 +60,7 @@ def choose_color(_args):
     parser.add_argument('--top_color', type=str, default="#fcd217", help="HEX color code for the top factor")
     parser.add_argument('--even_space', action='store_true', help="Evenly space the factors on the circle")
     parser.add_argument('--annotation', type=str, default = '', help='')
-    parser.add_argument('--linear', action='store_true', help="")
+    parser.add_argument('--circle', action='store_true', help="")
     parser.add_argument('--seed', type=int, default=-1, help='')
     args = parser.parse_args(_args)
 
@@ -126,12 +126,12 @@ def choose_color(_args):
     mtx /= mtx.sum(axis = 1)
     mtx = mtx + mtx.T
 
-    if args.linear:
-        c_pos = assign_color_mds_line(mtx, cmap_name, weight=weight, top_color=args.top_color, seed=seed)
-    else:
+    if args.circle:
         # Assign color using MDS with circular constraint
-        from mds_color_circle import assign_color_mds_circle
+        from ficture.utils.mds_color_circle import assign_color_mds_circle
         c_pos = assign_color_mds_circle(mtx, cmap_name, weight=weight, top_color=args.top_color, seed=seed)
+    else:
+        c_pos = assign_color_mds_line(mtx, cmap_name, weight=weight, top_color=args.top_color, seed=seed)
 
     # # Assign color using MDS with circular constraint
     # c_pos = assign_color_mds_circle(mtx, cmap_name, weight=weight, top_color=args.top_color, seed=seed)

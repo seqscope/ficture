@@ -50,8 +50,8 @@ def make_dge(_args):
     ct_header = args.count_header
     key = args.key
     if key not in ct_header:
-        key = ct_header[0]
-        logging.warning(f"The designated major key is not one of the specified count columns, --key is ignored the first existing key is chosen")
+        ct_header = [key]
+        logging.warning(f"The designated major key is not one of the specified count columns, --count_header is ignored")
     if not os.path.isfile(args.input):
         sys.exit(f"ERROR: cannot find input file \n {args.input}")
     with gzip.open(args.input, 'rt') as rf:
