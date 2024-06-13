@@ -33,7 +33,8 @@ def format_cosmx():
 
     with open(args.output, 'w') as wf:
         _ = wf.write('\t'.join(oheader)+'\n')
-    for chunk in pd.read_csv(args.input,header=0,chunksize=500000):
+    for chunk in pd.read_csv(args.input,header=0,chunksize=500000,\
+                             usecols=[xcol,ycol,gcol]+args.annotation):
         chunk.rename(columns = {gcol:'gene'}, inplace=True)
         if args.dummy_genes != '':
             chunk = chunk[~chunk.gene.str.contains(args.dummy_genes, flags=re.IGNORECASE, regex=True)]

@@ -28,13 +28,13 @@ The python script can be found in `ficture/misc`. use `python format_cosmx.py -h
 input=/path/to/input/Tissue5_tx_file.csv.gz # Change it to your transcript file
 path=/path/to/output
 iden=brain # how you identify your files
-dummy=NegPrb # Name of the negative controls, could pass regex to match multiple prob names
+dummy="Negativ|System" # Name or regex that match the negative control probs
 px_to_um=0.168 # convert the pixel unit in the input to micrometer
 
 output=${path}/filtered.matrix.${iden}.tsv
 feature=${path}/feature.clean.${iden}.tsv.gz
 
-python mist/format_cosmx.py --input ${input} --output ${output} --feature ${feature} --dummy_genes ${dummy} --px_to_um ${px_to_um} --annotation cell_ID --precision 2
+python misc/format_cosmx.py --input ${input} --output ${output} --feature ${feature} --dummy_genes ${dummy} --px_to_um ${px_to_um} --annotation cell_ID --precision 2
 sort -k2,2g -k1,1g ${output} | gzip -c > ${output}.gz
 rm ${output}
 ```
@@ -44,7 +44,7 @@ If we would like to merge pixels with (almost?) identical coordinates, replace t
 sort -k2,2g -k1,1g ${output} |
 awk 'BEGIN { OFS="\t"; print "X", "Y", "gene", "cell_ID", "Count" }
      NR > 1 {
-       if ($1 == prevX && $2 == prevY) {
+       if ($1 == prevX && $2 == prevY && $3 == prevGene) {
          sumCount += $5;
        } else {
          if (NR > 2) {

@@ -13,8 +13,6 @@ matplotlib
 numpy
 pandas
 pypng
-pymde
 scipy
 shapely
 scikit-learn
-torch

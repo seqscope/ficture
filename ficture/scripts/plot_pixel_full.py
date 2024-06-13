@@ -131,7 +131,7 @@ def plot_pixel_full(_args):
                     df[c] = 0
                     for k in range(1,loader.meta['TOPK']+1):
                         df[c] += color_info.loc[df['K'+str(k)].values, c].values * df['P'+str(k)].values
-        df = df.groupby(by=['X','Y']).agg({c:np.mean for c in rgb}).reset_index()
+        df = df.groupby(by=['X','Y']).agg({c:"mean" for c in rgb}).reset_index()
         logging.info(f"Reading pixels... {df.X.iloc[-1]}, {df.Y.iloc[-1]}, {df.shape[0]}")
         for i,c in enumerate(rgb):
             df[c] = np.clip(np.around(df[c] * 255),0,255).astype(np.uint8)
