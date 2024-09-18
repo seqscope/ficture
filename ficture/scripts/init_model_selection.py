@@ -127,6 +127,7 @@ def fit_model(_args):
         info.index = feature.gene.values
         info['gene_tot'] = info[factor_header].sum(axis = 1)
         info.drop(index = info.index[info.gene_tot < score_feature_min], inplace = True)
+        logging.info(f"Computing naive DE for {len(info)} genes")
         total_k = np.array(info[factor_header].sum(axis = 0) )
         total_umi = info[factor_header].sum().sum()
         res = []
@@ -144,11 +145,16 @@ def fit_model(_args):
         # Compute a "coherence" score using top DE gene co-occurrence
         score = []
         for k in range(K):
-            wd_idx = chidf.loc[chidf.factor.eq(str(k))].gene.iloc[:topM].map(ft_dict).values
+            topm = min(topM, chidf.factor.eq(str(k)).sum())
+            if topm < topM:
+                logging.info(f"Factor {k} has only {topm} over-expressed genes")
+            if topm == 0:
+                continue
+            wd_idx = chidf.loc[chidf.factor.eq(str(k))].gene.iloc[:topm].map(ft_dict).values
             wd_idx = sorted( list(wd_idx), key = lambda x : -gene_f[x])
             s = 0
-            for ii in range(topM - 1):
-                for jj in range(ii+1, topM):
+            for ii in range(topm - 1):
+                for jj in range(ii+1, topm):
                     i = wd_idx[ii]
                     j = wd_idx[jj]
                     idx = mtx.indices[mtx.indptr[i]:mtx.indptr[i+1]]

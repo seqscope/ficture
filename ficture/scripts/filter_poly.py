@@ -91,7 +91,7 @@ def filter_by_density(_args):
         chunk.Y /= args.mu_scale
         if len(gene_kept) > 0:
             chunk.drop(index = chunk[~chunk.gene.isin(gene_kept)].index, inplace = True)
-        sub = collapse_to_hex(chunk, hex_width = hex_diam, n_move = 2, key = key, )
+        sub = collapse_to_hex(chunk, hex_width = hex_diam, n_move = n_move, key = key, )
         brc = pd.concat([brc, sub])
 
     ct = brc.groupby(by = ['ID']).agg({key:sum}).reset_index()
