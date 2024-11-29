@@ -360,7 +360,7 @@ def read_ct_from_solo_barcodes_tsv(file, key, chunksize=500000, mu_scale=-1):
         chunk[key]=chunk[key].map(lambda x : x.split(',')[ct_idx]).astype(int)
         yield chunk
 
-def make_mtx_from_dge(file, min_ct_per_feature = 50, min_ct_per_unit = 100, feature_white_list = None, feature_list = None, unit = "random_index", key = "gn", epoch=1, epoch_id_length=2, return_df = False):
+def make_mtx_from_dge(file, min_ct_per_feature = 50, min_ct_per_unit = 100, feature_white_list = None, feature_list = None, unit = "random_index", key = "gn", epoch=1, epoch_id_length=2, return_df = False, feature_list_force = False):
     df = pd.DataFrame()
     epoch_id_list = set()
     for chunk in pd.read_csv(file, sep='\t', usecols = [unit,'X','Y','gene',key], dtype={unit:str}, chunksize=500000):
@@ -379,8 +379,12 @@ def make_mtx_from_dge(file, min_ct_per_feature = 50, min_ct_per_unit = 100, feat
     if feature_list is not None:
         feature = pd.DataFrame({"gene": feature_list})
         ct = df[one_pass].groupby(by=['gene']).agg({key:"sum"}).reset_index()
-        feature = feature.merge(right = ct, on = 'gene', how = 'left')
-        feature[key] = feature[key].fillna(0).astype(int)
+        if feature_list_force is False:
+            ct.drop(index = ct[ct[key].lt(min_ct_per_feature)].index, inplace=True)
+            feature = feature.merge(right = ct, on = 'gene', how = 'inner')
+        else:
+            feature = feature.merge(right = ct, on = 'gene', how = 'left')
+            feature.fillna(0, inplace=True)
     else:
         feature = df[one_pass].groupby(by=['gene']).agg({key:"sum"}).reset_index()
         feature_white_list = set() if feature_white_list is None else set(feature_white_list)
