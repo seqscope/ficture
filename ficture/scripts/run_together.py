@@ -275,7 +275,7 @@ rm ${input}
                     cmds.append(rf"$(info --------------------------------------------------------------)")
                     cmds.append(rf"$(info Performing pseudo-bulk differential expression analysis..)")
                     cmds.append(rf"$(info --------------------------------------------------------------)")
-                    cmds.append(f"ficture de_bulk --input {de_input} --output {de_output} --min_ct_per_feature {args.min_ct_feature} --max_pval_output {args.de_max_pval} --min_fold_output {args.de_min_fold} --thread {args.threads}")
+                    cmds.append(f"ficture de_bulk --input {de_input} --output {de_output} --min_ct_per_feature {args.min_ct_feature} --max_pval_output {args.de_max_pval} --min_fold_output {args.de_min_fold}")
 
                     cmap=f"{figure_path}/{model_id}.rgb.tsv"
                     cmds.append(f"ficture factor_report --path {model_path} --pref {decode_basename} --color_table {cmap}")

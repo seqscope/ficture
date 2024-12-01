@@ -16,3 +16,4 @@ pypng
 scipy
 shapely
 scikit-learn
+mpmath

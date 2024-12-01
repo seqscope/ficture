@@ -4,10 +4,19 @@ import sys, io, os, gzip, copy, re, time, argparse
 import numpy as np
 import pandas as pd
 import scipy.stats
+from mpmath import mp
 from scipy.sparse import *
 from joblib.parallel import Parallel, delayed
 
 from ficture.utils import utilt
+
+## calculate the log10 of the chi2 upper tail probability
+def log10_chi2_sf(x, df=1):
+    mp.dps = 8
+    log_gamma_a = mp.loggamma(df/2.0)
+    log_upper_gamma = mp.log(mp.gammainc(df/2.0, float(x)/2.0, mp.inf, regularized=False))
+    log_sf = log_upper_gamma - log_gamma_a
+    return 0-log_sf/np.log(10)
 
 def de_bulk(_args):
 
@@ -119,6 +128,7 @@ def de_bulk(_args):
     chidf.Chi2 = chidf.Chi2.map(lambda x : "{:.1f}".format(x) )
     chidf.FoldChange = chidf.FoldChange.map(lambda x : "{:.2f}".format(x) )
     chidf.gene_total = chidf.gene_total.astype(int)
+    chidf["log10pval"] = [log10_chi2_sf(x) for x in chidf.Chi2]
     chidf.drop(columns = 'Rank', inplace=True)
 
     outpath=os.path.dirname(args.output)
