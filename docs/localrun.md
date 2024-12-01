@@ -1,20 +1,31 @@
-# Real data process in a local linux machine
+# Running FICTURE in a local machine
 
-We take a small sub-region of Vizgen MERSCOPE mouse liver data as an example.
+## Overview 
+
+This document provides detailed instructions on how to run FICTURE on a local machine with real data.
+This instruction is intended for Ubuntu OS, but it should also work for Mac OS X and other Unix-like systems.
+If you rather want to run all steps together 
+with `run_togetehr` command, please refer to [Quick start](quickstart.md) for details.
 
 ## Setup
 
-### Input
+### Input Data
 
-```
+A small sub-region of Vizgen MERSCOPE mouse liver data is provided as an example in the GitHub repository
+
+```bash linenums="1"
+## main transcript file
 examples/data/transcripts.tsv.gz
+## gene list file (optional)
 examples/data/feature.clean.tsv.gz
+## bounding box file (optional)
+examples/data/coordinate_minmax.tsv 
 ```
 (All filese are tab-delimited text files unless specified otherwise.)
 
-See the following explanation for each file. If you have trouble, try [Format input](format_input.md) to see some examples of formating raw output from different platforms.
+See the following explanation for each file. If you have trouble, try [Format input](format_input.md) to see some examples of formatting raw output from different platforms.
 
-**Transcripts**
+#### Transcript file
 
 One file contains the molecular or pixel level information, the required columns are `X`, `Y`, `gene`, and `Count`. (There could be other columns in the file which would be ignored.)
 
@@ -24,50 +35,63 @@ The file has to be **sorted** by one of the coordinates. (Usually it is the long
 
 `Count` (could be any other name) is the number of transcripts for the specified `gene` observed at the coordinate. For imaging based technologies where each molecule has its unique coordinates, `Count` could be always 1.
 
-**Gene list**
+#### Gene list file
 
-Another file contains the (unique) names of genes that should be used in analysis. The required columns is just `gene` (including the header), the naming of genes should match the `gene` column in the transcript file. If your data contain negative control probes or if you would like to remove certain genes this is where you can specify. (If you would like to use all genes present in your input transcript file the gene list is not necessary, but you would need to modify the command in `generic_III.sh` to remove the argument `--feature` )
+Another file contains the (unique) names of genes that should be used in analysis. The required columns is just `gene` (including the header), the naming of genes should match the `gene` column in the transcript file. If your data contain negative control probes or if you would like to remove certain genes this is where you can specify. (If you would like to use all genes present in your input transcript file the gene list is not necessary, but you would need to modify the command in `examples/script/generic_III.sh` to remove the argument `--feature` )
 
-**Meta data**
+#### Bounding box of spatial coordinates
 
-We also prefer to keep a file listing the min and max of the coordinates (this is primarily for visuaizing very big tissue region where we do not read all data at once but would want to know the image dimension). The unit of the coordinates is micrometer.
-```
+We also prefer to keep a file listing the min and max of the coordinates (this is primarily for visualizing very big tissue region where we do not read all data at once but would want to know the image dimension). The unit of the coordinates is micrometer.
+
+```bash linenums="1"
 examples/data/coordinate_minmax.tsv
 ```
 
-### Prepare environment
+Note that, when `run_together` command is used, the gene list file and bounding box files will be automatically generated. 
 
-Activate your virtual environmnet if needed
+#### Prepare environment
+
+Activate your virtual environment if needed:
+
+```bash linenums="1"
+VENV=/path/to/venv/name   ## replace /path/to/venv/name with your virtual environment path
+source ${VENV}/bin/activate
 ```
-source venv/with/requirements/installed/bin/activate
-```
 
-Suppose you have installed FICTURE and dependencies following [Install](install.md) in this environment. Verify FICTURE is sucessfully installed with command `ficture`.
+Suppose you have installed FICTURE and dependencies following [Install](install.md) in this environment. Verify FICTURE is successfully installed with command `ficture`.
 
 
-## Process
+## Analysis with FICTURE
 
-Specify the base directory that contains the input data
-```bash
+### Key parameters
+
+First, specify the base directory that contains the input data
+
+```bash linenums="1"
 path=examples/data
 ```
 
-Data specific setup:
+The following data-specific setup may be required:
 
-`mu_scale` is the ratio between $\mu m$ and the unit used in the transcript coordinates. For example, if the coordinates are sotred in `nm` this number should be `1000`.
-
-`key` is the column name in the transcripts file corresponding to the gene counts (`Count` in our example). `major_axis` specify which axis the transcript file is sorted by.
+* `mu_scale` is the ratio between $\mu m$ and the unit used in the transcript coordinates. For example, if the coordinates are stored in `nm` this number should be `1000`.
+* `key` is the column name in the transcripts file corresponding to the gene counts (`Count` in our example). 
+* `major_axis` specify which axis the transcript file is sorted by. (either `X` or `Y`)
 
 ```bash
-mu_scale=1 # If your data's coordinates are already in micrometer
-key=Count
+mu_scale=1   # If your data's coordinates are already in micrometer
+key=Count    # If you data has 'Count' as the column name for gene counts
 major_axis=Y # If your data is sorted by the Y-axis
 ```
 
 
 ### Preprocessing
-Create pixel minibatches (`${path}/batched.matrix.tsv.gz`)
-```bash
+
+
+#### Anchor-level minibatch
+
+Create pixel minibatches (`${path}/batched.matrix.tsv.gz`) that will be used for anchor-level analysis using the following command: 
+
+```bash linenums="1"
 batch_size=500
 batch_buff=30
 input=${path}/transcripts.tsv.gz
@@ -80,24 +104,33 @@ sort -S 4G -k2,2n -k1,1g ${batch} | gzip -c > ${batch}.gz
 rm ${batch}
 ```
 
+#### Training hexagons
 
-Prepare training minibatches, only need to run once if you plan to fit multiple models (say with different number of factors)
-```bash
-train_width=12 # \sqrt{3} x the side length of the hexagon (um)
-min_ct_per_unit=50
+Prepare training hexagons. Even if you need to fit multiple models with different number of factors, you only need to run once for each training width. The training width is the flat-to-flat width of the hexagon in $\mu m$.
+
+```bash linenums="1"
+## set up the parameters
+train_width=12      # flat-to-flat width = \sqrt{3} x the side length of the hexagon (um)
+min_ct_per_unit=50  # filter out hexagons with total count < 50
 input=${path}/transcripts.tsv.gz
 out=${path}/hexagon.d_${train_width}.tsv
 
+## create hexagons
 ficture make_dge --key ${key} --count_header ${key} --input ${input} --output ${out} --hex_width ${train_width} --n_move 2 --min_ct_per_unit ${min_ct_per_unit} --mu_scale ${mu_scale} --precision 2 --major_axis ${major_axis}
 
-sort -S 4G -k1,1n ${out} | gzip -c > ${out}.gz # Shuffle hexagons
+## shuffle the hexagons based on random index
+sort -S 4G -k1,1n ${out} | gzip -c > ${out}.gz 
 rm ${out}
 ```
 
 
-### Model training
-Parameters for initializing the model
-```bash
+### LDA Model training
+
+To run FICTURE in a fully unsupervised manner, you need to initialize the model with LDA based on the hexagons created in the previous step. 
+
+#### Parameters for initializing the model
+
+```bash linenums="1"
 nFactor=12 # Number of factors
 sliding_step=2
 train_nEpoch=3
@@ -108,8 +141,9 @@ R=10 # We use R random initializations and pick one to fit the full model
 thread=4 # Number of threads to use
 ```
 
-Initialize the model
-```bash
+#### Setting the input and output paths 
+
+```bash linenums="1"
 # parameters
 min_ct_per_unit_fit=20
 cmap_name="turbo"
@@ -123,7 +157,6 @@ if [ ! -d "${figure_path}/sub" ]; then
     mkdir -p ${figure_path}/sub
 fi
 
-
 # input files
 hexagon=${path}/hexagon.d_${train_width}.tsv.gz
 pixel=${path}/transcripts.tsv.gz
@@ -131,10 +164,46 @@ feature=${path}/feature.clean.tsv.gz
 # output
 output=${output_path}/${output_id}
 model=${output}.model.p
+```
 
-# Fit model
+#### Initialize the model with LDA
+
+```bash linenums="1"
+# Fit model with unsupervised LDA 
 ficture fit_model --input ${hexagon} --output ${output} --feature ${feature} --nFactor ${nFactor} --epoch ${train_nEpoch} --epoch_id_length 2 --unit_attr X Y --key ${key} --min_ct_per_feature ${min_ct_per_feature} --test_split 0.5 --R ${R} --thread ${thread}
+```
 
+#### (Optional) Initializing LDA model from pseudo-bulk data
+
+Instead of initializing the model using LDA as shown above, if you want to initialize the model using pseudo-bulk data, you can 
+prepare the pseudo-bulk data as a model matrix in the following TSV format in a `tsv.gz` file:
+
+```plaintext linenums="1" 
+gene    celltype1   celltype2   ...
+gene1   10          20          ...
+gene2   5           15          ...
+...
+```
+
+This model matrix can be directly used for pixel-level decoding step described below. 
+However, if the gene list do not match between the pseudo-bulk data and the raw data, you may need to use the following command to initialize the model from the pseudo-bulk data.
+
+```bash linenums="1"
+# Fit model from pseudo-bulk data
+ficture init_model_from_pseudobulk --input ${hexagon} --output ${output} --feature ${feature} --epoch 0 --scale_model_rel -1 --reorder-factors --key ${key} --min_ct_per_feature ${min_ct_per_feature}--thread ${thread}
+
+# create a model matrix from the posterior count
+cp ${output}.posterior.count.tsv.gz ${output}.model_matrix.tsv.gz
+```
+
+After running the following command, the model will be initialized using the pseudo-bulk data.
+
+
+#### Visualizing the model
+
+The results from the initial model fitting can be visualized using the following commands:
+
+```bash linenums="1"
 # Choose color
 input=${output_path}/${output_id}.fit_result.tsv.gz
 output=${figure_path}/${output_id}
@@ -152,8 +221,16 @@ ficture plot_base --input ${input} --output ${output} --fill_range ${fillr} --co
 
 ### Pixel level decoding
 
-Parameters for pixel level decoding
-```bash
+#### Parameters for pixel level decoding
+
+After fitting the model, FICTURE performs pixel level decoding to infer the factors for each pixel. 
+The pixel-level decoding consists of two steps:
+* Perform anchor-level projection based on the fitted model
+* Perform pixel-level decoding based on anchor-level projection
+
+The following parameters can be used for pixel level decoding steps.
+
+```bash linenums="1"
 fit_width=12 # Often equal or smaller than train_width (um)
 anchor_res=4 # Distance between adjacent anchor points (um)
 fit_nmove=$((fit_width/anchor_res))
@@ -164,27 +241,44 @@ coor=${path}/coordinate_minmax.tsv
 cmap=${figure_path}/${output_id}.rgb.tsv
 ```
 
-```bash
-# Transform
-output=${output_path}/${output_id}.${anchor_info}
-ficture transform --input ${pixel} --output_pref ${output} --model ${model} --key ${key} --major_axis ${major_axis} --hex_width ${fit_width} --n_move ${fit_nmove} --min_ct_per_unit ${min_ct_per_unit_fit} --mu_scale ${mu_scale} --thread ${thread} --precision 2
+#### Produce anchor-level projection
 
-# Pixel level decoding & visualization
+Anchor-level projection can be performed using the following command:
+
+```bash linenums="1"
+# Output prefix
+output=${output_path}/${output_id}.${anchor_info}
+
+# Perform anchor-level projection
+ficture transform --input ${pixel} --output_pref ${output} --model ${model} --key ${key} --major_axis ${major_axis} --hex_width ${fit_width} --n_move ${fit_nmove} --min_ct_per_unit ${min_ct_per_unit_fit} --mu_scale ${mu_scale} --thread ${thread} --precision 2
+```
+
+#### Perform pixel-level decoding
+
+Pixel-level decoding can be performed using the following command:
+
+```bash linenums="1"
+# Input/output parameters for pixel-level decoding
 prefix=${output_id}.decode.${anchor_info}_${radius}
 input=${path}/batched.matrix.tsv.gz
 anchor=${output_path}/${output_id}.${anchor_info}.fit_result.tsv.gz
 output=${output_path}/${prefix}
 topk=3 # Output only a few top factors per pixel
+
+# Perform pixel-level decoding
 ficture slda_decode --input ${input} --output ${output} --model ${model} --anchor ${anchor} --anchor_in_um --neighbor_radius ${radius} --mu_scale ${mu_scale} --key ${key} --precision 0.1 --lite_topk_output_pixel ${topk} --lite_topk_output_anchor ${topk} --thread ${thread}
 ```
 
-### Optional post-processing
+#### Optional post-processing
 
-The following is not strictly necessary but it generates summary statistics and helps visualization.
+Although not required, after performing pixel-level decoding, it is useful to 
+generates summary statistics and visualize the results.
 
 
-Sort the pixel level output, this is for visualize large images with limited memory usage.
-```bash
+First step is to sort the pixel level output. This is 
+primarily for visualizing large images with limited memory usage.
+
+```bash linenums="1"
 input=${output_path}/${prefix}.pixel.tsv.gz # j, X, Y, K1, ..., KJ, P1, ..., PJ, J=topk
 output=${output_path}/${prefix}.pixel.sorted.tsv.gz
 
@@ -206,11 +300,11 @@ header="##K=${K};TOPK=3\n##BLOCK_SIZE=${bsize};BLOCK_AXIS=X;INDEX_AXIS=Y\n##OFFS
 
 tabix -f -s1 -b3 -e3 ${output}
 # rm ${input} # Make sure the sorted file makes sense before you remove the unsorted file
-
 ```
 
-Report differentially expressed genes. This is a naive pseudo-bulk chi-squared test, please view the results with caution.
-```bash
+Next, we can identify differentially expressed genes for each factor. This is a naive pseudo-bulk chi-squared test, please view the results with caution.
+
+```bash linenums="1"
 # DE
 max_pval_output=1e-3
 min_fold_output=1.5
@@ -222,22 +316,27 @@ ficture de_bulk --input ${input} --output ${output} --min_ct_per_feature ${min_c
 # Report (color table and top DE genes)
 cmap=${output_path}/figure/${output_id}.rgb.tsv
 output=${output_path}/${prefix}.factor.info.html
+
+# generate a report for each factor
 ficture factor_report --path ${output_path} --pref ${prefix} --color_table ${cmap}
 ```
 
-Generalize pixel level images representing the factorization result
-```bash
+Next, generalize pixel level images representing the factorization result
+
+```bash linenums="1"
 # Make pixel level figures
 cmap=${output_path}/figure/${output_id}.rgb.tsv
 input=${output_path}/${prefix}.pixel.sorted.tsv.gz
 output=${figure_path}/${prefix}.pixel.png
+
+# plot pixel level images
 ficture plot_pixel_full --input ${input} --color_table ${cmap} --output ${output} --plot_um_per_pixel 0.5 --full
 ```
 
-Generate heatmaps for individual factors. If the data is very large, making all individual factor maps may take some time.
+You may also want to generate heatmaps for individual factors. If the data is very large, making all individual factor maps may take some time.
 
 Generate everything in one run
-```bash
+```bash linenums="1"
 # Make single factor heatmaps, plot_subbatch balances speed and memory ...
 # batch size 8 should be safe for 7 or 14G in most cases
 output=${figure_path}/sub/${prefix}.pixel
@@ -245,7 +344,7 @@ ficture plot_pixel_single --input ${input} --output ${output} --plot_um_per_pixe
 ```
 
 Alternatively, you can generate by batch
-```bash
+```bash  linenums="1"
 plot_subbatch=8
 st=0
 ed=$((plot_subbatch+st-1))
@@ -263,26 +362,27 @@ done
 ```
 
 
-
-
 ## Output
+
 In the above example the analysis outputs are stored in
-```
+
+```bash linenums="1"
 ${path}/analysis/${model_id} # examples/data/analysis/nF12.d_12
 ```
 
 There is an html file reporting the color code and top genes of the inferred factors
-```
+```bash linenums="1"
 nF12.d_12.decode.prj_12.r_4_5.factor.info.html
 ```
 
-Pixel level visualizating
-```
+Pixel level visualization is stored in
+```bash linenums="1"
 figure/nF12.d_12.decode.prj_12.r_4_5.pixel.png
 ```
 
-Pixel level output is
-```
+Pixel level output is stored in
+
+```bash linenums="1"
 nF12.d_12.decode.prj_12.r_4_5.pixel.sorted.tsv.gz
 ```
 
@@ -293,7 +393,7 @@ To use the file as plain text, you can ignore this complication and read the fil
 
 The first few lines of the file are as follows:
 
-```
+```plaintext linenums="1"
 ##K=12;TOPK=3
 ##BLOCK_SIZE=2000;BLOCK_AXIS=X;INDEX_AXIS=Y
 ##OFFSET_X=6690;OFFSET_Y=6772;SIZE_X=676;SIZE_Y=676;SCALE=100

@@ -3,7 +3,7 @@
 Locate the transcript file from your Vizgen MERSCOPE output, most likely named as `detected_transcripts.csv.gz`.
 
 The first few lines may look like (from the public Human lung cancer 1 FFPE dataset)
-```
+```bash linenums="1"
 ,barcode_id,global_x,global_y,global_z,x,y,fov,gene,transcript_id
 747,0,2123.7725,156.28409,1.0,349.0,1891.4949,0,PDK4,ENST00000005178
 846,0,2239.8335,-1.2225803,2.0,1423.6388,433.0998,0,PDK4,ENST00000005178

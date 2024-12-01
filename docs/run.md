@@ -1,12 +1,14 @@
-# Real data process
+# Processing large real datasets
 
-We take a small sub-region of Vizgen MERSCOPE mouse liver data as an example. (The same region we showed in supplementary figure X)
+This document describes how to run large real datasets with FICTURE. Most of the contents here are similar to the [small run](localrun.md) document, but we provide more details on how to submit jobs to a SLURM cluster, using prepared scripts in the `examples/script/` directory.
 
-This document assume you have intalled FICTURE.
+In this example, we will use a small sub-region of Vizgen MERSCOPE mouse liver data as an example. (The same region we showed in supplementary figure X)
+
+This document assume you have intalled FICTURE. See [installing FICTURE](install.md) for more details.
 
 ### Input
 
-```
+```bash linenums="1"
 examples/data/transcripts.tsv.gz
 ```
 (All filese are tab-delimited text files unless specified otherwise.)
@@ -25,9 +27,9 @@ The file has to be **sorted** by one of the coordinates. (Usually it is the long
 
 Another file contains the (unique) names of genes that should be used in analysis. The required columns is just `gene` (including the header), the naming of genes should match the `gene` column in the transcript file. If your data contain negative control probes or if you would like to remove certain genes this is where you can specify. (If you would like to use all genes present in your input transcript file the gene list is not necessary, but you would need to modify the command in `generic_III.sh` to remove the argument `--feature` ) -->
 
-**Meta data**
+**Bounding box of spatial coordinates**
 
-We also prefer to keep a file listing the min and max of the coordinates (this is primarily for visuaizing very big tissue region where we do not read all data at once but would want to know the image dimension). The unit of the coordinates is micrometer.
+We also prefer to keep a file listing the min and max of the coordinates (this is primarily for visualizing very big tissue region where we do not read all data at once but would want to know the image dimension). The unit of the coordinates is micrometer.
 ```
 examples/data/coordinate_minmax.tsv
 ```
@@ -36,7 +38,7 @@ examples/data/coordinate_minmax.tsv
 ### Process
 
 Specify the base directory that contains the input data
-```
+```bash linenums="1"
 path=examples/data
 ```
 
@@ -47,18 +49,21 @@ Data specific setup:
 `key` is the column name in the transcripts file corresponding to the gene counts (`Count` in our example). `MJ` specify which axis the transcript file is sorted by.
 
 
-```bash
+```bash linenums="1"
 mu_scale=1 # If your data's coordinates are already in micrometer
 key=Count
 MJ=Y # If your data is sorted by the Y-axis
 env=venv/with/ficture/installed/bin/activate
+
+# Uncomment and modify the following line if you are using SLURM
 #SLURM_ACCOUNT= # For submitting jobs to slurm
 ```
 
 Example bash scripts are in `examples/script/`, you will need to modify them to work on your system.
 
 Create pixel minibatches (`${path}/batched.matrix.tsv.gz`)
-```bash
+
+```bash linenums="1"
 input=${path}/transcripts.tsv.gz
 output=${path}/batched.matrix.tsv.gz
 rec=$(sbatch --job-name=vz1 --account=${SLURM_ACCOUNT} --partition=standard --cpus-per-task=1 examples/script/generic_I.sh input=${input} output=${output} MJ=${MJ} env=${env} )
@@ -67,8 +72,8 @@ jobid1=${ADDR[3]}
 ```
 
 
-Parameters for initializing the model
-```bash
+Set up parameters for initializing the model.
+```bash linenums="1"
 nFactor=12 # Number of factors
 sliding_step=2
 train_nEpoch=3
@@ -80,7 +85,7 @@ thread=4 # Number of threads to use
 ```
 
 Parameters for pixel level decoding
-```bash
+```bash linenums="1"
 fit_width=12 # Often equal or smaller than train_width (um)
 anchor_res=4 # Distance between adjacent anchor points (um)
 radius=$(($anchor_res+1))
@@ -88,9 +93,9 @@ anchor_info=prj_${fit_width}.r_${anchor_res} # An identifier
 coor=${path}/coordinate_minmax.tsv
 ```
 
-Model fitting
-```bash
+Perform model fitting and pixel-level decoding
 
+```bash linenums="1"
 # Prepare training minibatches, only need to run once if you plan to fit multiple models (say with different number of factors)
 input=${path}/transcripts.tsv.gz
 hexagon=${path}/hexagon.d_${train_width}.tsv.gz
@@ -110,23 +115,28 @@ jobid4=${ADDR[3]}
 ```
 
 ### Output
+
 In the above example the analysis outputs are stored in
-```
+
+```bash linenums="1"
 ${path}/analysis/${model_id} # examples/data/analysis/nF12.d_12
 ```
 
 There is an html file reporting the color code and top genes of the inferred factors
-```
+
+```bash linenums="1"
 nF12.d_12.decode.prj_12.r_4_5.factor.info.html
 ```
 
 Pixel level visualizating
-```
+
+```bash linenums="1"
 figure/nF12.d_12.decode.prj_12.r_4_5.pixel.png
 ```
 
 Pixel level output is
-```
+
+```bash linenums="1"
 nF12.d_12.decode.prj_12.r_4_5.pixel.sorted.tsv.gz
 ```
 
@@ -137,7 +147,7 @@ To use the file as plain text, you can ignore this complication and read the fil
 
 The first few lines of the file are as follows:
 
-```
+```plaintext linenums="1"
 ##K=12;TOPK=3
 ##BLOCK_SIZE=2000;BLOCK_AXIS=X;INDEX_AXIS=Y
 ##OFFSET_X=6690;OFFSET_Y=6772;SIZE_X=676;SIZE_Y=676;SCALE=100
