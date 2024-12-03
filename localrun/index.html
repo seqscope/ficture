@@ -8,7 +8,7 @@
       
       
       
-        <link rel="canonical" href="https://Yichen-Si.github.io/ficture/localrun/">
+        <link rel="canonical" href="https://seqscope.github.io/ficture/localrun/">
       
       
         <link rel="prev" href="../quickstart/">
@@ -18,7 +18,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.17">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.47">
     
     
       
@@ -26,7 +26,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.bcfcd587.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.6f8fc17f.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
@@ -48,7 +48,7 @@
       
     
     
-    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -74,7 +74,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#real-data-process-in-a-local-linux-machine" class="md-skip">
+        <a href="#running-ficture-in-a-local-machine" class="md-skip">
           Skip to content
         </a>
       
@@ -91,12 +91,12 @@
     <a href=".." title="ficture" class="md-header__button md-logo" aria-label="ficture" data-md-component="logo">
       
   
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
       
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
     </label>
     <div class="md-header__title" data-md-component="header-title">
       <div class="md-header__ellipsis">
@@ -124,7 +124,7 @@
     <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
     
       <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1M8 13h8v-2H8v2m9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1 0 1.71-1.39 3.1-3.1 3.1h-4V17h4a5 5 0 0 0 5-5 5 5 0 0 0-5-5Z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1M8 13h8v-2H8zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4a5 5 0 0 0 5-5 5 5 0 0 0-5-5"/></svg>
       </label>
     
   
@@ -134,7 +134,7 @@
     <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
     
       <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5m0 8a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3Z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5m0 8a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3"/></svg>
       </label>
     
   
@@ -144,7 +144,7 @@
     <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
     
       <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5M7 15a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3Z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5M7 15a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3"/></svg>
       </label>
     
   
@@ -152,13 +152,13 @@
       
     
     
-      <script>var media,input,key,value,palette=__md_get("__palette");if(palette&&palette.color){"(prefers-color-scheme)"===palette.color.media&&(media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']"),palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent"));for([key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
     
     
     
       <label class="md-header__button md-icon" for="__search">
         
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
       </label>
       <div class="md-search" data-md-component="search" role="dialog">
   <label class="md-search__overlay" for="__search"></label>
@@ -167,21 +167,21 @@
       <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
       <label class="md-search__icon md-icon" for="__search">
         
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
         
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
       </label>
       <nav class="md-search__options" aria-label="Search">
         
         <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
           
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
         </button>
       </nav>
       
     </form>
     <div class="md-search__output">
-      <div class="md-search__scrollwrap" data-md-scrollfix>
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
         <div class="md-search-result" data-md-component="search-result">
           <div class="md-search-result__meta">
             Initializing search
@@ -198,7 +198,7 @@
         <a href="https://github.com/seqscope/ficture" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
   </div>
   <div class="md-source__repository">
     seqscope/ficture
@@ -352,7 +352,7 @@
     <a href=".." title="ficture" class="md-nav__button md-logo" aria-label="ficture" data-md-component="logo">
       
   
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
 
     </a>
     ficture
@@ -362,7 +362,7 @@
       <a href="https://github.com/seqscope/ficture" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
   </div>
   <div class="md-source__repository">
     seqscope/ficture
@@ -485,6 +485,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      Overview
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#setup" class="md-nav__link">
     <span class="md-ellipsis">
       Setup
@@ -495,9 +504,37 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#input" class="md-nav__link">
+  <a href="#input-data" class="md-nav__link">
     <span class="md-ellipsis">
-      Input
+      Input Data
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Input Data">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#transcript-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      Transcript file
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gene-list-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gene list file
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bounding-box-of-spatial-coordinates" class="md-nav__link">
+    <span class="md-ellipsis">
+      Bounding box of spatial coordinates
     </span>
   </a>
   
@@ -516,16 +553,30 @@
     </nav>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#process" class="md-nav__link">
+  <a href="#analysis-with-ficture" class="md-nav__link">
     <span class="md-ellipsis">
-      Process
+      Analysis with FICTURE
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Process">
+    <nav class="md-nav" aria-label="Analysis with FICTURE">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key parameters
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#preprocessing" class="md-nav__link">
@@ -534,14 +585,89 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Preprocessing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#anchor-level-minibatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      Anchor-level minibatch
+    </span>
+  </a>
+  
 </li>
         
           <li class="md-nav__item">
-  <a href="#model-training" class="md-nav__link">
+  <a href="#training-hexagons" class="md-nav__link">
     <span class="md-ellipsis">
-      Model training
+      Training hexagons
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lda-model-training" class="md-nav__link">
+    <span class="md-ellipsis">
+      LDA Model training
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="LDA Model training">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parameters-for-initializing-the-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      Parameters for initializing the model
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setting-the-input-and-output-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      Setting the input and output paths
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#initialize-the-model-with-lda" class="md-nav__link">
+    <span class="md-ellipsis">
+      Initialize the model with LDA
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optional-initializing-lda-model-from-pseudo-bulk-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      (Optional) Initializing LDA model from pseudo-bulk data
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#visualizing-the-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      Visualizing the model
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -549,6 +675,34 @@
   <a href="#pixel-level-decoding" class="md-nav__link">
     <span class="md-ellipsis">
       Pixel level decoding
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Pixel level decoding">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parameters-for-pixel-level-decoding" class="md-nav__link">
+    <span class="md-ellipsis">
+      Parameters for pixel level decoding
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#produce-anchor-level-projection" class="md-nav__link">
+    <span class="md-ellipsis">
+      Produce anchor-level projection
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#perform-pixel-level-decoding" class="md-nav__link">
+    <span class="md-ellipsis">
+      Perform pixel-level decoding
     </span>
   </a>
   
@@ -560,6 +714,11 @@
       Optional post-processing
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -796,6 +955,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      Overview
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#setup" class="md-nav__link">
     <span class="md-ellipsis">
       Setup
@@ -806,9 +974,37 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#input" class="md-nav__link">
+  <a href="#input-data" class="md-nav__link">
     <span class="md-ellipsis">
-      Input
+      Input Data
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Input Data">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#transcript-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      Transcript file
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gene-list-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gene list file
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bounding-box-of-spatial-coordinates" class="md-nav__link">
+    <span class="md-ellipsis">
+      Bounding box of spatial coordinates
     </span>
   </a>
   
@@ -827,16 +1023,30 @@
     </nav>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#process" class="md-nav__link">
+  <a href="#analysis-with-ficture" class="md-nav__link">
     <span class="md-ellipsis">
-      Process
+      Analysis with FICTURE
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Process">
+    <nav class="md-nav" aria-label="Analysis with FICTURE">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key parameters
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#preprocessing" class="md-nav__link">
@@ -845,14 +1055,89 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Preprocessing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#anchor-level-minibatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      Anchor-level minibatch
+    </span>
+  </a>
+  
 </li>
         
           <li class="md-nav__item">
-  <a href="#model-training" class="md-nav__link">
+  <a href="#training-hexagons" class="md-nav__link">
     <span class="md-ellipsis">
-      Model training
+      Training hexagons
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lda-model-training" class="md-nav__link">
+    <span class="md-ellipsis">
+      LDA Model training
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="LDA Model training">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parameters-for-initializing-the-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      Parameters for initializing the model
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setting-the-input-and-output-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      Setting the input and output paths
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#initialize-the-model-with-lda" class="md-nav__link">
+    <span class="md-ellipsis">
+      Initialize the model with LDA
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optional-initializing-lda-model-from-pseudo-bulk-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      (Optional) Initializing LDA model from pseudo-bulk data
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#visualizing-the-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      Visualizing the model
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -860,6 +1145,34 @@
   <a href="#pixel-level-decoding" class="md-nav__link">
     <span class="md-ellipsis">
       Pixel level decoding
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Pixel level decoding">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parameters-for-pixel-level-decoding" class="md-nav__link">
+    <span class="md-ellipsis">
+      Parameters for pixel level decoding
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#produce-anchor-level-projection" class="md-nav__link">
+    <span class="md-ellipsis">
+      Produce anchor-level projection
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#perform-pixel-level-decoding" class="md-nav__link">
+    <span class="md-ellipsis">
+      Perform pixel-level decoding
     </span>
   </a>
   
@@ -871,6 +1184,11 @@
       Optional post-processing
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -906,234 +1224,444 @@
   
 
 
-<h1 id="real-data-process-in-a-local-linux-machine">Real data process in a local linux machine<a class="headerlink" href="#real-data-process-in-a-local-linux-machine" title="Permanent link">&para;</a></h1>
-<p>We take a small sub-region of Vizgen MERSCOPE mouse liver data as an example.</p>
+<h1 id="running-ficture-in-a-local-machine">Running FICTURE in a local machine<a class="headerlink" href="#running-ficture-in-a-local-machine" title="Permanent link">&para;</a></h1>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>This document provides detailed instructions on how to run FICTURE on a local machine with real data.
+This instruction is intended for Ubuntu OS, but it should also work for Mac OS X and other Unix-like systems.
+If you rather want to run all steps together 
+with <code>run_togetehr</code> command, please refer to <a href="../quickstart/">Quick start</a> for details.</p>
 <h2 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">&para;</a></h2>
-<h3 id="input">Input<a class="headerlink" href="#input" title="Permanent link">&para;</a></h3>
-<p><div class="highlight"><pre><span></span><code>examples/data/transcripts.tsv.gz
-examples/data/feature.clean.tsv.gz
-</code></pre></div>
+<h3 id="input-data">Input Data<a class="headerlink" href="#input-data" title="Permanent link">&para;</a></h3>
+<p>A small sub-region of Vizgen MERSCOPE mouse liver data is provided as an example in the GitHub repository</p>
+<p><div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1">1</a></span>
+<span class="normal"><a href="#__codelineno-0-2">2</a></span>
+<span class="normal"><a href="#__codelineno-0-3">3</a></span>
+<span class="normal"><a href="#__codelineno-0-4">4</a></span>
+<span class="normal"><a href="#__codelineno-0-5">5</a></span>
+<span class="normal"><a href="#__codelineno-0-6">6</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1"></a><span class="c1">## main transcript file</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2"></a>examples/data/transcripts.tsv.gz
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3"></a><span class="c1">## gene list file (optional)</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4"></a>examples/data/feature.clean.tsv.gz
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5"></a><span class="c1">## bounding box file (optional)</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6"></a>examples/data/coordinate_minmax.tsv<span class="w"> </span>
+</span></code></pre></div></td></tr></table></div>
 (All filese are tab-delimited text files unless specified otherwise.)</p>
-<p>See the following explanation for each file. If you have trouble, try <a href="../format_input/">Format input</a> to see some examples of formating raw output from different platforms.</p>
-<p><strong>Transcripts</strong></p>
+<p>See the following explanation for each file. If you have trouble, try <a href="../format_input/">Format input</a> to see some examples of formatting raw output from different platforms.</p>
+<h4 id="transcript-file">Transcript file<a class="headerlink" href="#transcript-file" title="Permanent link">&para;</a></h4>
 <p>One file contains the molecular or pixel level information, the required columns are <code>X</code>, <code>Y</code>, <code>gene</code>, and <code>Count</code>. (There could be other columns in the file which would be ignored.)</p>
 <p>The coordinates <code>(X, Y)</code> can be float or integer numbers in arbitrary units, but if it is not in the unit of <span class="arithmatex">\(\mu m\)</span> we would need to specify the translation ratio later.</p>
 <p>The file has to be <strong>sorted</strong> by one of the coordinates. (Usually it is the longer axis, but it does not matter if the tissue area is not super asymmetric.)</p>
 <p><code>Count</code> (could be any other name) is the number of transcripts for the specified <code>gene</code> observed at the coordinate. For imaging based technologies where each molecule has its unique coordinates, <code>Count</code> could be always 1.</p>
-<p><strong>Gene list</strong></p>
-<p>Another file contains the (unique) names of genes that should be used in analysis. The required columns is just <code>gene</code> (including the header), the naming of genes should match the <code>gene</code> column in the transcript file. If your data contain negative control probes or if you would like to remove certain genes this is where you can specify. (If you would like to use all genes present in your input transcript file the gene list is not necessary, but you would need to modify the command in <code>generic_III.sh</code> to remove the argument <code>--feature</code> )</p>
-<p><strong>Meta data</strong></p>
-<p>We also prefer to keep a file listing the min and max of the coordinates (this is primarily for visuaizing very big tissue region where we do not read all data at once but would want to know the image dimension). The unit of the coordinates is micrometer.
-<div class="highlight"><pre><span></span><code>examples/data/coordinate_minmax.tsv
-</code></pre></div></p>
-<h3 id="prepare-environment">Prepare environment<a class="headerlink" href="#prepare-environment" title="Permanent link">&para;</a></h3>
-<p>Activate your virtual environmnet if needed
-<div class="highlight"><pre><span></span><code>source venv/with/requirements/installed/bin/activate
-</code></pre></div></p>
-<p>Suppose you have installed FICTURE and dependencies following <a href="../install/">Install</a> in this environment. Verify FICTURE is sucessfully installed with command <code>ficture</code>.</p>
-<h2 id="process">Process<a class="headerlink" href="#process" title="Permanent link">&para;</a></h2>
-<p>Specify the base directory that contains the input data
-<div class="highlight"><pre><span></span><code><span class="nv">path</span><span class="o">=</span>examples/data
-</code></pre></div></p>
-<p>Data specific setup:</p>
-<p><code>mu_scale</code> is the ratio between <span class="arithmatex">\(\mu m\)</span> and the unit used in the transcript coordinates. For example, if the coordinates are sotred in <code>nm</code> this number should be <code>1000</code>.</p>
-<p><code>key</code> is the column name in the transcripts file corresponding to the gene counts (<code>Count</code> in our example). <code>major_axis</code> specify which axis the transcript file is sorted by.</p>
-<div class="highlight"><pre><span></span><code><span class="nv">mu_scale</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="c1"># If your data&#39;s coordinates are already in micrometer</span>
-<span class="nv">key</span><span class="o">=</span>Count
-<span class="nv">major_axis</span><span class="o">=</span>Y<span class="w"> </span><span class="c1"># If your data is sorted by the Y-axis</span>
-</code></pre></div>
+<h4 id="gene-list-file">Gene list file<a class="headerlink" href="#gene-list-file" title="Permanent link">&para;</a></h4>
+<p>Another file contains the (unique) names of genes that should be used in analysis. The required columns is just <code>gene</code> (including the header), the naming of genes should match the <code>gene</code> column in the transcript file. If your data contain negative control probes or if you would like to remove certain genes this is where you can specify. (If you would like to use all genes present in your input transcript file the gene list is not necessary, but you would need to modify the command in <code>examples/script/generic_III.sh</code> to remove the argument <code>--feature</code> )</p>
+<h4 id="bounding-box-of-spatial-coordinates">Bounding box of spatial coordinates<a class="headerlink" href="#bounding-box-of-spatial-coordinates" title="Permanent link">&para;</a></h4>
+<p>We also prefer to keep a file listing the min and max of the coordinates (this is primarily for visualizing very big tissue region where we do not read all data at once but would want to know the image dimension). The unit of the coordinates is micrometer.</p>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-1-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1"></a>examples/data/coordinate_minmax.tsv
+</span></code></pre></div></td></tr></table></div>
+<p>Note that, when <code>run_together</code> command is used, the gene list file and bounding box files will be automatically generated. </p>
+<h4 id="prepare-environment">Prepare environment<a class="headerlink" href="#prepare-environment" title="Permanent link">&para;</a></h4>
+<p>Activate your virtual environment if needed:</p>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-2-1">1</a></span>
+<span class="normal"><a href="#__codelineno-2-2">2</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1"></a><span class="nv">VENV</span><span class="o">=</span>/path/to/venv/name<span class="w">   </span><span class="c1">## replace /path/to/venv/name with your virtual environment path</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2"></a><span class="nb">source</span><span class="w"> </span><span class="si">${</span><span class="nv">VENV</span><span class="si">}</span>/bin/activate
+</span></code></pre></div></td></tr></table></div>
+<p>Suppose you have installed FICTURE and dependencies following <a href="../install/">Install</a> in this environment. Verify FICTURE is successfully installed with command <code>ficture</code>.</p>
+<h2 id="analysis-with-ficture">Analysis with FICTURE<a class="headerlink" href="#analysis-with-ficture" title="Permanent link">&para;</a></h2>
+<h3 id="key-parameters">Key parameters<a class="headerlink" href="#key-parameters" title="Permanent link">&para;</a></h3>
+<p>First, specify the base directory that contains the input data</p>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-3-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1"></a><span class="nv">path</span><span class="o">=</span>examples/data
+</span></code></pre></div></td></tr></table></div>
+<p>The following data-specific setup may be required:</p>
+<ul>
+<li><code>mu_scale</code> is the ratio between <span class="arithmatex">\(\mu m\)</span> and the unit used in the transcript coordinates. For example, if the coordinates are stored in <code>nm</code> this number should be <code>1000</code>.</li>
+<li><code>key</code> is the column name in the transcripts file corresponding to the gene counts (<code>Count</code> in our example). </li>
+<li><code>major_axis</code> specify which axis the transcript file is sorted by. (either <code>X</code> or <code>Y</code>)</li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nv">mu_scale</span><span class="o">=</span><span class="m">1</span><span class="w">   </span><span class="c1"># If your data&#39;s coordinates are already in micrometer</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nv">key</span><span class="o">=</span>Count<span class="w">    </span><span class="c1"># If you data has &#39;Count&#39; as the column name for gene counts</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nv">major_axis</span><span class="o">=</span>Y<span class="w"> </span><span class="c1"># If your data is sorted by the Y-axis</span>
+</span></code></pre></div>
 <h3 id="preprocessing">Preprocessing<a class="headerlink" href="#preprocessing" title="Permanent link">&para;</a></h3>
-<p>Create pixel minibatches (<code>${path}/batched.matrix.tsv.gz</code>)
-<div class="highlight"><pre><span></span><code><span class="nv">batch_size</span><span class="o">=</span><span class="m">500</span>
-<span class="nv">batch_buff</span><span class="o">=</span><span class="m">30</span>
-<span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/transcripts.tsv.gz
-<span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/batched.matrix.tsv.gz
-<span class="nv">batch</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/batched.matrix.tsv
-
-ficture<span class="w"> </span>make_spatial_minibatch<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">batch</span><span class="si">}</span><span class="w"> </span>--mu_scale<span class="w"> </span><span class="si">${</span><span class="nv">mu_scale</span><span class="si">}</span><span class="w"> </span>--batch_size<span class="w"> </span><span class="si">${</span><span class="nv">batch_size</span><span class="si">}</span><span class="w"> </span>--batch_buff<span class="w"> </span><span class="si">${</span><span class="nv">batch_buff</span><span class="si">}</span><span class="w"> </span>--major_axis<span class="w"> </span><span class="si">${</span><span class="nv">major_axis</span><span class="si">}</span>
-
-sort<span class="w"> </span>-S<span class="w"> </span>4G<span class="w"> </span>-k2,2n<span class="w"> </span>-k1,1g<span class="w"> </span><span class="si">${</span><span class="nv">batch</span><span class="si">}</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>gzip<span class="w"> </span>-c<span class="w"> </span>&gt;<span class="w"> </span><span class="si">${</span><span class="nv">batch</span><span class="si">}</span>.gz
-rm<span class="w"> </span><span class="si">${</span><span class="nv">batch</span><span class="si">}</span>
-</code></pre></div></p>
-<p>Prepare training minibatches, only need to run once if you plan to fit multiple models (say with different number of factors)
-<div class="highlight"><pre><span></span><code><span class="nv">train_width</span><span class="o">=</span><span class="m">12</span><span class="w"> </span><span class="c1"># \sqrt{3} x the side length of the hexagon (um)</span>
-<span class="nv">min_ct_per_unit</span><span class="o">=</span><span class="m">50</span>
-<span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/transcripts.tsv.gz
-<span class="nv">out</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/hexagon.d_<span class="si">${</span><span class="nv">train_width</span><span class="si">}</span>.tsv
-
-ficture<span class="w"> </span>make_dge<span class="w"> </span>--key<span class="w"> </span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span>--count_header<span class="w"> </span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">out</span><span class="si">}</span><span class="w"> </span>--hex_width<span class="w"> </span><span class="si">${</span><span class="nv">train_width</span><span class="si">}</span><span class="w"> </span>--n_move<span class="w"> </span><span class="m">2</span><span class="w"> </span>--min_ct_per_unit<span class="w"> </span><span class="si">${</span><span class="nv">min_ct_per_unit</span><span class="si">}</span><span class="w"> </span>--mu_scale<span class="w"> </span><span class="si">${</span><span class="nv">mu_scale</span><span class="si">}</span><span class="w"> </span>--precision<span class="w"> </span><span class="m">2</span><span class="w"> </span>--major_axis<span class="w"> </span><span class="si">${</span><span class="nv">major_axis</span><span class="si">}</span>
-
-sort<span class="w"> </span>-S<span class="w"> </span>4G<span class="w"> </span>-k1,1n<span class="w"> </span><span class="si">${</span><span class="nv">out</span><span class="si">}</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>gzip<span class="w"> </span>-c<span class="w"> </span>&gt;<span class="w"> </span><span class="si">${</span><span class="nv">out</span><span class="si">}</span>.gz<span class="w"> </span><span class="c1"># Shuffle hexagons</span>
-rm<span class="w"> </span><span class="si">${</span><span class="nv">out</span><span class="si">}</span>
-</code></pre></div></p>
-<h3 id="model-training">Model training<a class="headerlink" href="#model-training" title="Permanent link">&para;</a></h3>
-<p>Parameters for initializing the model
-<div class="highlight"><pre><span></span><code><span class="nv">nFactor</span><span class="o">=</span><span class="m">12</span><span class="w"> </span><span class="c1"># Number of factors</span>
-<span class="nv">sliding_step</span><span class="o">=</span><span class="m">2</span>
-<span class="nv">train_nEpoch</span><span class="o">=</span><span class="m">3</span>
-<span class="c1"># train_width=12 # should be the same as used in the above step</span>
-<span class="nv">model_id</span><span class="o">=</span>nF<span class="si">${</span><span class="nv">nFactor</span><span class="si">}</span>.d_<span class="si">${</span><span class="nv">train_width</span><span class="si">}</span><span class="w"> </span><span class="c1"># An identifier kept in output file names</span>
-<span class="nv">min_ct_per_feature</span><span class="o">=</span><span class="m">20</span><span class="w"> </span><span class="c1"># Ignore genes with total count \&lt; 20</span>
-<span class="nv">R</span><span class="o">=</span><span class="m">10</span><span class="w"> </span><span class="c1"># We use R random initializations and pick one to fit the full model</span>
-<span class="nv">thread</span><span class="o">=</span><span class="m">4</span><span class="w"> </span><span class="c1"># Number of threads to use</span>
-</code></pre></div></p>
-<p>Initialize the model
-<div class="highlight"><pre><span></span><code><span class="c1"># parameters</span>
-<span class="nv">min_ct_per_unit_fit</span><span class="o">=</span><span class="m">20</span>
-<span class="nv">cmap_name</span><span class="o">=</span><span class="s2">&quot;turbo&quot;</span>
-
-<span class="c1"># output identifiers</span>
-<span class="nv">model_id</span><span class="o">=</span>nF<span class="si">${</span><span class="nv">nFactor</span><span class="si">}</span>.d_<span class="si">${</span><span class="nv">train_width</span><span class="si">}</span>
-<span class="nv">output_id</span><span class="o">=</span><span class="si">${</span><span class="nv">model_id</span><span class="si">}</span>
-<span class="nv">output_path</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/analysis/<span class="si">${</span><span class="nv">model_id</span><span class="si">}</span>
-<span class="nv">figure_path</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/figure
-<span class="k">if</span><span class="w"> </span><span class="o">[</span><span class="w"> </span>!<span class="w"> </span>-d<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span><span class="s2">/sub&quot;</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
-<span class="w">    </span>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span>/sub
-<span class="k">fi</span>
-
-
-<span class="c1"># input files</span>
-<span class="nv">hexagon</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/hexagon.d_<span class="si">${</span><span class="nv">train_width</span><span class="si">}</span>.tsv.gz
-<span class="nv">pixel</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/transcripts.tsv.gz
-<span class="nv">feature</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/feature.clean.tsv.gz
-<span class="c1"># output</span>
-<span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>
-<span class="nv">model</span><span class="o">=</span><span class="si">${</span><span class="nv">output</span><span class="si">}</span>.model.p
-
-<span class="c1"># Fit model</span>
-ficture<span class="w"> </span>fit_model<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">hexagon</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--feature<span class="w"> </span><span class="si">${</span><span class="nv">feature</span><span class="si">}</span><span class="w"> </span>--nFactor<span class="w"> </span><span class="si">${</span><span class="nv">nFactor</span><span class="si">}</span><span class="w"> </span>--epoch<span class="w"> </span><span class="si">${</span><span class="nv">train_nEpoch</span><span class="si">}</span><span class="w"> </span>--epoch_id_length<span class="w"> </span><span class="m">2</span><span class="w"> </span>--unit_attr<span class="w"> </span>X<span class="w"> </span>Y<span class="w"> </span>--key<span class="w"> </span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span>--min_ct_per_feature<span class="w"> </span><span class="si">${</span><span class="nv">min_ct_per_feature</span><span class="si">}</span><span class="w"> </span>--test_split<span class="w"> </span><span class="m">0</span>.5<span class="w"> </span>--R<span class="w"> </span><span class="si">${</span><span class="nv">R</span><span class="si">}</span><span class="w"> </span>--thread<span class="w"> </span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span>
-
-<span class="c1"># Choose color</span>
-<span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.fit_result.tsv.gz
-<span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>
-<span class="nv">cmap</span><span class="o">=</span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.rgb.tsv
-ficture<span class="w"> </span>choose_color<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--cmap_name<span class="w"> </span><span class="si">${</span><span class="nv">cmap_name</span><span class="si">}</span>
-
-<span class="c1"># Coarse plot for inspection</span>
-<span class="nv">cmap</span><span class="o">=</span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.rgb.tsv
-<span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.fit_result.tsv.gz
-<span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.coarse
-<span class="nv">fillr</span><span class="o">=</span><span class="k">$((</span><span class="nv">train_width</span><span class="o">/</span><span class="m">2</span><span class="o">+</span><span class="m">1</span><span class="k">))</span>
-ficture<span class="w"> </span>plot_base<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--fill_range<span class="w"> </span><span class="si">${</span><span class="nv">fillr</span><span class="si">}</span><span class="w"> </span>--color_table<span class="w"> </span><span class="si">${</span><span class="nv">cmap</span><span class="si">}</span><span class="w"> </span>--plot_um_per_pixel<span class="w"> </span><span class="m">1</span><span class="w"> </span>--plot_discretized
-</code></pre></div></p>
+<h4 id="anchor-level-minibatch">Anchor-level minibatch<a class="headerlink" href="#anchor-level-minibatch" title="Permanent link">&para;</a></h4>
+<p>Create pixel minibatches (<code>${path}/batched.matrix.tsv.gz</code>) that will be used for anchor-level analysis using the following command: </p>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-5-1"> 1</a></span>
+<span class="normal"><a href="#__codelineno-5-2"> 2</a></span>
+<span class="normal"><a href="#__codelineno-5-3"> 3</a></span>
+<span class="normal"><a href="#__codelineno-5-4"> 4</a></span>
+<span class="normal"><a href="#__codelineno-5-5"> 5</a></span>
+<span class="normal"><a href="#__codelineno-5-6"> 6</a></span>
+<span class="normal"><a href="#__codelineno-5-7"> 7</a></span>
+<span class="normal"><a href="#__codelineno-5-8"> 8</a></span>
+<span class="normal"><a href="#__codelineno-5-9"> 9</a></span>
+<span class="normal"><a href="#__codelineno-5-10">10</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1"></a><span class="nv">batch_size</span><span class="o">=</span><span class="m">500</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2"></a><span class="nv">batch_buff</span><span class="o">=</span><span class="m">30</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3"></a><span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/transcripts.tsv.gz
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4"></a><span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/batched.matrix.tsv.gz
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5"></a><span class="nv">batch</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/batched.matrix.tsv
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6"></a>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7"></a>ficture<span class="w"> </span>make_spatial_minibatch<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">batch</span><span class="si">}</span><span class="w"> </span>--mu_scale<span class="w"> </span><span class="si">${</span><span class="nv">mu_scale</span><span class="si">}</span><span class="w"> </span>--batch_size<span class="w"> </span><span class="si">${</span><span class="nv">batch_size</span><span class="si">}</span><span class="w"> </span>--batch_buff<span class="w"> </span><span class="si">${</span><span class="nv">batch_buff</span><span class="si">}</span><span class="w"> </span>--major_axis<span class="w"> </span><span class="si">${</span><span class="nv">major_axis</span><span class="si">}</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8"></a>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9"></a>sort<span class="w"> </span>-S<span class="w"> </span>4G<span class="w"> </span>-k2,2n<span class="w"> </span>-k1,1g<span class="w"> </span><span class="si">${</span><span class="nv">batch</span><span class="si">}</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>gzip<span class="w"> </span>-c<span class="w"> </span>&gt;<span class="w"> </span><span class="si">${</span><span class="nv">batch</span><span class="si">}</span>.gz
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10"></a>rm<span class="w"> </span><span class="si">${</span><span class="nv">batch</span><span class="si">}</span>
+</span></code></pre></div></td></tr></table></div>
+<h4 id="training-hexagons">Training hexagons<a class="headerlink" href="#training-hexagons" title="Permanent link">&para;</a></h4>
+<p>Prepare training hexagons. Even if you need to fit multiple models with different number of factors, you only need to run once for each training width. The training width is the flat-to-flat width of the hexagon in <span class="arithmatex">\(\mu m\)</span>.</p>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-6-1"> 1</a></span>
+<span class="normal"><a href="#__codelineno-6-2"> 2</a></span>
+<span class="normal"><a href="#__codelineno-6-3"> 3</a></span>
+<span class="normal"><a href="#__codelineno-6-4"> 4</a></span>
+<span class="normal"><a href="#__codelineno-6-5"> 5</a></span>
+<span class="normal"><a href="#__codelineno-6-6"> 6</a></span>
+<span class="normal"><a href="#__codelineno-6-7"> 7</a></span>
+<span class="normal"><a href="#__codelineno-6-8"> 8</a></span>
+<span class="normal"><a href="#__codelineno-6-9"> 9</a></span>
+<span class="normal"><a href="#__codelineno-6-10">10</a></span>
+<span class="normal"><a href="#__codelineno-6-11">11</a></span>
+<span class="normal"><a href="#__codelineno-6-12">12</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1"></a><span class="c1">## set up the parameters</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2"></a><span class="nv">train_width</span><span class="o">=</span><span class="m">12</span><span class="w">      </span><span class="c1"># flat-to-flat width = \sqrt{3} x the side length of the hexagon (um)</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3"></a><span class="nv">min_ct_per_unit</span><span class="o">=</span><span class="m">50</span><span class="w">  </span><span class="c1"># filter out hexagons with total count &lt; 50</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4"></a><span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/transcripts.tsv.gz
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5"></a><span class="nv">out</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/hexagon.d_<span class="si">${</span><span class="nv">train_width</span><span class="si">}</span>.tsv
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6"></a>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7"></a><span class="c1">## create hexagons</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8"></a>ficture<span class="w"> </span>make_dge<span class="w"> </span>--key<span class="w"> </span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span>--count_header<span class="w"> </span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">out</span><span class="si">}</span><span class="w"> </span>--hex_width<span class="w"> </span><span class="si">${</span><span class="nv">train_width</span><span class="si">}</span><span class="w"> </span>--n_move<span class="w"> </span><span class="m">2</span><span class="w"> </span>--min_ct_per_unit<span class="w"> </span><span class="si">${</span><span class="nv">min_ct_per_unit</span><span class="si">}</span><span class="w"> </span>--mu_scale<span class="w"> </span><span class="si">${</span><span class="nv">mu_scale</span><span class="si">}</span><span class="w"> </span>--precision<span class="w"> </span><span class="m">2</span><span class="w"> </span>--major_axis<span class="w"> </span><span class="si">${</span><span class="nv">major_axis</span><span class="si">}</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9"></a>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10"></a><span class="c1">## shuffle the hexagons based on random index</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11"></a>sort<span class="w"> </span>-S<span class="w"> </span>4G<span class="w"> </span>-k1,1n<span class="w"> </span><span class="si">${</span><span class="nv">out</span><span class="si">}</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>gzip<span class="w"> </span>-c<span class="w"> </span>&gt;<span class="w"> </span><span class="si">${</span><span class="nv">out</span><span class="si">}</span>.gz<span class="w"> </span>
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12"></a>rm<span class="w"> </span><span class="si">${</span><span class="nv">out</span><span class="si">}</span>
+</span></code></pre></div></td></tr></table></div>
+<h3 id="lda-model-training">LDA Model training<a class="headerlink" href="#lda-model-training" title="Permanent link">&para;</a></h3>
+<p>To run FICTURE in a fully unsupervised manner, you need to initialize the model with LDA based on the hexagons created in the previous step. </p>
+<h4 id="parameters-for-initializing-the-model">Parameters for initializing the model<a class="headerlink" href="#parameters-for-initializing-the-model" title="Permanent link">&para;</a></h4>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-7-1">1</a></span>
+<span class="normal"><a href="#__codelineno-7-2">2</a></span>
+<span class="normal"><a href="#__codelineno-7-3">3</a></span>
+<span class="normal"><a href="#__codelineno-7-4">4</a></span>
+<span class="normal"><a href="#__codelineno-7-5">5</a></span>
+<span class="normal"><a href="#__codelineno-7-6">6</a></span>
+<span class="normal"><a href="#__codelineno-7-7">7</a></span>
+<span class="normal"><a href="#__codelineno-7-8">8</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1"></a><span class="nv">nFactor</span><span class="o">=</span><span class="m">12</span><span class="w"> </span><span class="c1"># Number of factors</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2"></a><span class="nv">sliding_step</span><span class="o">=</span><span class="m">2</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3"></a><span class="nv">train_nEpoch</span><span class="o">=</span><span class="m">3</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4"></a><span class="c1"># train_width=12 # should be the same as used in the above step</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5"></a><span class="nv">model_id</span><span class="o">=</span>nF<span class="si">${</span><span class="nv">nFactor</span><span class="si">}</span>.d_<span class="si">${</span><span class="nv">train_width</span><span class="si">}</span><span class="w"> </span><span class="c1"># An identifier kept in output file names</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6"></a><span class="nv">min_ct_per_feature</span><span class="o">=</span><span class="m">20</span><span class="w"> </span><span class="c1"># Ignore genes with total count \&lt; 20</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7"></a><span class="nv">R</span><span class="o">=</span><span class="m">10</span><span class="w"> </span><span class="c1"># We use R random initializations and pick one to fit the full model</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8"></a><span class="nv">thread</span><span class="o">=</span><span class="m">4</span><span class="w"> </span><span class="c1"># Number of threads to use</span>
+</span></code></pre></div></td></tr></table></div>
+<h4 id="setting-the-input-and-output-paths">Setting the input and output paths<a class="headerlink" href="#setting-the-input-and-output-paths" title="Permanent link">&para;</a></h4>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-8-1"> 1</a></span>
+<span class="normal"><a href="#__codelineno-8-2"> 2</a></span>
+<span class="normal"><a href="#__codelineno-8-3"> 3</a></span>
+<span class="normal"><a href="#__codelineno-8-4"> 4</a></span>
+<span class="normal"><a href="#__codelineno-8-5"> 5</a></span>
+<span class="normal"><a href="#__codelineno-8-6"> 6</a></span>
+<span class="normal"><a href="#__codelineno-8-7"> 7</a></span>
+<span class="normal"><a href="#__codelineno-8-8"> 8</a></span>
+<span class="normal"><a href="#__codelineno-8-9"> 9</a></span>
+<span class="normal"><a href="#__codelineno-8-10">10</a></span>
+<span class="normal"><a href="#__codelineno-8-11">11</a></span>
+<span class="normal"><a href="#__codelineno-8-12">12</a></span>
+<span class="normal"><a href="#__codelineno-8-13">13</a></span>
+<span class="normal"><a href="#__codelineno-8-14">14</a></span>
+<span class="normal"><a href="#__codelineno-8-15">15</a></span>
+<span class="normal"><a href="#__codelineno-8-16">16</a></span>
+<span class="normal"><a href="#__codelineno-8-17">17</a></span>
+<span class="normal"><a href="#__codelineno-8-18">18</a></span>
+<span class="normal"><a href="#__codelineno-8-19">19</a></span>
+<span class="normal"><a href="#__codelineno-8-20">20</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1"></a><span class="c1"># parameters</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2"></a><span class="nv">min_ct_per_unit_fit</span><span class="o">=</span><span class="m">20</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3"></a><span class="nv">cmap_name</span><span class="o">=</span><span class="s2">&quot;turbo&quot;</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4"></a>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5"></a><span class="c1"># output identifiers</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6"></a><span class="nv">model_id</span><span class="o">=</span>nF<span class="si">${</span><span class="nv">nFactor</span><span class="si">}</span>.d_<span class="si">${</span><span class="nv">train_width</span><span class="si">}</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7"></a><span class="nv">output_id</span><span class="o">=</span><span class="si">${</span><span class="nv">model_id</span><span class="si">}</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8"></a><span class="nv">output_path</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/analysis/<span class="si">${</span><span class="nv">model_id</span><span class="si">}</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9"></a><span class="nv">figure_path</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/figure
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10"></a><span class="k">if</span><span class="w"> </span><span class="o">[</span><span class="w"> </span>!<span class="w"> </span>-d<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span><span class="s2">/sub&quot;</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11"></a><span class="w">    </span>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span>/sub
+</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12"></a><span class="k">fi</span>
+</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13"></a>
+</span><span id="__span-8-14"><a id="__codelineno-8-14" name="__codelineno-8-14"></a><span class="c1"># input files</span>
+</span><span id="__span-8-15"><a id="__codelineno-8-15" name="__codelineno-8-15"></a><span class="nv">hexagon</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/hexagon.d_<span class="si">${</span><span class="nv">train_width</span><span class="si">}</span>.tsv.gz
+</span><span id="__span-8-16"><a id="__codelineno-8-16" name="__codelineno-8-16"></a><span class="nv">pixel</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/transcripts.tsv.gz
+</span><span id="__span-8-17"><a id="__codelineno-8-17" name="__codelineno-8-17"></a><span class="nv">feature</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/feature.clean.tsv.gz
+</span><span id="__span-8-18"><a id="__codelineno-8-18" name="__codelineno-8-18"></a><span class="c1"># output</span>
+</span><span id="__span-8-19"><a id="__codelineno-8-19" name="__codelineno-8-19"></a><span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>
+</span><span id="__span-8-20"><a id="__codelineno-8-20" name="__codelineno-8-20"></a><span class="nv">model</span><span class="o">=</span><span class="si">${</span><span class="nv">output</span><span class="si">}</span>.model.p
+</span></code></pre></div></td></tr></table></div>
+<h4 id="initialize-the-model-with-lda">Initialize the model with LDA<a class="headerlink" href="#initialize-the-model-with-lda" title="Permanent link">&para;</a></h4>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-9-1">1</a></span>
+<span class="normal"><a href="#__codelineno-9-2">2</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1"></a><span class="c1"># Fit model with unsupervised LDA </span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2"></a>ficture<span class="w"> </span>fit_model<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">hexagon</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--feature<span class="w"> </span><span class="si">${</span><span class="nv">feature</span><span class="si">}</span><span class="w"> </span>--nFactor<span class="w"> </span><span class="si">${</span><span class="nv">nFactor</span><span class="si">}</span><span class="w"> </span>--epoch<span class="w"> </span><span class="si">${</span><span class="nv">train_nEpoch</span><span class="si">}</span><span class="w"> </span>--epoch_id_length<span class="w"> </span><span class="m">2</span><span class="w"> </span>--unit_attr<span class="w"> </span>X<span class="w"> </span>Y<span class="w"> </span>--key<span class="w"> </span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span>--min_ct_per_feature<span class="w"> </span><span class="si">${</span><span class="nv">min_ct_per_feature</span><span class="si">}</span><span class="w"> </span>--test_split<span class="w"> </span><span class="m">0</span>.5<span class="w"> </span>--R<span class="w"> </span><span class="si">${</span><span class="nv">R</span><span class="si">}</span><span class="w"> </span>--thread<span class="w"> </span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span>
+</span></code></pre></div></td></tr></table></div>
+<h4 id="optional-initializing-lda-model-from-pseudo-bulk-data">(Optional) Initializing LDA model from pseudo-bulk data<a class="headerlink" href="#optional-initializing-lda-model-from-pseudo-bulk-data" title="Permanent link">&para;</a></h4>
+<p>Instead of initializing the model using LDA as shown above, if you want to initialize the model using pseudo-bulk data, you can 
+prepare the pseudo-bulk data as a model matrix in the following TSV format in a <code>tsv.gz</code> file:</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-10-1">1</a></span>
+<span class="normal"><a href="#__codelineno-10-2">2</a></span>
+<span class="normal"><a href="#__codelineno-10-3">3</a></span>
+<span class="normal"><a href="#__codelineno-10-4">4</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1"></a>gene    celltype1   celltype2   ...
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2"></a>gene1   10          20          ...
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3"></a>gene2   5           15          ...
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4"></a>...
+</span></code></pre></div></td></tr></table></div>
+<p>This model matrix can be directly used for pixel-level decoding step described below. 
+However, if the gene list do not match between the pseudo-bulk data and the raw data, you may need to use the following command to initialize the model from the pseudo-bulk data.</p>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-11-1">1</a></span>
+<span class="normal"><a href="#__codelineno-11-2">2</a></span>
+<span class="normal"><a href="#__codelineno-11-3">3</a></span>
+<span class="normal"><a href="#__codelineno-11-4">4</a></span>
+<span class="normal"><a href="#__codelineno-11-5">5</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1"></a><span class="c1"># Fit model from pseudo-bulk data</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2"></a>ficture<span class="w"> </span>init_model_from_pseudobulk<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">hexagon</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--feature<span class="w"> </span><span class="si">${</span><span class="nv">feature</span><span class="si">}</span><span class="w"> </span>--epoch<span class="w"> </span><span class="m">0</span><span class="w"> </span>--scale_model_rel<span class="w"> </span>-1<span class="w"> </span>--reorder-factors<span class="w"> </span>--key<span class="w"> </span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span>--min_ct_per_feature<span class="w"> </span><span class="si">${</span><span class="nv">min_ct_per_feature</span><span class="si">}</span>--thread<span class="w"> </span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3"></a>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4"></a><span class="c1"># create a model matrix from the posterior count</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5"></a>cp<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span>.posterior.count.tsv.gz<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span>.model_matrix.tsv.gz
+</span></code></pre></div></td></tr></table></div>
+<p>After running the following command, the model will be initialized using the pseudo-bulk data.</p>
+<h4 id="visualizing-the-model">Visualizing the model<a class="headerlink" href="#visualizing-the-model" title="Permanent link">&para;</a></h4>
+<p>The results from the initial model fitting can be visualized using the following commands:</p>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-12-1"> 1</a></span>
+<span class="normal"><a href="#__codelineno-12-2"> 2</a></span>
+<span class="normal"><a href="#__codelineno-12-3"> 3</a></span>
+<span class="normal"><a href="#__codelineno-12-4"> 4</a></span>
+<span class="normal"><a href="#__codelineno-12-5"> 5</a></span>
+<span class="normal"><a href="#__codelineno-12-6"> 6</a></span>
+<span class="normal"><a href="#__codelineno-12-7"> 7</a></span>
+<span class="normal"><a href="#__codelineno-12-8"> 8</a></span>
+<span class="normal"><a href="#__codelineno-12-9"> 9</a></span>
+<span class="normal"><a href="#__codelineno-12-10">10</a></span>
+<span class="normal"><a href="#__codelineno-12-11">11</a></span>
+<span class="normal"><a href="#__codelineno-12-12">12</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1"></a><span class="c1"># Choose color</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2"></a><span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.fit_result.tsv.gz
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3"></a><span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4"></a><span class="nv">cmap</span><span class="o">=</span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.rgb.tsv
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5"></a>ficture<span class="w"> </span>choose_color<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--cmap_name<span class="w"> </span><span class="si">${</span><span class="nv">cmap_name</span><span class="si">}</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6"></a>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7"></a><span class="c1"># Coarse plot for inspection</span>
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8"></a><span class="nv">cmap</span><span class="o">=</span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.rgb.tsv
+</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9"></a><span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.fit_result.tsv.gz
+</span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10"></a><span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.coarse
+</span><span id="__span-12-11"><a id="__codelineno-12-11" name="__codelineno-12-11"></a><span class="nv">fillr</span><span class="o">=</span><span class="k">$((</span><span class="nv">train_width</span><span class="o">/</span><span class="m">2</span><span class="o">+</span><span class="m">1</span><span class="k">))</span>
+</span><span id="__span-12-12"><a id="__codelineno-12-12" name="__codelineno-12-12"></a>ficture<span class="w"> </span>plot_base<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--fill_range<span class="w"> </span><span class="si">${</span><span class="nv">fillr</span><span class="si">}</span><span class="w"> </span>--color_table<span class="w"> </span><span class="si">${</span><span class="nv">cmap</span><span class="si">}</span><span class="w"> </span>--plot_um_per_pixel<span class="w"> </span><span class="m">1</span><span class="w"> </span>--plot_discretized
+</span></code></pre></div></td></tr></table></div>
 <h3 id="pixel-level-decoding">Pixel level decoding<a class="headerlink" href="#pixel-level-decoding" title="Permanent link">&para;</a></h3>
-<p>Parameters for pixel level decoding
-<div class="highlight"><pre><span></span><code><span class="nv">fit_width</span><span class="o">=</span><span class="m">12</span><span class="w"> </span><span class="c1"># Often equal or smaller than train_width (um)</span>
-<span class="nv">anchor_res</span><span class="o">=</span><span class="m">4</span><span class="w"> </span><span class="c1"># Distance between adjacent anchor points (um)</span>
-<span class="nv">fit_nmove</span><span class="o">=</span><span class="k">$((</span><span class="nv">fit_width</span><span class="o">/</span><span class="nv">anchor_res</span><span class="k">))</span>
-<span class="nv">anchor_info</span><span class="o">=</span>prj_<span class="si">${</span><span class="nv">fit_width</span><span class="si">}</span>.r_<span class="si">${</span><span class="nv">anchor_res</span><span class="si">}</span>
-<span class="nv">radius</span><span class="o">=</span><span class="k">$((</span><span class="nv">$anchor_res</span><span class="o">+</span><span class="m">1</span><span class="k">))</span>
-<span class="nv">anchor_info</span><span class="o">=</span>prj_<span class="si">${</span><span class="nv">fit_width</span><span class="si">}</span>.r_<span class="si">${</span><span class="nv">anchor_res</span><span class="si">}</span><span class="w"> </span><span class="c1"># An identifier</span>
-<span class="nv">coor</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/coordinate_minmax.tsv
-<span class="nv">cmap</span><span class="o">=</span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.rgb.tsv
-</code></pre></div></p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Transform</span>
-<span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.<span class="si">${</span><span class="nv">anchor_info</span><span class="si">}</span>
-ficture<span class="w"> </span>transform<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">pixel</span><span class="si">}</span><span class="w"> </span>--output_pref<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--model<span class="w"> </span><span class="si">${</span><span class="nv">model</span><span class="si">}</span><span class="w"> </span>--key<span class="w"> </span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span>--major_axis<span class="w"> </span><span class="si">${</span><span class="nv">major_axis</span><span class="si">}</span><span class="w"> </span>--hex_width<span class="w"> </span><span class="si">${</span><span class="nv">fit_width</span><span class="si">}</span><span class="w"> </span>--n_move<span class="w"> </span><span class="si">${</span><span class="nv">fit_nmove</span><span class="si">}</span><span class="w"> </span>--min_ct_per_unit<span class="w"> </span><span class="si">${</span><span class="nv">min_ct_per_unit_fit</span><span class="si">}</span><span class="w"> </span>--mu_scale<span class="w"> </span><span class="si">${</span><span class="nv">mu_scale</span><span class="si">}</span><span class="w"> </span>--thread<span class="w"> </span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span><span class="w"> </span>--precision<span class="w"> </span><span class="m">2</span>
-
-<span class="c1"># Pixel level decoding &amp; visualization</span>
-<span class="nv">prefix</span><span class="o">=</span><span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.decode.<span class="si">${</span><span class="nv">anchor_info</span><span class="si">}</span>_<span class="si">${</span><span class="nv">radius</span><span class="si">}</span>
-<span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/batched.matrix.tsv.gz
-<span class="nv">anchor</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.<span class="si">${</span><span class="nv">anchor_info</span><span class="si">}</span>.fit_result.tsv.gz
-<span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>
-<span class="nv">topk</span><span class="o">=</span><span class="m">3</span><span class="w"> </span><span class="c1"># Output only a few top factors per pixel</span>
-ficture<span class="w"> </span>slda_decode<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--model<span class="w"> </span><span class="si">${</span><span class="nv">model</span><span class="si">}</span><span class="w"> </span>--anchor<span class="w"> </span><span class="si">${</span><span class="nv">anchor</span><span class="si">}</span><span class="w"> </span>--anchor_in_um<span class="w"> </span>--neighbor_radius<span class="w"> </span><span class="si">${</span><span class="nv">radius</span><span class="si">}</span><span class="w"> </span>--mu_scale<span class="w"> </span><span class="si">${</span><span class="nv">mu_scale</span><span class="si">}</span><span class="w"> </span>--key<span class="w"> </span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span>--precision<span class="w"> </span><span class="m">0</span>.1<span class="w"> </span>--lite_topk_output_pixel<span class="w"> </span><span class="si">${</span><span class="nv">topk</span><span class="si">}</span><span class="w"> </span>--lite_topk_output_anchor<span class="w"> </span><span class="si">${</span><span class="nv">topk</span><span class="si">}</span><span class="w"> </span>--thread<span class="w"> </span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span>
-</code></pre></div>
-<h3 id="optional-post-processing">Optional post-processing<a class="headerlink" href="#optional-post-processing" title="Permanent link">&para;</a></h3>
-<p>The following is not strictly necessary but it generates summary statistics and helps visualization.</p>
-<p>Sort the pixel level output, this is for visualize large images with limited memory usage.
-<div class="highlight"><pre><span></span><code><span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>.pixel.tsv.gz<span class="w"> </span><span class="c1"># j, X, Y, K1, ..., KJ, P1, ..., PJ, J=topk</span>
-<span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>.pixel.sorted.tsv.gz
-
-<span class="nv">K</span><span class="o">=</span><span class="k">$(</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="nv">$model_id</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span><span class="s1">&#39;s/nF\([0-9]\{1,\}\)\..*/\1/&#39;</span><span class="w"> </span><span class="k">)</span>
-<span class="k">while</span><span class="w"> </span><span class="nv">IFS</span><span class="o">=</span><span class="s1">$&#39;\t&#39;</span><span class="w"> </span><span class="nb">read</span><span class="w"> </span>-r<span class="w"> </span>r_key<span class="w"> </span>r_val<span class="p">;</span><span class="w"> </span><span class="k">do</span>
-<span class="w">    </span><span class="nb">export</span><span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">r_key</span><span class="si">}</span><span class="s2">&quot;</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">r_val</span><span class="si">}</span><span class="s2">&quot;</span>
-<span class="k">done</span><span class="w"> </span>&lt;<span class="w"> </span><span class="si">${</span><span class="nv">coor</span><span class="si">}</span>
-<span class="nb">echo</span><span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">xmin</span><span class="si">}</span><span class="s2">, </span><span class="si">${</span><span class="nv">xmax</span><span class="si">}</span><span class="s2">; </span><span class="si">${</span><span class="nv">ymin</span><span class="si">}</span><span class="s2">, </span><span class="si">${</span><span class="nv">ymax</span><span class="si">}</span><span class="s2">&quot;</span>
-
-<span class="nv">offsetx</span><span class="o">=</span><span class="si">${</span><span class="nv">xmin</span><span class="si">}</span>
-<span class="nv">offsety</span><span class="o">=</span><span class="si">${</span><span class="nv">ymin</span><span class="si">}</span>
-<span class="nv">rangex</span><span class="o">=</span><span class="k">$(</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;(</span><span class="si">${</span><span class="nv">xmax</span><span class="si">}</span><span class="s2"> - </span><span class="si">${</span><span class="nv">xmin</span><span class="si">}</span><span class="s2"> + 0.5)/1+1&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>bc<span class="w"> </span><span class="k">)</span>
-<span class="nv">rangey</span><span class="o">=</span><span class="k">$(</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;(</span><span class="si">${</span><span class="nv">ymax</span><span class="si">}</span><span class="s2"> - </span><span class="si">${</span><span class="nv">ymin</span><span class="si">}</span><span class="s2"> + 0.5)/1+1&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>bc<span class="w"> </span><span class="k">)</span>
-<span class="nv">bsize</span><span class="o">=</span><span class="m">2000</span>
-<span class="nv">scale</span><span class="o">=</span><span class="m">100</span>
-<span class="nv">header</span><span class="o">=</span><span class="s2">&quot;##K=</span><span class="si">${</span><span class="nv">K</span><span class="si">}</span><span class="s2">;TOPK=3\n##BLOCK_SIZE=</span><span class="si">${</span><span class="nv">bsize</span><span class="si">}</span><span class="s2">;BLOCK_AXIS=X;INDEX_AXIS=Y\n##OFFSET_X=</span><span class="si">${</span><span class="nv">offsetx</span><span class="si">}</span><span class="s2">;OFFSET_Y=</span><span class="si">${</span><span class="nv">offsety</span><span class="si">}</span><span class="s2">;SIZE_X=</span><span class="si">${</span><span class="nv">rangex</span><span class="si">}</span><span class="s2">;SIZE_Y=</span><span class="si">${</span><span class="nv">rangey</span><span class="si">}</span><span class="s2">;SCALE=</span><span class="si">${</span><span class="nv">scale</span><span class="si">}</span><span class="s2">\n#BLOCK\tX\tY\tK1\tK2\tK3\tP1\tP2\tP3&quot;</span>
-
-<span class="o">(</span><span class="nb">echo</span><span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">header</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>zcat<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>tail<span class="w"> </span>-n<span class="w"> </span>+2<span class="w"> </span><span class="p">|</span><span class="w"> </span>perl<span class="w"> </span>-slane<span class="w"> </span><span class="s1">&#39;$F[0]=int(($F[1]-$offx)/$bsize) * $bsize; $F[1]=int(($F[1]-$offx)*$scale); $F[1]=($F[1]&gt;=0)?$F[1]:0; $F[2]=int(($F[2]-$offy)*$scale); $F[2]=($F[2]&gt;=0)?$F[2]:0; print join(&quot;\t&quot;, @F);&#39;</span><span class="w"> </span>--<span class="w"> </span>-bsize<span class="o">=</span><span class="si">${</span><span class="nv">bsize</span><span class="si">}</span><span class="w"> </span>-scale<span class="o">=</span><span class="si">${</span><span class="nv">scale</span><span class="si">}</span><span class="w"> </span>-offx<span class="o">=</span><span class="si">${</span><span class="nv">offsetx</span><span class="si">}</span><span class="w"> </span>-offy<span class="o">=</span><span class="si">${</span><span class="nv">offsety</span><span class="si">}</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-S<span class="w"> </span>4G<span class="w"> </span>-k1,1g<span class="w"> </span>-k3,3g<span class="w"> </span><span class="o">)</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>bgzip<span class="w"> </span>-c<span class="w"> </span>&gt;<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span>
-
-tabix<span class="w"> </span>-f<span class="w"> </span>-s1<span class="w"> </span>-b3<span class="w"> </span>-e3<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span>
-rm<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span>
-</code></pre></div></p>
-<p>Report differentially expressed genes. This is a naive pseudo-bulk chi-squared test, please view the results with caution.
-<div class="highlight"><pre><span></span><code><span class="c1"># DE</span>
-<span class="nv">max_pval_output</span><span class="o">=</span>1e-3
-<span class="nv">min_fold_output</span><span class="o">=</span><span class="m">1</span>.5
-<span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>.posterior.count.tsv.gz
-<span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>.bulk_chisq.tsv
-ficture<span class="w"> </span>de_bulk<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--min_ct_per_feature<span class="w"> </span><span class="si">${</span><span class="nv">min_ct_per_feature</span><span class="si">}</span><span class="w"> </span>--max_pval_output<span class="w"> </span><span class="si">${</span><span class="nv">max_pval_output</span><span class="si">}</span><span class="w"> </span>--min_fold_output<span class="w"> </span><span class="si">${</span><span class="nv">min_fold_output</span><span class="si">}</span><span class="w"> </span>--thread<span class="w"> </span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span>
-
-
-<span class="c1"># Report (color table and top DE genes)</span>
-<span class="nv">cmap</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/figure/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.rgb.tsv
-<span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>.factor.info.html
-ficture<span class="w"> </span>factor_report<span class="w"> </span>--path<span class="w"> </span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span><span class="w"> </span>--pref<span class="w"> </span><span class="si">${</span><span class="nv">prefix</span><span class="si">}</span><span class="w"> </span>--color_table<span class="w"> </span><span class="si">${</span><span class="nv">cmap</span><span class="si">}</span>
-</code></pre></div></p>
-<p>Generalize pixel level images representing the factorization result
-<div class="highlight"><pre><span></span><code><span class="c1"># Make pixel level figures</span>
-<span class="nv">cmap</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/figure/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.rgb.tsv
-<span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>.pixel.sorted.tsv.gz
-<span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>.pixel.png
-ficture<span class="w"> </span>plot_pixel_full<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--color_table<span class="w"> </span><span class="si">${</span><span class="nv">cmap</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--plot_um_per_pixel<span class="w"> </span><span class="m">0</span>.5<span class="w"> </span>--full
-</code></pre></div></p>
-<p>Generate heatmaps for individual factors. If the data is very large, making all individual factor maps may take some time.</p>
+<h4 id="parameters-for-pixel-level-decoding">Parameters for pixel level decoding<a class="headerlink" href="#parameters-for-pixel-level-decoding" title="Permanent link">&para;</a></h4>
+<p>After fitting the model, FICTURE performs pixel level decoding to infer the factors for each pixel. 
+The pixel-level decoding consists of two steps:
+* Perform anchor-level projection based on the fitted model
+* Perform pixel-level decoding based on anchor-level projection</p>
+<p>The following parameters can be used for pixel level decoding steps.</p>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-13-1">1</a></span>
+<span class="normal"><a href="#__codelineno-13-2">2</a></span>
+<span class="normal"><a href="#__codelineno-13-3">3</a></span>
+<span class="normal"><a href="#__codelineno-13-4">4</a></span>
+<span class="normal"><a href="#__codelineno-13-5">5</a></span>
+<span class="normal"><a href="#__codelineno-13-6">6</a></span>
+<span class="normal"><a href="#__codelineno-13-7">7</a></span>
+<span class="normal"><a href="#__codelineno-13-8">8</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1"></a><span class="nv">fit_width</span><span class="o">=</span><span class="m">12</span><span class="w"> </span><span class="c1"># Often equal or smaller than train_width (um)</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2"></a><span class="nv">anchor_res</span><span class="o">=</span><span class="m">4</span><span class="w"> </span><span class="c1"># Distance between adjacent anchor points (um)</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3"></a><span class="nv">fit_nmove</span><span class="o">=</span><span class="k">$((</span><span class="nv">fit_width</span><span class="o">/</span><span class="nv">anchor_res</span><span class="k">))</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4"></a><span class="nv">anchor_info</span><span class="o">=</span>prj_<span class="si">${</span><span class="nv">fit_width</span><span class="si">}</span>.r_<span class="si">${</span><span class="nv">anchor_res</span><span class="si">}</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5"></a><span class="nv">radius</span><span class="o">=</span><span class="k">$((</span><span class="nv">$anchor_res</span><span class="o">+</span><span class="m">1</span><span class="k">))</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6"></a><span class="nv">anchor_info</span><span class="o">=</span>prj_<span class="si">${</span><span class="nv">fit_width</span><span class="si">}</span>.r_<span class="si">${</span><span class="nv">anchor_res</span><span class="si">}</span><span class="w"> </span><span class="c1"># An identifier</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7"></a><span class="nv">coor</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/coordinate_minmax.tsv
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8"></a><span class="nv">cmap</span><span class="o">=</span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.rgb.tsv
+</span></code></pre></div></td></tr></table></div>
+<h4 id="produce-anchor-level-projection">Produce anchor-level projection<a class="headerlink" href="#produce-anchor-level-projection" title="Permanent link">&para;</a></h4>
+<p>Anchor-level projection can be performed using the following command:</p>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-14-1">1</a></span>
+<span class="normal"><a href="#__codelineno-14-2">2</a></span>
+<span class="normal"><a href="#__codelineno-14-3">3</a></span>
+<span class="normal"><a href="#__codelineno-14-4">4</a></span>
+<span class="normal"><a href="#__codelineno-14-5">5</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1"></a><span class="c1"># Output prefix</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2"></a><span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.<span class="si">${</span><span class="nv">anchor_info</span><span class="si">}</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3"></a>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4"></a><span class="c1"># Perform anchor-level projection</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5"></a>ficture<span class="w"> </span>transform<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">pixel</span><span class="si">}</span><span class="w"> </span>--output_pref<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--model<span class="w"> </span><span class="si">${</span><span class="nv">model</span><span class="si">}</span><span class="w"> </span>--key<span class="w"> </span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span>--major_axis<span class="w"> </span><span class="si">${</span><span class="nv">major_axis</span><span class="si">}</span><span class="w"> </span>--hex_width<span class="w"> </span><span class="si">${</span><span class="nv">fit_width</span><span class="si">}</span><span class="w"> </span>--n_move<span class="w"> </span><span class="si">${</span><span class="nv">fit_nmove</span><span class="si">}</span><span class="w"> </span>--min_ct_per_unit<span class="w"> </span><span class="si">${</span><span class="nv">min_ct_per_unit_fit</span><span class="si">}</span><span class="w"> </span>--mu_scale<span class="w"> </span><span class="si">${</span><span class="nv">mu_scale</span><span class="si">}</span><span class="w"> </span>--thread<span class="w"> </span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span><span class="w"> </span>--precision<span class="w"> </span><span class="m">2</span>
+</span></code></pre></div></td></tr></table></div>
+<h4 id="perform-pixel-level-decoding">Perform pixel-level decoding<a class="headerlink" href="#perform-pixel-level-decoding" title="Permanent link">&para;</a></h4>
+<p>Pixel-level decoding can be performed using the following command:</p>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-15-1">1</a></span>
+<span class="normal"><a href="#__codelineno-15-2">2</a></span>
+<span class="normal"><a href="#__codelineno-15-3">3</a></span>
+<span class="normal"><a href="#__codelineno-15-4">4</a></span>
+<span class="normal"><a href="#__codelineno-15-5">5</a></span>
+<span class="normal"><a href="#__codelineno-15-6">6</a></span>
+<span class="normal"><a href="#__codelineno-15-7">7</a></span>
+<span class="normal"><a href="#__codelineno-15-8">8</a></span>
+<span class="normal"><a href="#__codelineno-15-9">9</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1"></a><span class="c1"># Input/output parameters for pixel-level decoding</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2"></a><span class="nv">prefix</span><span class="o">=</span><span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.decode.<span class="si">${</span><span class="nv">anchor_info</span><span class="si">}</span>_<span class="si">${</span><span class="nv">radius</span><span class="si">}</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3"></a><span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/batched.matrix.tsv.gz
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4"></a><span class="nv">anchor</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.<span class="si">${</span><span class="nv">anchor_info</span><span class="si">}</span>.fit_result.tsv.gz
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5"></a><span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6"></a><span class="nv">topk</span><span class="o">=</span><span class="m">3</span><span class="w"> </span><span class="c1"># Output only a few top factors per pixel</span>
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7"></a>
+</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8"></a><span class="c1"># Perform pixel-level decoding</span>
+</span><span id="__span-15-9"><a id="__codelineno-15-9" name="__codelineno-15-9"></a>ficture<span class="w"> </span>slda_decode<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--model<span class="w"> </span><span class="si">${</span><span class="nv">model</span><span class="si">}</span><span class="w"> </span>--anchor<span class="w"> </span><span class="si">${</span><span class="nv">anchor</span><span class="si">}</span><span class="w"> </span>--anchor_in_um<span class="w"> </span>--neighbor_radius<span class="w"> </span><span class="si">${</span><span class="nv">radius</span><span class="si">}</span><span class="w"> </span>--mu_scale<span class="w"> </span><span class="si">${</span><span class="nv">mu_scale</span><span class="si">}</span><span class="w"> </span>--key<span class="w"> </span><span class="si">${</span><span class="nv">key</span><span class="si">}</span><span class="w"> </span>--precision<span class="w"> </span><span class="m">0</span>.1<span class="w"> </span>--lite_topk_output_pixel<span class="w"> </span><span class="si">${</span><span class="nv">topk</span><span class="si">}</span><span class="w"> </span>--lite_topk_output_anchor<span class="w"> </span><span class="si">${</span><span class="nv">topk</span><span class="si">}</span><span class="w"> </span>--thread<span class="w"> </span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span>
+</span></code></pre></div></td></tr></table></div>
+<h4 id="optional-post-processing">Optional post-processing<a class="headerlink" href="#optional-post-processing" title="Permanent link">&para;</a></h4>
+<p>Although not required, after performing pixel-level decoding, it is useful to 
+generates summary statistics and visualize the results.</p>
+<p>First step is to sort the pixel level output. This is 
+primarily for visualizing large images with limited memory usage.</p>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-16-1"> 1</a></span>
+<span class="normal"><a href="#__codelineno-16-2"> 2</a></span>
+<span class="normal"><a href="#__codelineno-16-3"> 3</a></span>
+<span class="normal"><a href="#__codelineno-16-4"> 4</a></span>
+<span class="normal"><a href="#__codelineno-16-5"> 5</a></span>
+<span class="normal"><a href="#__codelineno-16-6"> 6</a></span>
+<span class="normal"><a href="#__codelineno-16-7"> 7</a></span>
+<span class="normal"><a href="#__codelineno-16-8"> 8</a></span>
+<span class="normal"><a href="#__codelineno-16-9"> 9</a></span>
+<span class="normal"><a href="#__codelineno-16-10">10</a></span>
+<span class="normal"><a href="#__codelineno-16-11">11</a></span>
+<span class="normal"><a href="#__codelineno-16-12">12</a></span>
+<span class="normal"><a href="#__codelineno-16-13">13</a></span>
+<span class="normal"><a href="#__codelineno-16-14">14</a></span>
+<span class="normal"><a href="#__codelineno-16-15">15</a></span>
+<span class="normal"><a href="#__codelineno-16-16">16</a></span>
+<span class="normal"><a href="#__codelineno-16-17">17</a></span>
+<span class="normal"><a href="#__codelineno-16-18">18</a></span>
+<span class="normal"><a href="#__codelineno-16-19">19</a></span>
+<span class="normal"><a href="#__codelineno-16-20">20</a></span>
+<span class="normal"><a href="#__codelineno-16-21">21</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1"></a><span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>.pixel.tsv.gz<span class="w"> </span><span class="c1"># j, X, Y, K1, ..., KJ, P1, ..., PJ, J=topk</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2"></a><span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>.pixel.sorted.tsv.gz
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3"></a>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4"></a><span class="nv">K</span><span class="o">=</span><span class="k">$(</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="nv">$model_id</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span><span class="s1">&#39;s/nF\([0-9]\{1,\}\)\..*/\1/&#39;</span><span class="w"> </span><span class="k">)</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5"></a><span class="k">while</span><span class="w"> </span><span class="nv">IFS</span><span class="o">=</span><span class="s1">$&#39;\t&#39;</span><span class="w"> </span><span class="nb">read</span><span class="w"> </span>-r<span class="w"> </span>r_key<span class="w"> </span>r_val<span class="p">;</span><span class="w"> </span><span class="k">do</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6"></a><span class="w">    </span><span class="nb">export</span><span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">r_key</span><span class="si">}</span><span class="s2">&quot;</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">r_val</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7"></a><span class="k">done</span><span class="w"> </span>&lt;<span class="w"> </span><span class="si">${</span><span class="nv">coor</span><span class="si">}</span>
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8"></a><span class="nb">echo</span><span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">xmin</span><span class="si">}</span><span class="s2">, </span><span class="si">${</span><span class="nv">xmax</span><span class="si">}</span><span class="s2">; </span><span class="si">${</span><span class="nv">ymin</span><span class="si">}</span><span class="s2">, </span><span class="si">${</span><span class="nv">ymax</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9"></a>
+</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10"></a><span class="nv">offsetx</span><span class="o">=</span><span class="si">${</span><span class="nv">xmin</span><span class="si">}</span>
+</span><span id="__span-16-11"><a id="__codelineno-16-11" name="__codelineno-16-11"></a><span class="nv">offsety</span><span class="o">=</span><span class="si">${</span><span class="nv">ymin</span><span class="si">}</span>
+</span><span id="__span-16-12"><a id="__codelineno-16-12" name="__codelineno-16-12"></a><span class="nv">rangex</span><span class="o">=</span><span class="k">$(</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;(</span><span class="si">${</span><span class="nv">xmax</span><span class="si">}</span><span class="s2"> - </span><span class="si">${</span><span class="nv">xmin</span><span class="si">}</span><span class="s2"> + 0.5)/1+1&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>bc<span class="w"> </span><span class="k">)</span>
+</span><span id="__span-16-13"><a id="__codelineno-16-13" name="__codelineno-16-13"></a><span class="nv">rangey</span><span class="o">=</span><span class="k">$(</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;(</span><span class="si">${</span><span class="nv">ymax</span><span class="si">}</span><span class="s2"> - </span><span class="si">${</span><span class="nv">ymin</span><span class="si">}</span><span class="s2"> + 0.5)/1+1&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>bc<span class="w"> </span><span class="k">)</span>
+</span><span id="__span-16-14"><a id="__codelineno-16-14" name="__codelineno-16-14"></a><span class="nv">bsize</span><span class="o">=</span><span class="m">2000</span>
+</span><span id="__span-16-15"><a id="__codelineno-16-15" name="__codelineno-16-15"></a><span class="nv">scale</span><span class="o">=</span><span class="m">100</span>
+</span><span id="__span-16-16"><a id="__codelineno-16-16" name="__codelineno-16-16"></a><span class="nv">header</span><span class="o">=</span><span class="s2">&quot;##K=</span><span class="si">${</span><span class="nv">K</span><span class="si">}</span><span class="s2">;TOPK=3\n##BLOCK_SIZE=</span><span class="si">${</span><span class="nv">bsize</span><span class="si">}</span><span class="s2">;BLOCK_AXIS=X;INDEX_AXIS=Y\n##OFFSET_X=</span><span class="si">${</span><span class="nv">offsetx</span><span class="si">}</span><span class="s2">;OFFSET_Y=</span><span class="si">${</span><span class="nv">offsety</span><span class="si">}</span><span class="s2">;SIZE_X=</span><span class="si">${</span><span class="nv">rangex</span><span class="si">}</span><span class="s2">;SIZE_Y=</span><span class="si">${</span><span class="nv">rangey</span><span class="si">}</span><span class="s2">;SCALE=</span><span class="si">${</span><span class="nv">scale</span><span class="si">}</span><span class="s2">\n#BLOCK\tX\tY\tK1\tK2\tK3\tP1\tP2\tP3&quot;</span>
+</span><span id="__span-16-17"><a id="__codelineno-16-17" name="__codelineno-16-17"></a>
+</span><span id="__span-16-18"><a id="__codelineno-16-18" name="__codelineno-16-18"></a><span class="o">(</span><span class="nb">echo</span><span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">header</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>zcat<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>tail<span class="w"> </span>-n<span class="w"> </span>+2<span class="w"> </span><span class="p">|</span><span class="w"> </span>perl<span class="w"> </span>-slane<span class="w"> </span><span class="s1">&#39;$F[0]=int(($F[1]-$offx)/$bsize) * $bsize; $F[1]=int(($F[1]-$offx)*$scale); $F[1]=($F[1]&gt;=0)?$F[1]:0; $F[2]=int(($F[2]-$offy)*$scale); $F[2]=($F[2]&gt;=0)?$F[2]:0; print join(&quot;\t&quot;, @F);&#39;</span><span class="w"> </span>--<span class="w"> </span>-bsize<span class="o">=</span><span class="si">${</span><span class="nv">bsize</span><span class="si">}</span><span class="w"> </span>-scale<span class="o">=</span><span class="si">${</span><span class="nv">scale</span><span class="si">}</span><span class="w"> </span>-offx<span class="o">=</span><span class="si">${</span><span class="nv">offsetx</span><span class="si">}</span><span class="w"> </span>-offy<span class="o">=</span><span class="si">${</span><span class="nv">offsety</span><span class="si">}</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-S<span class="w"> </span>4G<span class="w"> </span>-k1,1g<span class="w"> </span>-k3,3g<span class="w"> </span><span class="o">)</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>bgzip<span class="w"> </span>-c<span class="w"> </span>&gt;<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span>
+</span><span id="__span-16-19"><a id="__codelineno-16-19" name="__codelineno-16-19"></a>
+</span><span id="__span-16-20"><a id="__codelineno-16-20" name="__codelineno-16-20"></a>tabix<span class="w"> </span>-f<span class="w"> </span>-s1<span class="w"> </span>-b3<span class="w"> </span>-e3<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span>
+</span><span id="__span-16-21"><a id="__codelineno-16-21" name="__codelineno-16-21"></a><span class="c1"># rm ${input} # Make sure the sorted file makes sense before you remove the unsorted file</span>
+</span></code></pre></div></td></tr></table></div>
+<p>Next, we can identify differentially expressed genes for each factor. This is a naive pseudo-bulk chi-squared test, please view the results with caution.</p>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-17-1"> 1</a></span>
+<span class="normal"><a href="#__codelineno-17-2"> 2</a></span>
+<span class="normal"><a href="#__codelineno-17-3"> 3</a></span>
+<span class="normal"><a href="#__codelineno-17-4"> 4</a></span>
+<span class="normal"><a href="#__codelineno-17-5"> 5</a></span>
+<span class="normal"><a href="#__codelineno-17-6"> 6</a></span>
+<span class="normal"><a href="#__codelineno-17-7"> 7</a></span>
+<span class="normal"><a href="#__codelineno-17-8"> 8</a></span>
+<span class="normal"><a href="#__codelineno-17-9"> 9</a></span>
+<span class="normal"><a href="#__codelineno-17-10">10</a></span>
+<span class="normal"><a href="#__codelineno-17-11">11</a></span>
+<span class="normal"><a href="#__codelineno-17-12">12</a></span>
+<span class="normal"><a href="#__codelineno-17-13">13</a></span>
+<span class="normal"><a href="#__codelineno-17-14">14</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1"></a><span class="c1"># DE</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2"></a><span class="nv">max_pval_output</span><span class="o">=</span>1e-3
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3"></a><span class="nv">min_fold_output</span><span class="o">=</span><span class="m">1</span>.5
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4"></a><span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>.posterior.count.tsv.gz
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5"></a><span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>.bulk_chisq.tsv
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6"></a>ficture<span class="w"> </span>de_bulk<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--min_ct_per_feature<span class="w"> </span><span class="si">${</span><span class="nv">min_ct_per_feature</span><span class="si">}</span><span class="w"> </span>--max_pval_output<span class="w"> </span><span class="si">${</span><span class="nv">max_pval_output</span><span class="si">}</span><span class="w"> </span>--min_fold_output<span class="w"> </span><span class="si">${</span><span class="nv">min_fold_output</span><span class="si">}</span><span class="w"> </span>--thread<span class="w"> </span><span class="si">${</span><span class="nv">thread</span><span class="si">}</span>
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7"></a>
+</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8"></a>
+</span><span id="__span-17-9"><a id="__codelineno-17-9" name="__codelineno-17-9"></a><span class="c1"># Report (color table and top DE genes)</span>
+</span><span id="__span-17-10"><a id="__codelineno-17-10" name="__codelineno-17-10"></a><span class="nv">cmap</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/figure/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.rgb.tsv
+</span><span id="__span-17-11"><a id="__codelineno-17-11" name="__codelineno-17-11"></a><span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>.factor.info.html
+</span><span id="__span-17-12"><a id="__codelineno-17-12" name="__codelineno-17-12"></a>
+</span><span id="__span-17-13"><a id="__codelineno-17-13" name="__codelineno-17-13"></a><span class="c1"># generate a report for each factor</span>
+</span><span id="__span-17-14"><a id="__codelineno-17-14" name="__codelineno-17-14"></a>ficture<span class="w"> </span>factor_report<span class="w"> </span>--path<span class="w"> </span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span><span class="w"> </span>--pref<span class="w"> </span><span class="si">${</span><span class="nv">prefix</span><span class="si">}</span><span class="w"> </span>--color_table<span class="w"> </span><span class="si">${</span><span class="nv">cmap</span><span class="si">}</span>
+</span></code></pre></div></td></tr></table></div>
+<p>Next, generalize pixel level images representing the factorization result</p>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-18-1">1</a></span>
+<span class="normal"><a href="#__codelineno-18-2">2</a></span>
+<span class="normal"><a href="#__codelineno-18-3">3</a></span>
+<span class="normal"><a href="#__codelineno-18-4">4</a></span>
+<span class="normal"><a href="#__codelineno-18-5">5</a></span>
+<span class="normal"><a href="#__codelineno-18-6">6</a></span>
+<span class="normal"><a href="#__codelineno-18-7">7</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1"></a><span class="c1"># Make pixel level figures</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2"></a><span class="nv">cmap</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/figure/<span class="si">${</span><span class="nv">output_id</span><span class="si">}</span>.rgb.tsv
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3"></a><span class="nv">input</span><span class="o">=</span><span class="si">${</span><span class="nv">output_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>.pixel.sorted.tsv.gz
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4"></a><span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span>/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>.pixel.png
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5"></a>
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6"></a><span class="c1"># plot pixel level images</span>
+</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7"></a>ficture<span class="w"> </span>plot_pixel_full<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--color_table<span class="w"> </span><span class="si">${</span><span class="nv">cmap</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--plot_um_per_pixel<span class="w"> </span><span class="m">0</span>.5<span class="w"> </span>--full
+</span></code></pre></div></td></tr></table></div>
+<p>You may also want to generate heatmaps for individual factors. If the data is very large, making all individual factor maps may take some time.</p>
 <p>Generate everything in one run
-<div class="highlight"><pre><span></span><code><span class="c1"># Make single factor heatmaps, plot_subbatch balances speed and memory ...</span>
-<span class="c1"># batch size 8 should be safe for 7 or 14G in most cases</span>
-<span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span>/sub/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>.pixel
-ficture<span class="w"> </span>plot_pixel_single<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--plot_um_per_pixel<span class="w"> </span><span class="m">0</span>.5<span class="w"> </span>--full<span class="w"> </span>--all
-</code></pre></div></p>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-19-1">1</a></span>
+<span class="normal"><a href="#__codelineno-19-2">2</a></span>
+<span class="normal"><a href="#__codelineno-19-3">3</a></span>
+<span class="normal"><a href="#__codelineno-19-4">4</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1"></a><span class="c1"># Make single factor heatmaps, plot_subbatch balances speed and memory ...</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2"></a><span class="c1"># batch size 8 should be safe for 7 or 14G in most cases</span>
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3"></a><span class="nv">output</span><span class="o">=</span><span class="si">${</span><span class="nv">figure_path</span><span class="si">}</span>/sub/<span class="si">${</span><span class="nv">prefix</span><span class="si">}</span>.pixel
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4"></a>ficture<span class="w"> </span>plot_pixel_single<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--plot_um_per_pixel<span class="w"> </span><span class="m">0</span>.5<span class="w"> </span>--full<span class="w"> </span>--all
+</span></code></pre></div></td></tr></table></div></p>
 <p>Alternatively, you can generate by batch
-<div class="highlight"><pre><span></span><code><span class="nv">plot_subbatch</span><span class="o">=</span><span class="m">8</span>
-<span class="nv">st</span><span class="o">=</span><span class="m">0</span>
-<span class="nv">ed</span><span class="o">=</span><span class="k">$((</span><span class="nv">plot_subbatch</span><span class="o">+</span><span class="nv">st</span><span class="o">-</span><span class="m">1</span><span class="k">))</span>
-<span class="k">while</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="si">${</span><span class="nv">st</span><span class="si">}</span><span class="w"> </span>-lt<span class="w"> </span><span class="si">${</span><span class="nv">K</span><span class="si">}</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="si">${</span><span class="nv">ed</span><span class="si">}</span><span class="w"> </span>-gt<span class="w"> </span><span class="si">${</span><span class="nv">K</span><span class="si">}</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
-<span class="w">        </span><span class="nv">ed</span><span class="o">=</span><span class="k">$((</span><span class="nv">K</span><span class="o">-</span><span class="m">1</span><span class="k">))</span>
-<span class="w">    </span><span class="k">fi</span>
-<span class="w">    </span><span class="nv">id_list</span><span class="o">=</span><span class="k">$(</span><span class="w"> </span>seq<span class="w"> </span><span class="si">${</span><span class="nv">st</span><span class="si">}</span><span class="w"> </span><span class="si">${</span><span class="nv">ed</span><span class="si">}</span><span class="w"> </span><span class="k">)</span>
-<span class="w">    </span><span class="nb">echo</span><span class="w"> </span><span class="nv">$id_list</span>
-
-<span class="w">    </span>ficture<span class="w"> </span>plot_pixel_single<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--id_list<span class="w"> </span><span class="si">${</span><span class="nv">id_list</span><span class="si">}</span><span class="w"> </span>--plot_um_per_pixel<span class="w"> </span><span class="m">0</span>.5<span class="w"> </span>--full
-<span class="w">    </span><span class="nv">st</span><span class="o">=</span><span class="k">$((</span><span class="nv">ed</span><span class="o">+</span><span class="m">1</span><span class="k">))</span>
-<span class="w">    </span><span class="nv">ed</span><span class="o">=</span><span class="k">$((</span><span class="nv">plot_subbatch</span><span class="o">+</span><span class="nv">st</span><span class="o">-</span><span class="m">1</span><span class="k">))</span>
-<span class="k">done</span>
-</code></pre></div></p>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-20-1"> 1</a></span>
+<span class="normal"><a href="#__codelineno-20-2"> 2</a></span>
+<span class="normal"><a href="#__codelineno-20-3"> 3</a></span>
+<span class="normal"><a href="#__codelineno-20-4"> 4</a></span>
+<span class="normal"><a href="#__codelineno-20-5"> 5</a></span>
+<span class="normal"><a href="#__codelineno-20-6"> 6</a></span>
+<span class="normal"><a href="#__codelineno-20-7"> 7</a></span>
+<span class="normal"><a href="#__codelineno-20-8"> 8</a></span>
+<span class="normal"><a href="#__codelineno-20-9"> 9</a></span>
+<span class="normal"><a href="#__codelineno-20-10">10</a></span>
+<span class="normal"><a href="#__codelineno-20-11">11</a></span>
+<span class="normal"><a href="#__codelineno-20-12">12</a></span>
+<span class="normal"><a href="#__codelineno-20-13">13</a></span>
+<span class="normal"><a href="#__codelineno-20-14">14</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1"></a><span class="nv">plot_subbatch</span><span class="o">=</span><span class="m">8</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2"></a><span class="nv">st</span><span class="o">=</span><span class="m">0</span>
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3"></a><span class="nv">ed</span><span class="o">=</span><span class="k">$((</span><span class="nv">plot_subbatch</span><span class="o">+</span><span class="nv">st</span><span class="o">-</span><span class="m">1</span><span class="k">))</span>
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4"></a><span class="k">while</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="si">${</span><span class="nv">st</span><span class="si">}</span><span class="w"> </span>-lt<span class="w"> </span><span class="si">${</span><span class="nv">K</span><span class="si">}</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
+</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="si">${</span><span class="nv">ed</span><span class="si">}</span><span class="w"> </span>-gt<span class="w"> </span><span class="si">${</span><span class="nv">K</span><span class="si">}</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6"></a><span class="w">        </span><span class="nv">ed</span><span class="o">=</span><span class="k">$((</span><span class="nv">K</span><span class="o">-</span><span class="m">1</span><span class="k">))</span>
+</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7"></a><span class="w">    </span><span class="k">fi</span>
+</span><span id="__span-20-8"><a id="__codelineno-20-8" name="__codelineno-20-8"></a><span class="w">    </span><span class="nv">id_list</span><span class="o">=</span><span class="k">$(</span><span class="w"> </span>seq<span class="w"> </span><span class="si">${</span><span class="nv">st</span><span class="si">}</span><span class="w"> </span><span class="si">${</span><span class="nv">ed</span><span class="si">}</span><span class="w"> </span><span class="k">)</span>
+</span><span id="__span-20-9"><a id="__codelineno-20-9" name="__codelineno-20-9"></a><span class="w">    </span><span class="nb">echo</span><span class="w"> </span><span class="nv">$id_list</span>
+</span><span id="__span-20-10"><a id="__codelineno-20-10" name="__codelineno-20-10"></a>
+</span><span id="__span-20-11"><a id="__codelineno-20-11" name="__codelineno-20-11"></a><span class="w">    </span>ficture<span class="w"> </span>plot_pixel_single<span class="w"> </span>--input<span class="w"> </span><span class="si">${</span><span class="nv">input</span><span class="si">}</span><span class="w"> </span>--output<span class="w"> </span><span class="si">${</span><span class="nv">output</span><span class="si">}</span><span class="w"> </span>--id_list<span class="w"> </span><span class="si">${</span><span class="nv">id_list</span><span class="si">}</span><span class="w"> </span>--plot_um_per_pixel<span class="w"> </span><span class="m">0</span>.5<span class="w"> </span>--full
+</span><span id="__span-20-12"><a id="__codelineno-20-12" name="__codelineno-20-12"></a><span class="w">    </span><span class="nv">st</span><span class="o">=</span><span class="k">$((</span><span class="nv">ed</span><span class="o">+</span><span class="m">1</span><span class="k">))</span>
+</span><span id="__span-20-13"><a id="__codelineno-20-13" name="__codelineno-20-13"></a><span class="w">    </span><span class="nv">ed</span><span class="o">=</span><span class="k">$((</span><span class="nv">plot_subbatch</span><span class="o">+</span><span class="nv">st</span><span class="o">-</span><span class="m">1</span><span class="k">))</span>
+</span><span id="__span-20-14"><a id="__codelineno-20-14" name="__codelineno-20-14"></a><span class="k">done</span>
+</span></code></pre></div></td></tr></table></div></p>
 <h2 id="output">Output<a class="headerlink" href="#output" title="Permanent link">&para;</a></h2>
-<p>In the above example the analysis outputs are stored in
-<div class="highlight"><pre><span></span><code>${path}/analysis/${model_id} # examples/data/analysis/nF12.d_12
-</code></pre></div></p>
+<p>In the above example the analysis outputs are stored in</p>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-21-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1"></a><span class="si">${</span><span class="nv">path</span><span class="si">}</span>/analysis/<span class="si">${</span><span class="nv">model_id</span><span class="si">}</span><span class="w"> </span><span class="c1"># examples/data/analysis/nF12.d_12</span>
+</span></code></pre></div></td></tr></table></div>
 <p>There is an html file reporting the color code and top genes of the inferred factors
-<div class="highlight"><pre><span></span><code>nF12.d_12.decode.prj_12.r_4_5.factor.info.html
-</code></pre></div></p>
-<p>Pixel level visualizating
-<div class="highlight"><pre><span></span><code>figure/nF12.d_12.decode.prj_12.r_4_5.pixel.png
-</code></pre></div></p>
-<p>Pixel level output is
-<div class="highlight"><pre><span></span><code>nF12.d_12.decode.prj_12.r_4_5.pixel.sorted.tsv.gz
-</code></pre></div></p>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-22-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1"></a>nF12.d_12.decode.prj_12.r_4_5.factor.info.html
+</span></code></pre></div></td></tr></table></div></p>
+<p>Pixel level visualization is stored in
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-23-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1"></a>figure/nF12.d_12.decode.prj_12.r_4_5.pixel.png
+</span></code></pre></div></td></tr></table></div></p>
+<p>Pixel level output is stored in</p>
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-24-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1"></a>nF12.d_12.decode.prj_12.r_4_5.pixel.sorted.tsv.gz
+</span></code></pre></div></td></tr></table></div>
 <p>We store the top 3 factors and their corresponding posterior probabilities for each pixel in tab delimted text files.
 As a temporary hack for accessing specific regions in large dataset faster, we divided the data along one axis (X or Y), sorted within each block by the other axis.
 The first 3 lines of the file, starting with <code>##</code>, are metadata, the 4<sup>th</sup> line, starting with <code>#</code>, contains columns names.
 To use the file as plain text, you can ignore this complication and read the file from the 4<sup>th</sup> line.</p>
 <p>The first few lines of the file are as follows:</p>
-<div class="highlight"><pre><span></span><code>##K=12;TOPK=3
-##BLOCK_SIZE=2000;BLOCK_AXIS=X;INDEX_AXIS=Y
-##OFFSET_X=6690;OFFSET_Y=6772;SIZE_X=676;SIZE_Y=676;SCALE=100
-#BLOCK  X       Y       K1      K2      K3      P1      P2      P3
-0       10400   360     2       1       8       9.07e-01        9.27e-02        2.61e-13
-0       10669   360     2       1       8       9.36e-01        6.37e-02        4.20e-08
-0       10730   360     2       1       8       8.85e-01        1.15e-01        1.83e-05
-</code></pre></div>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-25-1">1</a></span>
+<span class="normal"><a href="#__codelineno-25-2">2</a></span>
+<span class="normal"><a href="#__codelineno-25-3">3</a></span>
+<span class="normal"><a href="#__codelineno-25-4">4</a></span>
+<span class="normal"><a href="#__codelineno-25-5">5</a></span>
+<span class="normal"><a href="#__codelineno-25-6">6</a></span>
+<span class="normal"><a href="#__codelineno-25-7">7</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1"></a>##K=12;TOPK=3
+</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2"></a>##BLOCK_SIZE=2000;BLOCK_AXIS=X;INDEX_AXIS=Y
+</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3"></a>##OFFSET_X=6690;OFFSET_Y=6772;SIZE_X=676;SIZE_Y=676;SCALE=100
+</span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4"></a>#BLOCK  X       Y       K1      K2      K3      P1      P2      P3
+</span><span id="__span-25-5"><a id="__codelineno-25-5" name="__codelineno-25-5"></a>0       10400   360     2       1       8       9.07e-01        9.27e-02        2.61e-13
+</span><span id="__span-25-6"><a id="__codelineno-25-6" name="__codelineno-25-6"></a>0       10669   360     2       1       8       9.36e-01        6.37e-02        4.20e-08
+</span><span id="__span-25-7"><a id="__codelineno-25-7" name="__codelineno-25-7"></a>0       10730   360     2       1       8       8.85e-01        1.15e-01        1.83e-05
+</span></code></pre></div></td></tr></table></div>
 <p>The 4<sup>th</sup> line contains the column names. From the 5<sup>th</sup> line on, each line contains the information for one pixel with coordinates <code>(X, Y)</code>, the top 3 factors indicated by <code>K1, K2, K3</code> and their corresponding posterior probabilities <code>P1, P2, P3</code>. Factors are 0-indexed.</p>
 <p>The 1<sup>st</sup> line indicates that the data is from a model with 12 factors (<code>K=12</code>) and we store the top 3 factors for each pixel (<code>TOPK=3</code>).</p>
 <p>The 2<sup>nd</sup> line indicates that the data is separated into blocks by the X axis (<code>BLOCK_AXIS=X</code>) with block size 2000<span class="arithmatex">\(\mu m\)</span> (<code>BLOCK_SIZE=2000</code>), then within each block the data is sorted by the Y axis (<code>INDEX_AXIS=Y</code>).
@@ -1187,10 +1715,14 @@ In this above example, the raw data from Vizgen MERSCOPE mouse liver data contai
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.tabs", "navigation.indexes", "navigation.sections"], "search": "../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.tabs", "navigation.indexes", "navigation.sections"], "search": "../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.1e8ae164.min.js"></script>
+      <script src="../assets/javascripts/bundle.83f73b43.min.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
       
     
   </body>
