@@ -62,7 +62,7 @@ def run_together(_args):
     aux_params.add_argument('--cmap-name', type=str, default="turbo", help='Name of color map')
     aux_params.add_argument('--dge-precision', type=float, default=2, help='Output precision of hexagon coordinates')
     aux_params.add_argument('--fit-precision', type=float, default=2, help='Output precision of model fitting')
-    aux_params.add_argument('--decode-precision', type=float, default=0.1, help='Precision of pixel level decoding')
+    aux_params.add_argument('--decode-precision', type=float, default=0.01, help='Precision of pixel level decoding')
     aux_params.add_argument('--lda-plot-um-per-pixel', type=float, default=1, help='Image resolution for LDA plot')
     aux_params.add_argument('--decode-plot-um-per-pixel', type=float, default=0.5, help='Image resolution for pixel decoding plot')
     aux_params.add_argument('--decode-sub-um-per-pixel', type=float, default=1, help='Image resolution for individual subplots')
@@ -70,6 +70,7 @@ def run_together(_args):
     aux_params.add_argument('--tabix', type=str, default="tabix", help='Path to tabix binary')
     aux_params.add_argument('--gzip', type=str, default="gzip", help='Path to gzip binary. For faster processing, use "pigz -p 4"')
     aux_params.add_argument('--sort', type=str, default="sort", help='Path to sort binary. For faster processing, you may add arguments like "sort -T /path/to/new/tmpdir --parallel=20 -S 10G"')
+    aux_params.add_argument('--sort-mem', type=str, default="5G", help='Memory size for each process')
 
     args = parser.parse_args(_args)
 
@@ -194,39 +195,94 @@ gzip -cd ${input} | awk 'BEGIN{FS=OFS="\t"} NR==1{for(i=1;i<=NF;i++){if($i=="X")
             logging.error(f"Cannot find {args.tabix}. Please make sure that the path to --tabix is correct")
             sys.exit(1)
 
-
         script_path = f"{args.out_dir}/sort_decode.sh"
+        
         with open(script_path, "w") as f:
             f.write(r"""#!/bin/bash
 input=$1
 output=$2
 coor=$3
-model_id=$4
+                    
+n_factor=$4
 bsize=$5
 scale=$6
 topk=$7
-bgzip=$8
-tabix=$9
+major_axis=$8
+                    
+bgzip=$9
+tabix=${10}
+sort=${11}
+sort_mem=${12}
 
-K=$( echo $model_id | sed 's/nF\([0-9]\{1,\}\)\..*/\1/' )
+# 1) x y limits
 while IFS=$'\t' read -r r_key r_val; do
     export "${r_key}"="${r_val}"
 done < ${coor}
-echo -e "${xmin}, ${xmax}; ${ymin}, ${ymax}"
+echo -e "x: ${xmin}, ${xmax}\ny: ${ymin}, ${ymax}"
 
 offsetx=${xmin}
 offsety=${ymin}
 rangex=$( echo "(${xmax} - ${xmin} + 0.5)/1+1" | bc )
 rangey=$( echo "(${ymax} - ${ymin} + 0.5)/1+1" | bc )
-bsize=2000
-scale=100
-header="##K=${K};TOPK=${topk}\n##BLOCK_SIZE=${bsize};BLOCK_AXIS=X;INDEX_AXIS=Y\n##OFFSET_X=${offsetx};OFFSET_Y=${offsety};SIZE_X=${rangex};SIZE_Y=${rangey};SCALE=${scale}\n#BLOCK\tX\tY\tK1\tK2\tK3\tP1\tP2\tP3"
+                    
 
-(echo -e "${header}" && gzip -cd "${input}" | tail -n +2 | perl -slane '$F[0]=int(($F[1]-$offx)/$bsize) * $bsize; $F[1]=int(($F[1]-$offx)*$scale); $F[1]=($F[1]>=0)?$F[1]:0; $F[2]=int(($F[2]-$offy)*$scale); $F[2]=($F[2]>=0)?$F[2]:0; print join("\t", @F);' -- -bsize="${bsize}" -scale="${scale}" -offx="${offsetx}" -offy="${offsety}" | sort -S 1G -k1,1g -k3,3g ) | ${bgzip} -c > ${output}
+# 2) define the block and sort axis
+axis2col_X=2
+axis2col_Y=3
 
-${tabix} -f -s1 -b3 -e3 ${output}
-rm ${input}
+if [[ ${major_axis} == "Y" ]]; then
+    block_axis="X"
+    offblock="${offsetx}"
+else
+    block_axis="Y"
+    offblock="${offsety}"
+fi
+
+blockidx0=$( echo "$(eval echo \${axis2col_${block_axis}}) - 1" | bc )   # perl is 0-based
+sortidx=$(eval echo \${axis2col_${major_axis}})
+                    
+# echo
+echo -e "block_axis: ${block_axis}\noffblock: ${offblock}\nblockidx in perl: ${blockidx0}\nsortidx: ${sortidx}"
+        
+header="##K=${n_factor};TOPK=${topk}\n##BLOCK_SIZE=${bsize};BLOCK_AXIS=${block_axis};INDEX_AXIS=${major_axis}\n##OFFSET_X=${offsetx};OFFSET_Y=${offsety};SIZE_X=${rangex};SIZE_Y=${rangey};SCALE=${scale}\n#BLOCK\tX\tY\tK1\tK2\tK3\tP1\tP2\tP3"
+
+(echo -e "${header}" && gzip -cd "${input}" | tail -n +2 | perl -slane '$F[0]=int(($F[$bidx]-$offb)/$bsize) * $bsize; $F[1]=int(($F[1]-$offx)*$scale); $F[1]=($F[1]>=0)?$F[1]:0; $F[2]=int(($F[2]-$offy)*$scale); $F[2]=($F[2]>=0)?$F[2]:0; print join("\t", @F);' -- -bsize="${bsize}" -scale="${scale}" -offx="${offsetx}" -offy="${offsety}" -bidx="${blockidx0}" -offb="${offblock}"|  ${sort} -S ${sort_mem} -k1,1g -k"${sortidx},${sortidx}g") | ${bgzip} -c > ${output}
+
+${tabix} -f -s1 -b"${sortidx}" -e"${sortidx}" ${output}
+                                    
 """)
+#         script_path = f"{args.out_dir}/sort_decode.sh"
+#         with open(script_path, "w") as f:
+#             f.write(r"""#!/bin/bash
+# input=$1
+# output=$2
+# coor=$3
+# model_id=$4
+# bsize=$5
+# scale=$6
+# topk=$7
+# bgzip=$8
+# tabix=$9
+
+# K=$( echo $model_id | sed 's/nF\([0-9]\{1,\}\)\..*/\1/' )
+# while IFS=$'\t' read -r r_key r_val; do
+#     export "${r_key}"="${r_val}"
+# done < ${coor}
+# echo -e "${xmin}, ${xmax}; ${ymin}, ${ymax}"
+
+# offsetx=${xmin}
+# offsety=${ymin}
+# rangex=$( echo "(${xmax} - ${xmin} + 0.5)/1+1" | bc )
+# rangey=$( echo "(${ymax} - ${ymin} + 0.5)/1+1" | bc )
+# bsize=2000
+# scale=100
+# header="##K=${K};TOPK=${topk}\n##BLOCK_SIZE=${bsize};BLOCK_AXIS=X;INDEX_AXIS=Y\n##OFFSET_X=${offsetx};OFFSET_Y=${offsety};SIZE_X=${rangex};SIZE_Y=${rangey};SCALE=${scale}\n#BLOCK\tX\tY\tK1\tK2\tK3\tP1\tP2\tP3"
+
+# (echo -e "${header}" && gzip -cd "${input}" | tail -n +2 | perl -slane '$F[0]=int(($F[1]-$offx)/$bsize) * $bsize; $F[1]=int(($F[1]-$offx)*$scale); $F[1]=($F[1]>=0)?$F[1]:0; $F[2]=int(($F[2]-$offy)*$scale); $F[2]=($F[2]>=0)?$F[2]:0; print join("\t", @F);' -- -bsize="${bsize}" -scale="${scale}" -offx="${offsetx}" -offy="${offsety}" | sort -S 1G -k1,1g -k3,3g ) | ${bgzip} -c > ${output}
+
+# ${tabix} -f -s1 -b3 -e3 ${output}
+# rm ${input}
+# """)
         for train_width in train_widths:
             for n_factor in n_factors:
                 batch_in = f"{args.out_dir}/batched.matrix.tsv.gz"
@@ -267,7 +323,8 @@ rm ${input}
                     cmds.append(rf"$(info --------------------------------------------------------------)")
                     cmds.append(rf"$(info Sorting and reformatting the pixel-level output..)")
                     cmds.append(rf"$(info --------------------------------------------------------------)")
-                    cmds.append(f"bash {script_path} {decode_prefix}.pixel.tsv.gz {decode_prefix}.pixel.sorted.tsv.gz {minmax_out} {model_id} {args.decode_block_size} {args.decode_scale} {args.decode_top_k} {args.bgzip} {args.tabix}")
+#                    cmds.append(f"bash {script_path} {decode_prefix}.pixel.tsv.gz {decode_prefix}.pixel.sorted.tsv.gz {minmax_out} {model_id} {args.decode_block_size} {args.decode_scale} {args.decode_top_k} {args.bgzip} {args.tabix}")
+                    cmds.append(f"bash {script_path} {decode_prefix}.pixel.tsv.gz {decode_prefix}.pixel.sorted.tsv.gz {minmax_out} {model_id} {args.decode_block_size} {args.decode_scale} {args.decode_top_k} {args.major_axis} {args.bgzip} {args.tabix} {args.sort} {args.sort_mem}")
 
                     de_input=f"{decode_prefix}.posterior.count.tsv.gz"
                     de_output=f"{decode_prefix}.bulk_chisq.tsv"
