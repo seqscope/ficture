@@ -62,7 +62,7 @@ def run_together(_args):
     aux_params.add_argument('--cmap-name', type=str, default="turbo", help='Name of color map')
     aux_params.add_argument('--dge-precision', type=float, default=2, help='Output precision of hexagon coordinates')
     aux_params.add_argument('--fit-precision', type=float, default=2, help='Output precision of model fitting')
-    aux_params.add_argument('--decode-precision', type=float, default=0.01, help='Precision of pixel level decoding')
+    aux_params.add_argument('--decode-precision', type=float, default=0.1, help='Precision of pixel level decoding')
     aux_params.add_argument('--lda-plot-um-per-pixel', type=float, default=1, help='Image resolution for LDA plot')
     aux_params.add_argument('--decode-plot-um-per-pixel', type=float, default=0.5, help='Image resolution for pixel decoding plot')
     aux_params.add_argument('--decode-sub-um-per-pixel', type=float, default=1, help='Image resolution for individual subplots')
@@ -308,7 +308,8 @@ ${tabix} -f -s1 -b"${sortidx}" -e"${sortidx}" ${output}
                     cmds.append(rf"$(info --------------------------------------------------------------)")
                     cmds.append(rf"$(info Creating projection for {train_width}um and {n_factor} factors, at {fit_width}um)")
                     cmds.append(rf"$(info --------------------------------------------------------------)")
-                    cmds.append(f"ficture transform --input {args.in_tsv} --output_pref {prj_prefix} --model {model} --key {args.key_col} --major_axis {args.major_axis} --hex_width {fit_width} --n_move {fit_nmove} --min_ct_per_unit {args.min_ct_unit_fit} --mu_scale {args.mu_scale} --thread {args.threads} --precision {args.fit_precision}")
+                    feature_prefix = f"--feature {args.in_feature}" if args.in_feature is not None else ""
+                    cmds.append(f"ficture transform --input {args.in_tsv} {feature_prefix} --output_pref {prj_prefix} --model {model} --key {args.key_col} --major_axis {args.major_axis} --hex_width {fit_width} --n_move {fit_nmove} --min_ct_per_unit {args.min_ct_unit_fit} --mu_scale {args.mu_scale} --thread {args.threads} --precision {args.fit_precision}")
 
                     batch_input=f"{args.out_dir}/batched.matrix.tsv.gz"
                     anchor=f"{prj_prefix}.fit_result.tsv.gz"
@@ -318,7 +319,7 @@ ${tabix} -f -s1 -b"${sortidx}" -e"${sortidx}" ${output}
                     cmds.append(rf"$(info --------------------------------------------------------------)")
                     cmds.append(rf"$(info Performing pixel-level decoding..)")
                     cmds.append(rf"$(info --------------------------------------------------------------)")
-                    cmds.append(f"ficture slda_decode --input {batch_in} --output {decode_prefix} --model {model} --anchor {anchor} --anchor_in_um --neighbor_radius {radius} --mu_scale {args.mu_scale} --key {args.key_col} --precision {args.decode_precision} --lite_topk_output_pixel {args.decode_top_k} --lite_topk_output_anchor {args.decode_top_k} --thread {args.threads}")
+                    cmds.append(f"ficture slda_decode --input {batch_in} {feature_prefix} --output {decode_prefix} --model {model} --anchor {anchor} --anchor_in_um --neighbor_radius {radius} --mu_scale {args.mu_scale} --key {args.key_col} --precision {args.decode_precision} --lite_topk_output_pixel {args.decode_top_k} --lite_topk_output_anchor {args.decode_top_k} --thread {args.threads}")
 
                     cmds.append(rf"$(info --------------------------------------------------------------)")
                     cmds.append(rf"$(info Sorting and reformatting the pixel-level output..)")
