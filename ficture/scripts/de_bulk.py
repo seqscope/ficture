@@ -66,7 +66,8 @@ def de_bulk(_args):
 
     if len(gene_kept) > 0:
         info = info.loc[info.gene.isin(gene_kept), :]
-    info["gene_tot"] = info.loc[:, header].sum(axis=1).astype(int)
+    info["gene_tot"] = info.loc[:, header].sum(axis=1)
+    #info["gene_tot"] = info.loc[:, header].sum(axis=1).astype(int)
     info = info[info["gene_tot"] > args.min_ct_per_feature]
     info.index = info.gene.values
     total_umi = info.gene_tot.sum()
