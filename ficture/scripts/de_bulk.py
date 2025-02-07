@@ -76,7 +76,10 @@ def de_bulk(_args):
 
     print(f"Testing {M} genes over {K} factors")
 
-    def chisq(k,info,total_k,total_umi):
+    pseudocount = 1/K
+
+    def chisq(k,info,total_k,total_umi, pseudocount):
+
         res = []
         if total_k <= 0:
             return res
@@ -88,7 +91,11 @@ def de_bulk(_args):
             tab[0,1]=v["gene_tot"]-tab[0,0]
             tab[1,0]=total_k-tab[0,0]
             tab[1,1]=total_umi-total_k-v["gene_tot"]+tab[0,0]
-            fd=tab[0,0]/total_k/tab[0,1]*(total_umi-total_k)
+            # Check if any denominator is zero
+            if tab[0,1] == 0 or (total_umi - total_k[k]) == 0:
+                fd = (tab[0,0] + pseudocount) / (total_k[k] + pseudocount) / (tab[0,1] + pseudocount) * (total_umi - total_k[k] + pseudocount)
+            else:
+                fd = tab[0,0] / total_k[k] / tab[0,1] * (total_umi - total_k[k])
             if fd < 1:
                 continue
             tab = np.around(tab, 0).astype(int) + 1
@@ -103,7 +110,7 @@ def de_bulk(_args):
             with Parallel(n_jobs=args.thread, verbose=0) as parallel:
                 result = parallel(delayed(chisq)(kname, \
                             info.iloc[idx, :].loc[:, [kname, 'gene_tot']],\
-                            total_k[k], total_umi) for idx in idx_slices)
+                            total_k[k], total_umi, pseudocount) for idx in idx_slices)
             res += [item for sublist in result for item in sublist]
     else:
         for name, v in info.iterrows():
@@ -111,11 +118,16 @@ def de_bulk(_args):
                 if total_k[k] <= 0 or v[str(k)] <= 0:
                     continue
                 tab=np.zeros((2,2))
-                tab[0,0]=v[kname]
-                tab[0,1]=v["gene_tot"]-tab[0,0]
-                tab[1,0]=total_k[k]-tab[0,0]
-                tab[1,1]=total_umi-total_k[k]-v["gene_tot"]+tab[0,0]
-                fd=tab[0,0]/total_k[k]/tab[0,1]*(total_umi-total_k[k])
+                tab[0,0]=v[kname]                   # Gene X count in Factor k
+                tab[0,1]=v["gene_tot"]-tab[0,0]     # Gene X count in other factors
+                tab[1,0]=total_k[k]-tab[0,0]        # Other genes in Factor k
+                tab[1,1]=total_umi-total_k[k]-v["gene_tot"]+tab[0,0] # Other genes in other factors
+
+                # Check if any denominator is zero
+                if tab[0,1] == 0 or (total_umi - total_k[k]) == 0:
+                    fd = (tab[0,0] + pseudocount) / (total_k[k] + pseudocount) / (tab[0,1] + pseudocount) * (total_umi - total_k[k] + pseudocount)
+                else:
+                    fd = tab[0,0] / total_k[k] / tab[0,1] * (total_umi - total_k[k])
                 if fd < 1:
                     continue
                 tab = np.around(tab, 0).astype(int) + 1
