@@ -76,38 +76,32 @@ def de_bulk(_args):
 
     print(f"Testing {M} genes over {K} factors")
 
-    pseudocount = 1/K
-
-    def chisq(k,info,total_k,total_umi, pseudocount):
+    def chisq(k,info,total_k,total_umi):
         res = []
         if total_k <= 0:
             return res
         for name, v in info.iterrows():
-            v_in_k = v[k]
-            genes_in_k = total_k
-            v_in_factors = v["gene_tot"]
-            temp_total = total_umi
-            if v_in_k <= 0:
+            if v[k] <= 0:
                 continue
-            # if the gene is not expressed in other factors, add pseudocount
-            if v_in_factors - v_in_k <=0:
-                v_in_k += pseudocount
-                genes_in_k += pseudocount
-                v_in_factors += 1
-                temp_total +=1
-            
             tab=np.zeros((2,2))
-            tab[0,0] = v_in_k                   
-            tab[0,1] = v_in_factors - v_in_k    
-            tab[1,0] = genes_in_k - v_in_k      
-            tab[1,1] = temp_total - genes_in_k - v_in_factors + v_in_k 
-            
-            fd = v_in_k / genes_in_k / (v_in_factors - v_in_k) * (temp_total - genes_in_k)
+            tab[0,0]=v[str(k)]
+            tab[0,1]=v["gene_tot"]-tab[0,0]
+            tab[1,0]=total_k-tab[0,0]
+            tab[1,1]=total_umi-total_k-v["gene_tot"]+tab[0,0]
+            #fd=tab[0,0]/total_k/tab[0,1]*(total_umi-total_k)
+            # add 0.5 to avoid division by zero ()
+            if float(tab[0,1]) > 0 and (total_umi - total_k) >0:
+                fd_numerator = tab[0,0] / total_k
+                fd_denominator = tab[0,1] / (total_umi - total_k) 
+            else:
+                fd_numerator = (tab[0,0] + 0.5) / ( total_k + 1)
+                fd_denominator = (tab[0,1] + 0.5) / ( total_umi - total_k + 1 )
+            fd = fd_numerator / fd_denominator
             if fd < 1:
                 continue
             tab = np.around(tab, 0).astype(int) + 1
             chi2, p, dof, ex = scipy.stats.chi2_contingency(tab, correction=False)
-            res.append([name, k, chi2, p, fd, v_in_factors])
+            res.append([name,k,chi2,p,fd,v["gene_tot"]])
         return res
 
     res = []
@@ -117,38 +111,31 @@ def de_bulk(_args):
             with Parallel(n_jobs=args.thread, verbose=0) as parallel:
                 result = parallel(delayed(chisq)(kname, \
                             info.iloc[idx, :].loc[:, [kname, 'gene_tot']],\
-                            total_k[k], total_umi, pseudocount) for idx in idx_slices)
+                            total_k[k], total_umi) for idx in idx_slices)
             res += [item for sublist in result for item in sublist]
     else:
         for name, v in info.iterrows():
             for k, kname in enumerate(header):
                 if total_k[k] <= 0 or v[str(k)] <= 0:
                     continue
-                
-                v_in_k = v[kname]                 # Gene X count in Factor k
-                genes_in_k = total_k[k]           # All genes in Factor k
-                v_in_factors = v["gene_tot"]      # Gene X count in all factors
-                temp_total = total_umi            # use a temp variable to avoid changing the total_umi
-                
-                # if the gene is not expressed in other factors, add pseudocount
-                if v_in_factors - v_in_k <=0:
-                    v_in_k += pseudocount
-                    genes_in_k += pseudocount
-                    v_in_factors += 1
-                    temp_total +=1
-
                 tab=np.zeros((2,2))
-                tab[0,0] = v_in_k                   # Gene X count in Factor k
-                tab[0,1] = v_in_factors - v_in_k    # Gene X count in other factors
-                tab[1,0] = genes_in_k - v_in_k      # Other genes in Factor k
-                tab[1,1] = temp_total - genes_in_k - v_in_factors + v_in_k # Other genes in other factors
-
-                fd = v_in_k / genes_in_k / (v_in_factors - v_in_k) * (temp_total - genes_in_k)
+                tab[0,0]=v[kname]
+                tab[0,1]=v["gene_tot"]-tab[0,0]
+                tab[1,0]=total_k[k]-tab[0,0]
+                tab[1,1]=total_umi-total_k[k]-v["gene_tot"]+tab[0,0]
+                #fd=tab[0,0]/total_k[k]/tab[0,1]*(total_umi-total_k[k])
+                if tab[0,1]>0 and (total_umi - total_k[k]) > 0:
+                    fd_numerator = float(tab[0,0]) / total_k[k]
+                    fd_denominator = float(tab[0,1]) / (total_umi - total_k[k]) 
+                else:
+                    fd_numerator = (tab[0,0] + 0.5) / (total_k[k] + 1)
+                    fd_denominator = (tab[0,1] + 0.5) / (total_umi - total_k[k] + 1)
+                fd = fd_numerator / fd_denominator
                 if fd < 1:
                     continue
                 tab = np.around(tab, 0).astype(int) + 1
                 chi2, p, dof, ex = scipy.stats.chi2_contingency(tab, correction=False)
-                res.append([name, kname, chi2, p, fd, v_in_factors])
+                res.append([name,kname,chi2,p,fd,v["gene_tot"]])
 
     chidf=pd.DataFrame(res,columns=['gene','factor','Chi2','pval','FoldChange','gene_total'])
     chidf["Rank"] = chidf.groupby(by = "factor")["Chi2"].rank(ascending=False)
