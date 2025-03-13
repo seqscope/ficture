@@ -27,6 +27,6 @@ coor=${path}/coordinate_minmax.tsv
 
 python foramt_Vizgen.py --input ${input} --output ${output} --feature ${feature} --coor_minmax ${coor} --precision 2 --dummy_genes Blank
 
-sort -S 4G -k1,1g ${output} | gzip -c > ${output}.gz
+sort -S 4G -k2,2g ${output} | gzip -c > ${output}.gz
 rm ${output}
 ```
