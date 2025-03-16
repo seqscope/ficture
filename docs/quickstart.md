@@ -11,7 +11,7 @@ The simplest way to FICTURE using PyPI. Please see [installing FICTURE](install.
 pip install ficture
 ```
 
-Please make sure that `bgzip` and `tabix` is available in your system. Otherwise, please visit [htslib](https://www.htslib.org/download/) website to install htslib.
+<!-- Please make sure that `bgzip` and `tabix` is available in your system. Otherwise, please visit [htslib](https://www.htslib.org/download/) website to install htslib. -->
 
 ## Clone the repository
 
@@ -63,7 +63,7 @@ If you want to see more options with the local pipeline, please run the followin
 ficture run_together --help
 ```
 
-Note that the local pipeline is a wrapper for individual commands, and provided for convenience. 
+Note that the local pipeline is a wrapper for individual commands, and provided for convenience.
 For large datasets, you may need to run individual commands to mitigate memory or CPU constraints.
 
 If you want to run FICTURE with individual commands rather than using the local pipeline, please refer to other sections in this documentation.

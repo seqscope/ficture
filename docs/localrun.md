@@ -1,10 +1,10 @@
 # Running FICTURE in a local machine
 
-## Overview 
+## Overview
 
 This document provides detailed instructions on how to run FICTURE on a local machine with real data.
 This instruction is intended for Ubuntu OS, but it should also work for Mac OS X and other Unix-like systems.
-If you rather want to run all steps together 
+If you rather want to run all steps together
 with `run_togetehr` command, please refer to [Quick start](quickstart.md) for details.
 
 ## Setup
@@ -19,7 +19,7 @@ examples/data/transcripts.tsv.gz
 ## gene list file (optional)
 examples/data/feature.clean.tsv.gz
 ## bounding box file (optional)
-examples/data/coordinate_minmax.tsv 
+examples/data/coordinate_minmax.tsv
 ```
 (All filese are tab-delimited text files unless specified otherwise.)
 
@@ -47,7 +47,7 @@ We also prefer to keep a file listing the min and max of the coordinates (this i
 examples/data/coordinate_minmax.tsv
 ```
 
-Note that, when `run_together` command is used, the gene list file and bounding box files will be automatically generated. 
+Note that, when `run_together` command is used, the gene list file and bounding box files will be automatically generated.
 
 #### Prepare environment
 
@@ -74,7 +74,7 @@ path=examples/data
 The following data-specific setup may be required:
 
 * `mu_scale` is the ratio between $\mu m$ and the unit used in the transcript coordinates. For example, if the coordinates are stored in `nm` this number should be `1000`.
-* `key` is the column name in the transcripts file corresponding to the gene counts (`Count` in our example). 
+* `key` is the column name in the transcripts file corresponding to the gene counts (`Count` in our example).
 * `major_axis` specify which axis the transcript file is sorted by. (either `X` or `Y`)
 
 ```bash
@@ -87,9 +87,9 @@ major_axis=Y # If your data is sorted by the Y-axis
 ### Preprocessing
 
 
-#### Anchor-level minibatch
+#### Pixel-level minibatch
 
-Create pixel minibatches (`${path}/batched.matrix.tsv.gz`) that will be used for anchor-level analysis using the following command: 
+Create pixel minibatches (`${path}/batched.matrix.tsv.gz`) that will be used for pixel-level analysis using the following command:
 
 ```bash linenums="1"
 batch_size=500
@@ -99,9 +99,7 @@ output=${path}/batched.matrix.tsv.gz
 batch=${path}/batched.matrix.tsv
 
 ficture make_spatial_minibatch --input ${input} --output ${batch} --mu_scale ${mu_scale} --batch_size ${batch_size} --batch_buff ${batch_buff} --major_axis ${major_axis}
-
-sort -S 4G -k2,2n -k1,1g ${batch} | gzip -c > ${batch}.gz
-rm ${batch}
+gzip -f ${batch}
 ```
 
 #### Training hexagons
@@ -119,14 +117,14 @@ out=${path}/hexagon.d_${train_width}.tsv
 ficture make_dge --key ${key} --count_header ${key} --input ${input} --output ${out} --hex_width ${train_width} --n_move 2 --min_ct_per_unit ${min_ct_per_unit} --mu_scale ${mu_scale} --precision 2 --major_axis ${major_axis}
 
 ## shuffle the hexagons based on random index
-sort -S 4G -k1,1n ${out} | gzip -c > ${out}.gz 
+sort -S 4G -k1,1n ${out} | gzip -c > ${out}.gz
 rm ${out}
 ```
 
 
 ### LDA Model training
 
-To run FICTURE in a fully unsupervised manner, you need to initialize the model with LDA based on the hexagons created in the previous step. 
+To run FICTURE in a fully unsupervised manner, you need to initialize the model with LDA based on the hexagons created in the previous step.
 
 #### Parameters for initializing the model
 
@@ -141,7 +139,7 @@ R=10 # We use R random initializations and pick one to fit the full model
 thread=4 # Number of threads to use
 ```
 
-#### Setting the input and output paths 
+#### Setting the input and output paths
 
 ```bash linenums="1"
 # parameters
@@ -169,23 +167,23 @@ model=${output}.model.p
 #### Initialize the model with LDA
 
 ```bash linenums="1"
-# Fit model with unsupervised LDA 
+# Fit model with unsupervised LDA
 ficture fit_model --input ${hexagon} --output ${output} --feature ${feature} --nFactor ${nFactor} --epoch ${train_nEpoch} --epoch_id_length 2 --unit_attr X Y --key ${key} --min_ct_per_feature ${min_ct_per_feature} --test_split 0.5 --R ${R} --thread ${thread}
 ```
 
 #### (Optional) Initializing LDA model from pseudo-bulk data
 
-Instead of initializing the model using LDA as shown above, if you want to initialize the model using pseudo-bulk data, you can 
+Instead of initializing the model using LDA as shown above, if you want to initialize the model using pseudo-bulk data, you can
 prepare the pseudo-bulk data as a model matrix in the following TSV format in a `tsv.gz` file:
 
-```plaintext linenums="1" 
+```plaintext linenums="1"
 gene    celltype1   celltype2   ...
 gene1   10          20          ...
 gene2   5           15          ...
 ...
 ```
 
-This model matrix can be directly used for pixel-level decoding step described below. 
+This model matrix can be directly used for pixel-level decoding step described below.
 However, if the gene list do not match between the pseudo-bulk data and the raw data, you may need to use the following command to initialize the model from the pseudo-bulk data.
 
 ```bash linenums="1"
@@ -223,7 +221,7 @@ ficture plot_base --input ${input} --output ${output} --fill_range ${fillr} --co
 
 #### Parameters for pixel level decoding
 
-After fitting the model, FICTURE performs pixel level decoding to infer the factors for each pixel. 
+After fitting the model, FICTURE performs pixel level decoding to infer the factors for each pixel.
 The pixel-level decoding consists of two steps:
 * Perform anchor-level projection based on the fitted model
 * Perform pixel-level decoding based on anchor-level projection
@@ -271,11 +269,11 @@ ficture slda_decode --input ${input} --output ${output} --model ${model} --ancho
 
 #### Optional post-processing
 
-Although not required, after performing pixel-level decoding, it is useful to 
+Although not required, after performing pixel-level decoding, it is useful to
 generates summary statistics and visualize the results.
 
 
-First step is to sort the pixel level output. This is 
+First step is to sort the pixel level output. This is
 primarily for visualizing large images with limited memory usage.
 
 ```bash linenums="1"

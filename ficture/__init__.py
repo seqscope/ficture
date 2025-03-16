@@ -1,4 +1,6 @@
 import logging
+import matplotlib
+matplotlib.use("Agg") # To be save since we don't need interactive visualization
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
