@@ -3,7 +3,7 @@
 Locate the transcript file from your Xenium output, most likely named as `transcripts.csv.gz`.
 
 The first few lines may look like (from the public human breast cancer dataset)
-```
+```plaintext linenums="1"
 "transcript_id","cell_id","overlaps_nucleus","feature_name","x_location","y_location","z_location","qv"
 281474976710656,565,0,"SEC11C",4.395842,328.66647,12.019493,18.66248
 281474976710657,540,0,"NegControlCodeword_0502",5.074415,236.96484,7.6085105,18.634956
@@ -16,7 +16,7 @@ The following command assume your input is in `inpath` and you you want to store
 
 The script `format_xenium.py` can be found in `misc/` in the FICTURE repository.
 
-```bash
+```bash linenums="1"
 input=${inpath}/transcripts.csv.gz
 output=${path}/filtered.matrix.${iden}.tsv
 feature=${path}/feature.clean.${iden}.tsv.gz

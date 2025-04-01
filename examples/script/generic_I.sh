@@ -14,7 +14,7 @@
 mu_scale=1
 batch_size=500
 batch_buff=30
-skipshuffle=0
+skipshuffle=1
 
 for ARGUMENT in "$@"
 do

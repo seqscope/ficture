@@ -66,8 +66,8 @@ def run_together(_args):
     aux_params.add_argument('--lda-plot-um-per-pixel', type=float, default=1, help='Image resolution for LDA plot')
     aux_params.add_argument('--decode-plot-um-per-pixel', type=float, default=0.5, help='Image resolution for pixel decoding plot')
     aux_params.add_argument('--decode-sub-um-per-pixel', type=float, default=1, help='Image resolution for individual subplots')
-    aux_params.add_argument('--bgzip', type=str, default="bgzip", help='Path to bgzip binary. For faster processing, use "bgzip -@ 4')
-    aux_params.add_argument('--tabix', type=str, default="tabix", help='Path to tabix binary')
+    # aux_params.add_argument('--bgzip', type=str, default="bgzip", help='Path to bgzip binary. For faster processing, use "bgzip -@ 4')
+    # aux_params.add_argument('--tabix', type=str, default="tabix", help='Path to tabix binary')
     aux_params.add_argument('--gzip', type=str, default="gzip", help='Path to gzip binary. For faster processing, use "pigz -p 4"')
     aux_params.add_argument('--sort', type=str, default="sort", help='Path to sort binary. For faster processing, you may add arguments like "sort -T /path/to/new/tmpdir --parallel=20 -S 10G"')
 
@@ -114,8 +114,10 @@ def run_together(_args):
         cmds.append(rf"$(info --------------------------------------------------------------)")
         ## create minibatch
         cmds.append(f"ficture make_spatial_minibatch --input {args.in_tsv} --output {batch_tsv} --mu_scale {args.mu_scale} --batch_size {args.minibatch_size} --batch_buff {args.minibatch_buffer} --major_axis {args.major_axis}")
-        cmds.append(f"{args.sort} -k 2,2n -k 1,1g {batch_tsv} | {args.gzip} -c > {batch_out}")
-        cmds.append(f"rm {batch_tsv}")
+        # cmds.append(f"{args.sort} -k 2,2n -k 1,1g {batch_tsv} | {args.gzip} -c > {batch_out}")
+        cmds.append(f"{args.gzip} -f {batch_tsv}")
+        # cmds.append(f"rm {batch_tsv}")
+
         mm.add_target(batch_out, [args.in_tsv], cmds)
 
         if args.in_minmax is None:
@@ -186,13 +188,13 @@ gzip -cd ${input} | awk 'BEGIN{FS=OFS="\t"} NR==1{for(i=1;i<=NF;i++){if($i=="X")
                 mm.add_target(f"{model_prefix}.done", [args.in_tsv, hexagon], cmds)
 
     if args.decode:
-        if not shutil.which(args.bgzip.split(" ")[0]):
-            logging.error(f"Cannot find {args.bgzip}. Please make sure that the path to --bgzip is correct")
-            sys.exit(1)
+        # if not shutil.which(args.bgzip.split(" ")[0]):
+        #     logging.error(f"Cannot find {args.bgzip}. Please make sure that the path to --bgzip is correct")
+        #     sys.exit(1)
 
-        if not shutil.which(args.tabix.split(" ")[0]):
-            logging.error(f"Cannot find {args.tabix}. Please make sure that the path to --tabix is correct")
-            sys.exit(1)
+        # if not shutil.which(args.tabix.split(" ")[0]):
+        #     logging.error(f"Cannot find {args.tabix}. Please make sure that the path to --tabix is correct")
+        #     sys.exit(1)
 
 
         script_path = f"{args.out_dir}/sort_decode.sh"
@@ -205,8 +207,9 @@ model_id=$4
 bsize=$5
 scale=$6
 topk=$7
-bgzip=$8
-tabix=$9
+gzip=$8
+#bgzip=$8
+#tabix=$9
 
 K=$( echo $model_id | sed 's/nF\([0-9]\{1,\}\)\..*/\1/' )
 while IFS=$'\t' read -r r_key r_val; do
@@ -222,9 +225,9 @@ bsize=2000
 scale=100
 header="##K=${K};TOPK=${topk}\n##BLOCK_SIZE=${bsize};BLOCK_AXIS=X;INDEX_AXIS=Y\n##OFFSET_X=${offsetx};OFFSET_Y=${offsety};SIZE_X=${rangex};SIZE_Y=${rangey};SCALE=${scale}\n#BLOCK\tX\tY\tK1\tK2\tK3\tP1\tP2\tP3"
 
-(echo -e "${header}" && gzip -cd "${input}" | tail -n +2 | perl -slane '$F[0]=int(($F[1]-$offx)/$bsize) * $bsize; $F[1]=int(($F[1]-$offx)*$scale); $F[1]=($F[1]>=0)?$F[1]:0; $F[2]=int(($F[2]-$offy)*$scale); $F[2]=($F[2]>=0)?$F[2]:0; print join("\t", @F);' -- -bsize="${bsize}" -scale="${scale}" -offx="${offsetx}" -offy="${offsety}" | sort -S 1G -k1,1g -k3,3g ) | ${bgzip} -c > ${output}
+(echo -e "${header}" && gzip -cd "${input}" | tail -n +2 | perl -slane '$F[0]=int(($F[1]-$offx)/$bsize) * $bsize; $F[1]=int(($F[1]-$offx)*$scale); $F[1]=($F[1]>=0)?$F[1]:0; $F[2]=int(($F[2]-$offy)*$scale); $F[2]=($F[2]>=0)?$F[2]:0; print join("\t", @F);' -- -bsize="${bsize}" -scale="${scale}" -offx="${offsetx}" -offy="${offsety}" | sort -S 1G -k1,1g -k3,3g ) | ${gzip} -c > ${output}
 
-${tabix} -f -s1 -b3 -e3 ${output}
+#${tabix} -f -s1 -b3 -e3 ${output}
 rm ${input}
 """)
         for train_width in train_widths:
@@ -267,7 +270,7 @@ rm ${input}
                     cmds.append(rf"$(info --------------------------------------------------------------)")
                     cmds.append(rf"$(info Sorting and reformatting the pixel-level output..)")
                     cmds.append(rf"$(info --------------------------------------------------------------)")
-                    cmds.append(f"bash {script_path} {decode_prefix}.pixel.tsv.gz {decode_prefix}.pixel.sorted.tsv.gz {minmax_out} {model_id} {args.decode_block_size} {args.decode_scale} {args.decode_top_k} {args.bgzip} {args.tabix}")
+                    cmds.append(f"bash {script_path} {decode_prefix}.pixel.tsv.gz {decode_prefix}.pixel.sorted.tsv.gz {minmax_out} {model_id} {args.decode_block_size} {args.decode_scale} {args.decode_top_k} {arg.gzip}")
 
                     de_input=f"{decode_prefix}.posterior.count.tsv.gz"
                     de_output=f"{decode_prefix}.bulk_chisq.tsv"
@@ -275,7 +278,7 @@ rm ${input}
                     cmds.append(rf"$(info --------------------------------------------------------------)")
                     cmds.append(rf"$(info Performing pseudo-bulk differential expression analysis..)")
                     cmds.append(rf"$(info --------------------------------------------------------------)")
-                    cmds.append(f"ficture de_bulk --input {de_input} --output {de_output} --min_ct_per_feature {args.min_ct_feature} --max_pval_output {args.de_max_pval} --min_fold_output {args.de_min_fold} --thread {args.threads}")
+                    cmds.append(f"ficture de_bulk --input {de_input} --output {de_output} --min_ct_per_feature {args.min_ct_feature} --max_pval_output {args.de_max_pval} --min_fold_output {args.de_min_fold}")
 
                     cmap=f"{figure_path}/{model_id}.rgb.tsv"
                     cmds.append(f"ficture factor_report --path {model_path} --pref {decode_basename} --color_table {cmap}")

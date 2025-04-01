@@ -40,8 +40,8 @@ def filter_by_density(_args):
 
     parser.add_argument('--feature', type=str, default='', help='')
     parser.add_argument('--filter_based_on', type=str, default="Count", help='')
-    parser.add_argument('--gene_header', type = str, default = ['gene', 'gene_id'])
-    parser.add_argument('--count_header', type = str, default = ['gn', 'gt', 'spl', 'unspl', 'ambig'])
+    parser.add_argument('--gene_header', nargs = "+", default = ['gene', 'gene_id'])
+    parser.add_argument('--count_header', nargs = "+", default = ['gn', 'gt', 'spl', 'unspl', 'ambig'])
     parser.add_argument('--mu_scale', type=float, default=26.67, help='Coordinate to um translate')
     parser.add_argument('--max_npts_to_fit_model', type=float, default=1e6, help='')
     parser.add_argument('--min_abs_mol_density_squm_dense', type=float, default=0.1, help='Lowerbound for dense tissue region')

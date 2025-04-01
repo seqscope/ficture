@@ -24,6 +24,7 @@ def main():
         "plot_pixel_full": "plot_pixel_full", \
         "plot_pixel_single": "plot_pixel_single", \
         "run_together": "run_together", \
+        "init_model_from_pseudobulk": "init_from_pseudobulk", \
     }
 
     if len(sys.argv) < 2:

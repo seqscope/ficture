@@ -90,7 +90,7 @@ def choose_color(_args):
     header = df.columns
     factor_header = []
     for x in header:
-        y = re.match('^[A-Za-z]*_*(\d+)$', x)
+        y = re.match(r'^[A-Za-z]*_*(\d+)$', x)
         if y:
             factor_header.append(y.group(0))
     K = len(factor_header)

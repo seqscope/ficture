@@ -18,31 +18,18 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 site_name: ficture
-site_url: https://Yichen-Si.github.io/ficture
+site_url: https://seqscope.github.io/ficture
 
 # Repository
 repo_name: seqscope/ficture
 repo_url: https://github.com/seqscope/ficture
 
-theme:
+theme: 
   name: material
   features:
     - navigation.tabs
-    # - announce.dismiss
-    # - content.action.edit
-    # - content.action.view
-    # - content.code.annotate
-    # - content.code.copy
-    # - content.tooltips
-    # - navigation.footer
     - navigation.indexes
     - navigation.sections
-    # - navigation.top
-    # - navigation.tracking
-    # - search.highlight
-    # - search.share
-    # - search.suggest
-    # - toc.follow
   palette:
     - media: "(prefers-color-scheme)"
       toggle:
@@ -85,17 +72,14 @@ nav:
   # - Miscellaneous: misc.md
 
 markdown_extensions:
-  # - abbr
   - attr_list
-  # - def_list
   - footnotes
-  # - md_in_html
   - toc:
       permalink: true
   ## MathJax expression support
   - pymdownx.arithmatex:
       generic: true
-  ## Improved detection of Markup
+  ## Improved detection of Markup 
   - pymdownx.betterem:
       smart_enable: all
   ## Highight text and define sub- and superscript
@@ -108,18 +92,13 @@ markdown_extensions:
   - pymdownx.emoji:
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
       emoji_index: !!python/name:material.extensions.emoji.twemoji
-  # - pymdownx.highlight:
-  #     anchor_linenums: true
-  #     line_spans: __span
-  #     pygments_lang_class: true
-  # - pymdownx.inlinehilite
-  # - pymdownx.keys
-  # - pymdownx.magiclink:
-  #     normalize_issue_symbols: true
-  #     repo_url_shorthand: true
-  #     user: squidfunk
-  #     repo: mkdocs-material
   - pymdownx.smartsymbols
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
   - pymdownx.snippets:
       auto_append:
         - includes/mkdocs.md
@@ -134,5 +113,7 @@ markdown_extensions:
       slugify: !!python/object/apply:pymdownx.slugs.slugify
         kwds:
           case: lower
-  # - pymdownx.tasklist:
-  #     custom_checkbox: true
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js

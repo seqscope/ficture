@@ -138,7 +138,7 @@ def slda_decode(_args):
         pcount, pixel, anchor  = pixel_obj.run_chunk(slda, init_bound)
         pixel.X = pixel.X.map('{:.2f}'.format)
         pixel.Y = pixel.Y.map('{:.2f}'.format)
-        if args.lite_topk_output_pixel > 0 and args.lite_topk_output_pixel < K:
+        if args.lite_topk_output_pixel > 0 and args.lite_topk_output_pixel <= K:
             X = pixel[factor_header].values
             partial_indices = np.argpartition(X, -args.lite_topk_output_pixel, axis=1)[:, -args.lite_topk_output_pixel:]
             sorted_top_indices = np.argsort(X[np.arange(X.shape[0])[:, None], partial_indices], axis=1)[:, ::-1]
@@ -155,7 +155,7 @@ def slda_decode(_args):
         logging.info(f"Output {pixel.shape[0]} pixels and {anchor.shape[0]} anchors")
         anchor.X = anchor.X.map('{:.2f}'.format)
         anchor.Y = anchor.Y.map('{:.2f}'.format)
-        if args.lite_topk_output_anchor > 0 and args.lite_topk_output_anchor < K:
+        if args.lite_topk_output_anchor > 0 and args.lite_topk_output_anchor <= K:
             X = anchor[factor_header].values
             partial_indices = np.argpartition(X, -args.lite_topk_output_anchor, axis=1)[:, -args.lite_topk_output_anchor:]
             sorted_top_indices = np.argsort(X[np.arange(X.shape[0])[:, None], partial_indices], axis=1)[:, ::-1]

@@ -6,19 +6,23 @@
 3) The coordinates in the input files are in "pixel" unit, but please keep track of the min and max coordinate values of X and Y axis in *micrometer*, they would be needed to create the final pixel level visualization.
 4) Since Visium HD has resolution $2\mu m$, set `--plot_um_per_pixel 2` when visualizing the final pixel output (in `ficture plot_pixel_full`).
 
+## Alternative: Using `spatula convert-sge` command
+
+The [spatula sge-convert](https://seqscope.github.io/spatula/tools/convert_sge/) tool offers a convenient way to convert Visium HD raw data to FICTURE input format. You may want to use the tool to convert the raw Visium HD data to FICTURE input format instead of following the manual steps below.
+
 ## Details
 
 Visium HD output contains a sparse count matrix and a separate parquet file defining pixels' spatial locations.
 
 Locate Visium HD outputs
-```bash
+```bash linenums="1"
 brc_parq=/path/to/spatial/tissue_positions.parquet
 mtx_path=/path/to/filtered_feature_bc_matrix # or raw_feature_bc_matrix
 opath=/output/directory
 ```
 
 The barcode (`tissue_positions.parquet`) file looks like
-```
+```plaintext linenums="1"
 barcode 	in_tissue 	array_row 	array_col 	pxl_row_in_fullres 	pxl_col_in_fullres
 s_002um_00000_00000-1 	0 	0 	0 	44.189527 	21030.743288
 s_002um_00000_00001-1 	0 	0 	1 	44.302100 	21023.440349
@@ -27,7 +31,7 @@ s_002um_00000_00001-1 	0 	0 	1 	44.302100 	21023.440349
 
 `pxl_row_in_fullres` and `pxl_col_in_fullres` are in the unit of "pixel", we need to look at the `scalefactors_json.json` file (should be in the same folder as `tissue_positions.parquet`) to get its ratio to micrometer. In our example the json file looks like
 
-```
+```json linenums="1"
 {
     "spot_diameter_fullres": 7.303953797779634,
     "bin_size_um": 2.0,
@@ -43,11 +47,11 @@ Record the number `microns_per_pixel` and later set `mu_scale=1/microns_per_pixe
 
 
 The matrix directory looks like
-```bash
+```bash linenums="1"
 ls ${mtx_path}
 ```
 
-```
+```bash linenums="1"
 barcodes.tsv.gz  features.tsv.gz  matrix.mtx.gz
 ```
 
@@ -63,7 +67,7 @@ Given the current data formats, we first match barcodes' integer indices in the 
 
 You may need to install a tool to read parquet file, one option is `pip install parquet-tools`. The following command takes ~8.5 min for the public [Visium HD mouse brain](https://www.10xgenomics.com/datasets/visium-hd-cytassist-gene-expression-libraries-of-mouse-brain-he) dataset.
 
-```bash
+```bash linenums="1"
 bfile=${mtx_path}/barcodes.tsv.gz
 mfile=${mtx_path}/matrix.mtx.gz
 ffile=${mtx_path}/features.tsv.gz
@@ -86,7 +90,7 @@ echo -e "xmin\t${xmin}\nxmax\t${xmax}\nymin\t${ymin}\nymax\t${ymax}" > ${coor}
 ```
 
 Coordinate range in `${opath}/coordinate_minmax.tsv` is in micrometer, for the mouse brain data it looks like
-```
+```plaintext linenums="1"
 xmin    0
 xmax    6806.13
 ymin    0
@@ -94,7 +98,7 @@ ymax    5858.36
 ```
 
 Merge coordinate and gene count informations
-```bash
+```bash linenums="1"
 # First match barcode index (in the matrix file) with their spatial coordinates (in the tissue_positions file)
 
 awk -v FS=',' -v OFS='\t' 'NR==FNR{bcd[$1]=NR; next} ($1 in bcd){ printf "%d\t%.2f\t%.2f\n", bcd[$1], $2, $3 } ' <(zcat $bfile) <(cut -d',' -f 1,5,6 ${brc_raw}) | sort -k1,1n > ${opath}/barcodes.tsv
@@ -113,11 +117,11 @@ join -t $'\t' -1 1 -2 2 ${opath}/barcodes.tsv <(zcat $mfile | tail -n +4 | sed '
 The sorting by coordinates part can take some time for large data, you could check intermediate results first to see if it makes sense.
 
 Output looks like
-```bash
+```bash linenums="1"
 zcat $output | head
 ```
 
-```
+```plaintext linenums="1"
 #barcode_idx    X       Y       gene_id gene    Count
 4116872 12859.72        318.87  ENSMUSG00000002980      Bcam    1
 4116872 12859.72        318.87  ENSMUSG00000022426      Josd1   1
