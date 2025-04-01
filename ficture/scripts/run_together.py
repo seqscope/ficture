@@ -70,6 +70,9 @@ def run_together(_args):
     # aux_params.add_argument('--tabix', type=str, default="tabix", help='Path to tabix binary')
     aux_params.add_argument('--gzip', type=str, default="gzip", help='Path to gzip binary. For faster processing, use "pigz -p 4"')
     aux_params.add_argument('--sort', type=str, default="sort", help='Path to sort binary. For faster processing, you may add arguments like "sort -T /path/to/new/tmpdir --parallel=20 -S 10G"')
+    aux_params.add_argument('--external-model', type=str, help='Path to external model. Must have same feature list or further processing is required.')
+    aux_params.add_argument('--external-cmap', type=str, help='Path to external cmap.')
+
 
     args = parser.parse_args(_args)
 
@@ -233,13 +236,17 @@ rm ${input}
         for train_width in train_widths:
             for n_factor in n_factors:
                 batch_in = f"{args.out_dir}/batched.matrix.tsv.gz"
+                hexagon = f"{args.out_dir}/hexagon.d_{train_width}.tsv.gz"
                 model_id=f"nF{n_factor}.d_{train_width}"
                 model_path=f"{args.out_dir}/analysis/{model_id}"
                 figure_path=f"{model_path}/figure"
                 model_prefix=f"{model_path}/{model_id}"
-                cmap=f"{figure_path}/{model_id}.rgb.tsv"
-                model=f"{args.out_dir}/analysis/{model_id}/{model_id}.model.p"
-
+                if args.external_model is None:
+                    cmap=f"{figure_path}/{model_id}.rgb.tsv"
+                    model=f"{args.out_dir}/analysis/{model_id}/{model_id}.model.p"
+                else:
+                    model=args.external_model
+                    cmap=args.external_cmap
                 if args.fit_width is None:
                     fit_widths = [train_width]
                 else:
@@ -255,6 +262,7 @@ rm ${input}
                     cmds.append(rf"$(info --------------------------------------------------------------)")
                     cmds.append(rf"$(info Creating projection for {train_width}um and {n_factor} factors, at {fit_width}um)")
                     cmds.append(rf"$(info --------------------------------------------------------------)")
+                    cmds.append(f"mkdir -p {model_path}/figure")
                     cmds.append(f"ficture transform --input {args.in_tsv} --output_pref {prj_prefix} --model {model} --key {args.key_col} --major_axis {args.major_axis} --hex_width {fit_width} --n_move {fit_nmove} --min_ct_per_unit {args.min_ct_unit_fit} --mu_scale {args.mu_scale} --thread {args.threads} --precision {args.fit_precision}")
 
                     batch_input=f"{args.out_dir}/batched.matrix.tsv.gz"
@@ -270,7 +278,7 @@ rm ${input}
                     cmds.append(rf"$(info --------------------------------------------------------------)")
                     cmds.append(rf"$(info Sorting and reformatting the pixel-level output..)")
                     cmds.append(rf"$(info --------------------------------------------------------------)")
-                    cmds.append(f"bash {script_path} {decode_prefix}.pixel.tsv.gz {decode_prefix}.pixel.sorted.tsv.gz {minmax_out} {model_id} {args.decode_block_size} {args.decode_scale} {args.decode_top_k} {arg.gzip}")
+                    cmds.append(f"bash {script_path} {decode_prefix}.pixel.tsv.gz {decode_prefix}.pixel.sorted.tsv.gz {minmax_out} {model_id} {args.decode_block_size} {args.decode_scale} {args.decode_top_k} {args.gzip}")
 
                     de_input=f"{decode_prefix}.posterior.count.tsv.gz"
                     de_output=f"{decode_prefix}.bulk_chisq.tsv"
@@ -280,7 +288,7 @@ rm ${input}
                     cmds.append(rf"$(info --------------------------------------------------------------)")
                     cmds.append(f"ficture de_bulk --input {de_input} --output {de_output} --min_ct_per_feature {args.min_ct_feature} --max_pval_output {args.de_max_pval} --min_fold_output {args.de_min_fold}")
 
-                    cmap=f"{figure_path}/{model_id}.rgb.tsv"
+                    # cmap=f"{figure_path}/{model_id}.rgb.tsv"
                     cmds.append(f"ficture factor_report --path {model_path} --pref {decode_basename} --color_table {cmap}")
 
                     decode_tsv=f"{decode_prefix}.pixel.sorted.tsv.gz"
@@ -297,7 +305,10 @@ rm ${input}
                         cmds.append(f"ficture plot_pixel_single --input {decode_tsv} --output {sub_prefix} --plot_um_per_pixel {args.decode_sub_um_per_pixel} --full --all")
 
                     cmds.append(f"touch {decode_prefix}.done")
-                    mm.add_target(f"{decode_prefix}.done", [batch_in, hexagon,f"{model_prefix}.done"], cmds)
+                    if args.external_model is None:
+                        mm.add_target(f"{decode_prefix}.done", [batch_in, hexagon,f"{model_prefix}.done"], cmds)
+                    else:
+                        mm.add_target(f"{decode_prefix}.done", [batch_in, hexagon, model, cmap], cmds)
 
 
     if len(mm.targets) == 0:
