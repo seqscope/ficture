@@ -31,6 +31,7 @@ Using example datasets, you can run FICTURE with the following command:
 ficture run_together --in-tsv examples/data/transcripts.tsv.gz \
     --in-minmax examples/data/coordinate_minmax.tsv \
     --in-feature examples/data/feature.clean.tsv.gz \
+    --major-axis Y \
     --out-dir output1 --all
 ```
 
@@ -47,12 +48,25 @@ You can change the parameter settings, such as the width of training parameters,
 ficture run_together --in-tsv examples/data/transcripts.tsv.gz \
     --in-minmax examples/data/coordinate_minmax.tsv \
     --in-feature examples/data/feature.clean.tsv.gz \
+    --major-axis Y \
     --out-dir output2 \
     --train-width 12,18 \
     --n-factor 6,12 \
     --n-jobs 4 \
     --plot-each-factor \
     --all
+```
+
+## Running FICTURE with your own model matrix and color scheme
+Caution: your input model and color scheme file must be in the same format as those created by the above commands.
+```bash linenums="1"
+ficture run_together --in-tsv ../examples/data/transcripts.tsv.gz \
+    --in-minmax ../examples/data/coordinate_minmax.tsv \
+    --in-feature ../examples/data/feature.clean.tsv.gz \
+    --out-dir ./out --major-axis Y --threads 4 \
+    --decode-from-external-model \
+    --external-model YOUR_MODEL_FILE \
+    --external-cmap YOUR_COLOR_SCHEME_FILE
 ```
 
 ## More information
