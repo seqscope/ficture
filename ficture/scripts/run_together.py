@@ -100,11 +100,11 @@ def run_together(_args):
         args.decode = False
 
     ## parse input parameters
-    train_widths = []
-    n_factors = []
-    if not args.decode_from_external_model:
-        train_widths = [int(x) for x in args.train_width.split(",")]
-        n_factors = [int(x) for x in args.n_factor.split(",")]
+    #train_widths = []
+    #n_factors = []
+    #if not args.decode_from_external_model:
+    train_widths = [int(x) for x in args.train_width.split(",")]
+    n_factors = [int(x) for x in args.n_factor.split(",")]
 
     batch_tsv = f"{args.out_dir}/batched.matrix.tsv"
     batch_out = f"{args.out_dir}/batched.matrix.tsv.gz"
@@ -253,7 +253,8 @@ rm ${input}
         batch_in = f"{args.out_dir}/batched.matrix.tsv.gz"
         cmap=args.external_cmap
         model=args.external_model
-        model_id=os.path.basename(model).split(".")[0]
+        #model_id=os.path.basename(model).split(".")[0]
+        model_id=f"nF{n_factors[0]}.d_{train_widths[0]}"
         model_path=f"{args.out_dir}/analysis/{model_id}"
         figure_path=f"{model_path}/figure"
         model_prefix=f"{model_path}/{model_id}"
