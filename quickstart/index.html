@@ -505,6 +505,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#running-ficture-with-your-own-model-matrix-and-color-scheme" class="md-nav__link">
+    <span class="md-ellipsis">
+      Running FICTURE with your own model matrix and color scheme
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#more-information" class="md-nav__link">
     <span class="md-ellipsis">
       More information
@@ -796,6 +805,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#running-ficture-with-your-own-model-matrix-and-color-scheme" class="md-nav__link">
+    <span class="md-ellipsis">
+      Running FICTURE with your own model matrix and color scheme
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#more-information" class="md-nav__link">
     <span class="md-ellipsis">
       More information
@@ -845,11 +863,13 @@
 <span class="normal"><a href="#__codelineno-2-2">2</a></span>
 <span class="normal"><a href="#__codelineno-2-3">3</a></span>
 <span class="normal"><a href="#__codelineno-2-4">4</a></span>
-<span class="normal"><a href="#__codelineno-2-5">5</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1"></a><span class="c1">## Run all steps together with the example datasets</span>
+<span class="normal"><a href="#__codelineno-2-5">5</a></span>
+<span class="normal"><a href="#__codelineno-2-6">6</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1"></a><span class="c1">## Run all steps together with the example datasets</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2"></a>ficture<span class="w"> </span>run_together<span class="w"> </span>--in-tsv<span class="w"> </span>examples/data/transcripts.tsv.gz<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3"></a><span class="w">    </span>--in-minmax<span class="w"> </span>examples/data/coordinate_minmax.tsv<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4"></a><span class="w">    </span>--in-feature<span class="w"> </span>examples/data/feature.clean.tsv.gz<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5"></a><span class="w">    </span>--out-dir<span class="w"> </span>output1<span class="w"> </span>--all
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5"></a><span class="w">    </span>--major-axis<span class="w"> </span>Y<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6"></a><span class="w">    </span>--out-dir<span class="w"> </span>output1<span class="w"> </span>--all
 </span></code></pre></div></td></tr></table></div>
 <p>This command will create a GNU makefile and run the FICTURE local pipeline.</p>
 <p>This will run FICTURE on the example datasets and save the results in the <code>output1</code> directory.</p>
@@ -864,20 +884,38 @@
 <span class="normal"><a href="#__codelineno-3-7"> 7</a></span>
 <span class="normal"><a href="#__codelineno-3-8"> 8</a></span>
 <span class="normal"><a href="#__codelineno-3-9"> 9</a></span>
-<span class="normal"><a href="#__codelineno-3-10">10</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1"></a><span class="c1">## Specify multiple LDA training widths and number of factors</span>
+<span class="normal"><a href="#__codelineno-3-10">10</a></span>
+<span class="normal"><a href="#__codelineno-3-11">11</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1"></a><span class="c1">## Specify multiple LDA training widths and number of factors</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2"></a>ficture<span class="w"> </span>run_together<span class="w"> </span>--in-tsv<span class="w"> </span>examples/data/transcripts.tsv.gz<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3"></a><span class="w">    </span>--in-minmax<span class="w"> </span>examples/data/coordinate_minmax.tsv<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4"></a><span class="w">    </span>--in-feature<span class="w"> </span>examples/data/feature.clean.tsv.gz<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5"></a><span class="w">    </span>--out-dir<span class="w"> </span>output2<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6"></a><span class="w">    </span>--train-width<span class="w"> </span><span class="m">12</span>,18<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7"></a><span class="w">    </span>--n-factor<span class="w"> </span><span class="m">6</span>,12<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8"></a><span class="w">    </span>--n-jobs<span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9"></a><span class="w">    </span>--plot-each-factor<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10"></a><span class="w">    </span>--all
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5"></a><span class="w">    </span>--major-axis<span class="w"> </span>Y<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6"></a><span class="w">    </span>--out-dir<span class="w"> </span>output2<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7"></a><span class="w">    </span>--train-width<span class="w"> </span><span class="m">12</span>,18<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8"></a><span class="w">    </span>--n-factor<span class="w"> </span><span class="m">6</span>,12<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9"></a><span class="w">    </span>--n-jobs<span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10"></a><span class="w">    </span>--plot-each-factor<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11"></a><span class="w">    </span>--all
 </span></code></pre></div></td></tr></table></div>
+<h2 id="running-ficture-with-your-own-model-matrix-and-color-scheme">Running FICTURE with your own model matrix and color scheme<a class="headerlink" href="#running-ficture-with-your-own-model-matrix-and-color-scheme" title="Permanent link">&para;</a></h2>
+<p>Caution: your input model and color scheme file must be in the same format as those created by the above commands.
+<div class="language-bash highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-4-1">1</a></span>
+<span class="normal"><a href="#__codelineno-4-2">2</a></span>
+<span class="normal"><a href="#__codelineno-4-3">3</a></span>
+<span class="normal"><a href="#__codelineno-4-4">4</a></span>
+<span class="normal"><a href="#__codelineno-4-5">5</a></span>
+<span class="normal"><a href="#__codelineno-4-6">6</a></span>
+<span class="normal"><a href="#__codelineno-4-7">7</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1"></a>ficture<span class="w"> </span>run_together<span class="w"> </span>--in-tsv<span class="w"> </span>../examples/data/transcripts.tsv.gz<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2"></a><span class="w">    </span>--in-minmax<span class="w"> </span>../examples/data/coordinate_minmax.tsv<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3"></a><span class="w">    </span>--in-feature<span class="w"> </span>../examples/data/feature.clean.tsv.gz<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4"></a><span class="w">    </span>--out-dir<span class="w"> </span>./out<span class="w"> </span>--major-axis<span class="w"> </span>Y<span class="w"> </span>--threads<span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5"></a><span class="w">    </span>--decode-from-external-model<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6"></a><span class="w">    </span>--external-model<span class="w"> </span>YOUR_MODEL_FILE<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7"></a><span class="w">    </span>--external-cmap<span class="w"> </span>YOUR_COLOR_SCHEME_FILE
+</span></code></pre></div></td></tr></table></div></p>
 <h2 id="more-information">More information<a class="headerlink" href="#more-information" title="Permanent link">&para;</a></h2>
 <p>If you want to see more options with the local pipeline, please run the following command:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>ficture<span class="w"> </span>run_together<span class="w"> </span>--help
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>ficture<span class="w"> </span>run_together<span class="w"> </span>--help
 </span></code></pre></div>
 <p>Note that the local pipeline is a wrapper for individual commands, and provided for convenience.
 For large datasets, you may need to run individual commands to mitigate memory or CPU constraints.</p>
