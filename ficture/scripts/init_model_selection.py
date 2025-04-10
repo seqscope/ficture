@@ -41,6 +41,7 @@ def fit_model(_args):
     parser.add_argument('--epoch_id_length', type=int, default=2, help='')
     parser.add_argument('--min_ct_per_unit', type=int, default=50, help='')
     parser.add_argument('--min_ct_per_feature', type=int, default=50, help='')
+    parser.add_argument('--fractional-count', type=int, help='Set to 1 if the count columns contain float values')
     parser.add_argument('--debug', action='store_true', help='')
 
     args = parser.parse_args(_args)
@@ -186,8 +187,12 @@ def fit_model(_args):
     with gzip.open(args.input, 'rt') as rf:
         header = rf.readline().strip().split('\t')
     header = [x.lower() if x != key else x for x in header]
-    adt = {unit_key:str, key:int}
+    adt = {unit_key:str}
     adt.update({x:str for x in unit_attr})
+    if args.fractional_count > 0:
+        adt.update({key:float})
+    else:
+        adt.update({key:int})
     while epoch < args.epoch:
         reader = pd.read_csv(gzip.open(args.input, 'rt'), \
                 sep='\t',chunksize=chunksize, skiprows=1, names = header,

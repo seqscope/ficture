@@ -111,7 +111,6 @@ def slda_decode(_args):
     oheader = [x.lower() if len(x) > 1 else x.upper() for x in oheader]
     input_header = [batch_id,"X","Y","gene",key]
     dty = {x:float for x in ['X','Y']}
-    dty[key] = int
     dty.update({x:str for x in [batch_id, 'gene']})
     mheader = [x for x in input_header if x not in oheader]
     if len(mheader) > 0:

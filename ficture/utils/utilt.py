@@ -150,7 +150,7 @@ def gen_slices_from_list(vec, bsize):
 def get_string_with_integer_suff(in_array):
     out = []
     for u in in_array:
-        v = re.match('^[A-Za-z]*_*(\d+)$', u.strip())
+        v = re.match(r'^[A-Za-z]*_*(\d+)$', u.strip())
         if v:
             out.append(v.group(0))
     return out
@@ -158,7 +158,7 @@ def get_string_with_integer_suff(in_array):
 def get_integer_suff_from_string(in_array):
     out = []
     for u in in_array:
-        v = re.match('^[A-Za-z]*_*(\d+)$', u.strip())
+        v = re.match(r'^[A-Za-z]*_*(\d+)$', u.strip())
         if v:
             out.append(v.group(1))
     return out
@@ -371,9 +371,9 @@ def make_mtx_from_dge(file, min_ct_per_feature = 50, min_ct_per_unit = 100, feat
             i += 1
         if len(epoch_id_list) >= epoch and unit_list[-1] not in epoch_id_list:
             pat = '^' + '|'.join(list(epoch_id_list))
-            df = pd.concat([df, chunk[chunk[unit].str.contains(pat) & chunk[key].ge(1)] ])
+            df = pd.concat([df, chunk[chunk[unit].str.contains(pat) & chunk[key].gt(0)] ])
             break
-        df = pd.concat([df, chunk[chunk[key].ge(1)] ])
+        df = pd.concat([df, chunk[chunk[key].gt(0)] ])
     epoch0 = df[unit].iloc[0][:epoch_id_length]
     one_pass = df[unit].str[:epoch_id_length].eq(epoch0)
     if feature_list is not None:

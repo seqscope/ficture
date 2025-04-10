@@ -73,6 +73,7 @@ def run_together(_args):
     aux_params.add_argument('--sort', type=str, default="sort", help='Path to sort binary. For faster processing, you may add arguments like "sort -T /path/to/new/tmpdir --parallel=20 -S 10G"')
     aux_params.add_argument('--external-model', type=str, help='Path to external model. Must have same feature list or further processing is required.')
     aux_params.add_argument('--external-cmap', type=str, help='Path to external cmap.')
+    parser.add_argument('--fractional-count', type=int, help='Set to 1 if the count columns contain float values')
 
     args = parser.parse_args(_args)
 
@@ -161,7 +162,7 @@ gzip -cd ${input} | awk 'BEGIN{FS=OFS="\t"} NR==1{for(i=1;i<=NF;i++){if($i=="X")
             cmds.append(rf"$(info --------------------------------------------------------------)")
             cmds.append(rf"$(info Creating DGE for {train_width}um...)")
             cmds.append(rf"$(info --------------------------------------------------------------)")
-            cmds.append(f"ficture make_dge --key {args.key_col} --input {args.in_tsv} --output {dge_out} --hex_width {train_width} --n_move {args.train_n_move} --min_ct_per_unit {args.min_ct_unit_dge} --mu_scale {args.mu_scale} --precision {args.dge_precision} --major_axis {args.major_axis}")
+            cmds.append(f"ficture make_dge --key {args.key_col} --input {args.in_tsv} --output {dge_out} --hex_width {train_width} --n_move {args.train_n_move} --min_ct_per_unit {args.min_ct_unit_dge} --mu_scale {args.mu_scale} --precision {args.dge_precision} --major_axis {args.major_axis} --fractional-count {args.fractional_count}")
             cmds.append(f"{args.sort} -k 1,1n {dge_out} | {args.gzip} -c > {dge_out}.gz")
             cmds.append(f"rm {dge_out}")
             mm.add_target(f"{dge_out}.gz", [args.in_tsv], cmds)
@@ -192,7 +193,7 @@ gzip -cd ${input} | awk 'BEGIN{FS=OFS="\t"} NR==1{for(i=1;i<=NF;i++){if($i=="X")
                 cmds.append(rf"$(info Creating LDA for {train_width}um and {n_factor} factors...)")
                 cmds.append(rf"$(info --------------------------------------------------------------)")
                 cmds.append(f"mkdir -p {model_path}/figure")
-                cmds.append(f"ficture fit_model --input {hexagon} --output {model_prefix} {feature_arg} --nFactor {n_factor} --epoch {args.train_epoch} --epoch_id_length {args.train_epoch_id_len} --unit_attr X Y --key {args.key_col} --min_ct_per_feature {args.min_ct_feature} --test_split 0.5 --R {args.lda_rand_init} --thread {args.threads}")
+                cmds.append(f"ficture fit_model --input {hexagon} --output {model_prefix} {feature_arg} --nFactor {n_factor} --epoch {args.train_epoch} --epoch_id_length {args.train_epoch_id_len} --unit_attr X Y --key {args.key_col} --min_ct_per_feature {args.min_ct_feature} --test_split 0.5 --R {args.lda_rand_init} --fractional-count {args.fractional_count} --thread {args.threads}")
 
                 fit_tsv=f"{model_path}/{model_id}.fit_result.tsv.gz"
                 fig_prefix=f"{figure_path}/{model_id}"
@@ -277,7 +278,6 @@ rm ${input}
             cmds.append(rf"$(info --------------------------------------------------------------)")
             cmds.append(f"ficture transform --input {args.in_tsv} --output_pref {prj_prefix} --model {model} --key {args.key_col} --major_axis {args.major_axis} --hex_width {fit_width} --n_move {fit_nmove} --min_ct_per_unit {args.min_ct_unit_fit} --mu_scale {args.mu_scale} --thread {args.threads} --precision {args.fit_precision}")
 
-            batch_input=f"{args.out_dir}/batched.matrix.tsv.gz"
             anchor=f"{prj_prefix}.fit_result.tsv.gz"
             decode_basename=f"{model_id}.decode.{anchor_info}_{radius}"
             decode_prefix=f"{model_path}/{decode_basename}"

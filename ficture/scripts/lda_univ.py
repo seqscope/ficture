@@ -43,6 +43,7 @@ def lda(_args):
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--verbose', action='store_true')
     parser.add_argument('--overwrite', action='store_true')
+    parser.add_argument('--fractional-count', type=int, help='Set to 1 if the count columns contain float values')
 
     args = parser.parse_args(_args)
     if len(_args) == 0:
@@ -68,8 +69,12 @@ def lda(_args):
     gene_key = args.feature_label.lower()
     if train_on == '':
         train_on = key
-    adt = {unit_key:str, gene_key:str, key:int, train_on:int}
+    adt = {unit_key:str, gene_key:str}
     adt.update({x:str for x in unit_attr})
+    if args.fractional_count > 0:
+        adt.update({train_on:float, key:float})
+    else:
+        adt.update({train_on:int, key:int})
     print(unit_attr)
 
     ### Basic parameterse

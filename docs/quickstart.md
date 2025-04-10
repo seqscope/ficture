@@ -65,6 +65,7 @@ ficture run_together --in-tsv ../examples/data/transcripts.tsv.gz \
     --in-feature ../examples/data/feature.clean.tsv.gz \
     --out-dir ./out --major-axis Y --threads 4 \
     --decode-from-external-model \
+    --fit-width 12 \
     --external-model YOUR_MODEL_FILE \
     --external-cmap YOUR_COLOR_SCHEME_FILE
 ```

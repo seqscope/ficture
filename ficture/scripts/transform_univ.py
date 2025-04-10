@@ -61,7 +61,7 @@ def transform(_args):
     key = args.key.lower()
     header=[x.upper() if len(x) == 1 else x.lower() for x in header]
     usecol = ['X','Y','gene',key]
-    adt={'X':float,'Y':float,'gene':str,args.key:int}
+    adt={'X':float,'Y':float,'gene':str}
     if args.region_id is not None:
         usecol.append(args.region_id)
         adt[args.region_id] = str
