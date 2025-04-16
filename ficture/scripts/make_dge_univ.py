@@ -34,7 +34,7 @@ def make_dge(_args):
     parser.add_argument('--hex_radius', type=int, default=-1, help='')
     parser.add_argument('--min_ct_per_unit', type=int, default=20, help='')
     parser.add_argument('--min_density_per_unit', type=float, default=0.2, help='')
-    parser.add_argument('--fractional-count', type=int, help='Set to 1 if the count columns contain float values')
+    parser.add_argument('--fractional-count', type=int, help='Set to 1 if the count columns contain float values', default = 0)
 
     args = parser.parse_args(_args)
     if len(_args) == 0:

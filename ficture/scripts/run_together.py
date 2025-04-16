@@ -73,7 +73,7 @@ def run_together(_args):
     aux_params.add_argument('--sort', type=str, default="sort", help='Path to sort binary. For faster processing, you may add arguments like "sort -T /path/to/new/tmpdir --parallel=20 -S 10G"')
     aux_params.add_argument('--external-model', type=str, help='Path to external model. Must have same feature list or further processing is required.')
     aux_params.add_argument('--external-cmap', type=str, help='Path to external cmap.')
-    parser.add_argument('--fractional-count', type=int, help='Set to 1 if the count columns contain float values')
+    parser.add_argument('--fractional-count', type=int, help='Set to 1 if the count columns contain float values', default = 0)
 
     args = parser.parse_args(_args)
 
