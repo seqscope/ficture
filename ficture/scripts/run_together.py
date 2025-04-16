@@ -236,13 +236,18 @@ while IFS=$'\t' read -r r_key r_val; do
 done < ${coor}
 echo -e "${xmin}, ${xmax}; ${ymin}, ${ymax}"
 
+if [ $topk -gt $K ]; then
+    topk=$K
+fi
+
 offsetx=${xmin}
 offsety=${ymin}
 rangex=$( echo "(${xmax} - ${xmin} + 0.5)/1+1" | bc )
 rangey=$( echo "(${ymax} - ${ymin} + 0.5)/1+1" | bc )
 bsize=2000
 scale=100
-header="##K=${K};TOPK=${topk}\n##BLOCK_SIZE=${bsize};BLOCK_AXIS=X;INDEX_AXIS=Y\n##OFFSET_X=${offsetx};OFFSET_Y=${offsety};SIZE_X=${rangex};SIZE_Y=${rangey};SCALE=${scale}\n#BLOCK\tX\tY\tK1\tK2\tK3\tP1\tP2\tP3"
+header="##K=${K};TOPK=${topk}\n##BLOCK_SIZE=${bsize};BLOCK_AXIS=X;INDEX_AXIS=Y\n##OFFSET_X=${offsetx};OFFSET_Y=${offsety};SIZE_X=${rangex};SIZE_Y=${rangey};SCALE=${scale}\n#BLOCK\tX\tY"
+header="${header}\t$(seq 1 ${K} | sed 's/^/K/' | tr '\n' '\t')$(seq 1 ${K} | sed 's/^/P/' | tr '\n' '\t')"
 
 (echo -e "${header}" && gzip -cd "${input}" | tail -n +2 | perl -slane '$F[0]=int(($F[1]-$offx)/$bsize) * $bsize; $F[1]=int(($F[1]-$offx)*$scale); $F[1]=($F[1]>=0)?$F[1]:0; $F[2]=int(($F[2]-$offy)*$scale); $F[2]=($F[2]>=0)?$F[2]:0; print join("\t", @F);' -- -bsize="${bsize}" -scale="${scale}" -offx="${offsetx}" -offy="${offsety}" | sort -S 1G -k1,1g -k3,3g ) | ${gzip} -c > ${output}
 
@@ -346,7 +351,6 @@ rm ${input}
                     cmds.append(rf"$(info --------------------------------------------------------------)")
                     cmds.append(f"ficture transform --input {args.in_tsv} --output_pref {prj_prefix} --model {model} --key {args.key_col} --major_axis {args.major_axis} --hex_width {fit_width} --n_move {fit_nmove} --min_ct_per_unit {args.min_ct_unit_fit} --mu_scale {args.mu_scale} --thread {args.threads} --precision {args.fit_precision}")
 
-                    batch_input=f"{args.out_dir}/batched.matrix.tsv.gz"
                     anchor=f"{prj_prefix}.fit_result.tsv.gz"
                     decode_basename=f"{model_id}.decode.{anchor_info}_{radius}"
                     decode_prefix=f"{model_path}/{decode_basename}"
