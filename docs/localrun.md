@@ -273,18 +273,21 @@ Although not required, after performing pixel-level decoding, it is useful to
 generates summary statistics and visualize the results.
 
 
-First step is to sort the pixel level output. This is
-primarily for visualizing large images with limited memory usage.
+First step is to sort the pixel level output. This is primarily for visualizing large images with limited memory.
+
+We will need the range of the coordinates for visualization. You can also set `xmin`, `xmax`, `ymin`, and `ymax` directly.
+```bash linenums="1"
+while IFS=$'\t' read -r r_key r_val; do
+    export "${r_key}"="${r_val}"
+done < ${coor}
+echo -e "${xmin}, ${xmax}; ${ymin}, ${ymax}"
+```
 
 ```bash linenums="1"
 input=${output_path}/${prefix}.pixel.tsv.gz # j, X, Y, K1, ..., KJ, P1, ..., PJ, J=topk
 output=${output_path}/${prefix}.pixel.sorted.tsv.gz
 
 K=$( echo $model_id | sed 's/nF\([0-9]\{1,\}\)\..*/\1/' )
-while IFS=$'\t' read -r r_key r_val; do
-    export "${r_key}"="${r_val}"
-done < ${coor}
-echo -e "${xmin}, ${xmax}; ${ymin}, ${ymax}"
 
 offsetx=${xmin}
 offsety=${ymin}
@@ -294,10 +297,21 @@ bsize=2000
 scale=100
 header="##K=${K};TOPK=3\n##BLOCK_SIZE=${bsize};BLOCK_AXIS=X;INDEX_AXIS=Y\n##OFFSET_X=${offsetx};OFFSET_Y=${offsety};SIZE_X=${rangex};SIZE_Y=${rangey};SCALE=${scale}\n#BLOCK\tX\tY\tK1\tK2\tK3\tP1\tP2\tP3"
 
-(echo -e "${header}" && zcat ${input} | tail -n +2 | perl -slane '$F[0]=int(($F[1]-$offx)/$bsize) * $bsize; $F[1]=int(($F[1]-$offx)*$scale); $F[1]=($F[1]>=0)?$F[1]:0; $F[2]=int(($F[2]-$offy)*$scale); $F[2]=($F[2]>=0)?$F[2]:0; print join("\t", @F);' -- -bsize=${bsize} -scale=${scale} -offx=${offsetx} -offy=${offsety} | sort -S 4G -k1,1g -k3,3g ) | bgzip -c > ${output}
+(echo -e "${header}" && zcat ${input} | tail -n +2 | perl -slane '$F[0]=int(($F[1]-$offx)/$bsize) * $bsize; $F[1]=int(($F[1]-$offx)*$scale); $F[1]=($F[1]>=0)?$F[1]:0; $F[2]=int(($F[2]-$offy)*$scale); $F[2]=($F[2]>=0)?$F[2]:0; print join("\t", @F);' -- -bsize=${bsize} -scale=${scale} -offx=${offsetx} -offy=${offsety} | sort -S 4G -k1,1g -k3,3g ) | gzip -c > ${output}
 
-tabix -f -s1 -b3 -e3 ${output}
 # rm ${input} # Make sure the sorted file makes sense before you remove the unsorted file
+```
+
+Generate pixel level image representing the factorization result
+
+```bash linenums="1"
+# Make pixel level figures
+cmap=${output_path}/figure/${output_id}.rgb.tsv
+input=${output_path}/${prefix}.pixel.sorted.tsv.gz
+output=${figure_path}/${prefix}.pixel.png
+
+# plot pixel level images
+ficture plot_pixel_full --input ${input} --color_table ${cmap} --output ${output} --plot_um_per_pixel 0.5 --full
 ```
 
 Next, we can identify differentially expressed genes for each factor. This is a naive pseudo-bulk chi-squared test, please view the results with caution.
@@ -317,18 +331,6 @@ output=${output_path}/${prefix}.factor.info.html
 
 # generate a report for each factor
 ficture factor_report --path ${output_path} --pref ${prefix} --color_table ${cmap}
-```
-
-Next, generalize pixel level images representing the factorization result
-
-```bash linenums="1"
-# Make pixel level figures
-cmap=${output_path}/figure/${output_id}.rgb.tsv
-input=${output_path}/${prefix}.pixel.sorted.tsv.gz
-output=${figure_path}/${prefix}.pixel.png
-
-# plot pixel level images
-ficture plot_pixel_full --input ${input} --color_table ${cmap} --output ${output} --plot_um_per_pixel 0.5 --full
 ```
 
 You may also want to generate heatmaps for individual factors. If the data is very large, making all individual factor maps may take some time.
