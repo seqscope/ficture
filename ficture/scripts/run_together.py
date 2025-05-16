@@ -267,7 +267,7 @@ rm ${input}
             os.makedirs(figure_path, exist_ok=True)
 
         if args.fit_width is None:
-            fit_widths = train_widths
+            fit_widths = [int(x) for x in args.train_width.split(",")]
         else:
             fit_widths = [float(x) for x in args.fit_width.split(",")]
         for fit_width in fit_widths:
