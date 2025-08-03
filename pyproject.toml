@@ -1,7 +1,7 @@
 [project]
 name = "ficture"
 description = "Segmentation free factor analysis for sub-micron resolution spatial transcriptomics"
-version = "0.0.5.4.3"
+version = "0.0.5.5"
 authors = [{name = "Yichen Si", email = "ycsi@umich.edu"}]
 license = {text = "CC BY-NC 4.0"}
 readme = "README.md"

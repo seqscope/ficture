@@ -107,7 +107,7 @@ def de_bulk(_args):
     else:
         for name, v in info.iterrows():
             for k, kname in enumerate(header):
-                if total_k[k] <= 0 or v[str(k)] <= 0:
+                if total_k[k] <= 0 or v[kname] <= 0:
                     continue
                 tab=np.zeros((2,2))
                 tab[0,0]=v[kname]

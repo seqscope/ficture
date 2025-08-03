@@ -61,6 +61,8 @@ def choose_color(_args):
     parser.add_argument('--even_space', action='store_true', help="Evenly space the factors on the circle")
     parser.add_argument('--annotation', type=str, default = '', help='')
     parser.add_argument('--circle', action='store_true', help="")
+    parser.add_argument('--non_factor_cols', nargs='*', default=[], help="List of non-factor column names in the input")
+    parser.add_argument('--factor_cols', nargs='*', default=[], help="List of factor column names in the input")
     parser.add_argument('--seed', type=int, default=-1, help='')
     args = parser.parse_args(_args)
 
@@ -93,8 +95,22 @@ def choose_color(_args):
         y = re.match(r'^[A-Za-z]*_*(\d+)$', x)
         if y:
             factor_header.append(y.group(0))
+    if len(factor_header) == 0:
+        if len(args.factor_cols) > 0:
+            factor_header = args.factor_cols
+        else:
+            if len(args.non_factor_cols) > 0:
+                non_factor_col = set([x.lower() for x in args.non_factor_cols])
+            else:
+                warnings.warn("Factor names do not include integers and neither --factor_cols nor --non_factor_cols is provided. We exclude ('unit', 'x', 'y', 'count', 'topk', 'topp') (case insensitive) and assume the rest are factors.")
+                non_factor_col = set(["unit", "x", "y", "count", "topk", "topp"])
+            factor_header = [x for x in header if x.lower() not in non_factor_col]
+        if len(factor_header) == 0:
+            error("Can't identify columns representing factors.")
+
     K = len(factor_header)
     N = df.shape[0]
+    print(f"Found {K} factors in the input data")
 
     # Factor abundance (want top factors to have more distinct colors)
     if args.even_space:

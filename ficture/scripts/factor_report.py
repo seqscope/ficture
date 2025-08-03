@@ -69,19 +69,6 @@ def factor_report(_args):
     K = color_table.shape[0]
     logging.info(f"Read color table from {color_f}")
 
-    factor_header = np.arange(K).astype(str)
-    factor_name = {}
-    if os.path.isfile(args.annotation):
-        with open(args.annotation) as f:
-            for line in f:
-                x = line.strip().split('\t')
-                factor_name[x[0]] = x[1]
-                factor_header[int(x[0])] = x[1]
-
-    print(factor_header)
-    color_table['RGB'] = [','.join(x) for x in np.clip((color_table.loc[:, ['R','G','B']].values * 255).astype(int), 0, 255).astype(str) ]
-    color_table['HEX'] = [ matplotlib.colors.to_hex(v) for v in np.array(color_table.loc[:, ['R','G','B']]) ]
-    node_color = {factor_header[v['Name']]:v['HEX'] for i,v in color_table.iterrows() }
 
     # Posterior count
     f=path+"/"+pref+".posterior.count.tsv.gz"
@@ -94,11 +81,24 @@ def factor_report(_args):
             recol[v.group(0)] = v.group(1)
     if len(recol) == K:
         post.rename(columns=recol, inplace=True)
+    factor_header = [x for x in post.columns if x != "gene"]
     for u in factor_header:
         post[u] = post[u].astype(float)
     post_umi = post.loc[:, factor_header].sum(axis = 0).astype(int).values
     post_weight = post.loc[:, factor_header].sum(axis = 0).values.astype(float)
     post_weight /= post_weight.sum()
+
+    if os.path.isfile(args.annotation):
+        with open(args.annotation) as f:
+            for line in f:
+                x = line.strip().split('\t')
+                factor_header[int(x[0])] = x[1]
+
+    print(factor_header)
+    color_table['RGB'] = [','.join(x) for x in np.clip((color_table.loc[:, ['R','G','B']].values * 255).astype(int), 0, 255).astype(str) ]
+    color_table['HEX'] = [ matplotlib.colors.to_hex(v) for v in np.array(color_table.loc[:, ['R','G','B']]) ]
+    node_color = {factor_header[v['Name']]:v['HEX'] for i,v in color_table.iterrows() }
+
 
     # DE genes
     f=path+"/DE/"+pref+".bulk_chisq.tsv"

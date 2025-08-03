@@ -25,6 +25,8 @@ def plot_base(_args):
     parser.add_argument('--scale', type=float, default=-1, help="")
     parser.add_argument('--origin', type=int, default=[0,0], help="{0, 1} x {0, 1}, specify how to orient the image w.r.t. the coordinates. (0, 0) means the lower left corner has the minimum x-value and the minimum y-value; (0, 1) means the lower left corner has the minimum x-value and the maximum y-value;")
     parser.add_argument('--category_column', type=str, default='', help='')
+    parser.add_argument('--non_factor_cols', nargs='*', default=[], help="List of non-factor column names in the input")
+    parser.add_argument('--factor_cols', nargs='*', default=[], help="List of factor column names in the input")
 
     parser.add_argument('--color_table_category_name', type=str, default='Name', help='When --category_column is provided, which column to use as the category name')
     parser.add_argument('--binary_cmap_name', type=str, default="plasma", help="Name of Matplotlib colormap to use for ploting individual factors")
@@ -85,8 +87,21 @@ def plot_base(_args):
             y = re.match('^[A-Za-z]*_*(\d+)$', x)
             if y:
                 factor_header.append([y.group(0), int(y.group(1)) ])
-        factor_header.sort(key = lambda x : x[1] )
-        factor_header = [x[0] for x in factor_header]
+        if len(factor_header) == 0:
+            if len(args.factor_cols) > 0:
+                factor_header = args.factor_cols
+            else:
+                if len(args.non_factor_cols) > 0:
+                    non_factor_col = set([x.lower() for x in args.non_factor_cols])
+                else:
+                    warnings.warn("Factor names do not include integers and neither --factor_cols nor --non_factor_cols is provided. We exclude ('unit', 'x', 'y', 'count', 'topk', 'topp') (case insensitive) and assume the rest are factors.")
+                    non_factor_col = set(["unit", "x", "y", "count", "topk", "topp"])
+                factor_header = [x for x in header if x.lower() not in non_factor_col]
+            if len(factor_header) == 0:
+                error("Can't identify columns representing factors.")
+        else:
+            factor_header.sort(key = lambda x : x[1] )
+            factor_header = [x[0] for x in factor_header]
         K = len(factor_header)
         if os.path.exists(args.color_table):
             color_info = pd.read_csv(args.color_table, sep='\t', header=0)
