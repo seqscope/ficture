@@ -30,7 +30,8 @@ def get_xy_max_from_img(transcripts_path):
         for elem in root.iter():
             if 'Pixels' in elem.tag:
                 x_res, y_res = float(elem.attrib['PhysicalSizeX']), float(elem.attrib['PhysicalSizeY'])
-        
+            else:
+                x_res, y_res = 0.2125, 0.2125  #default Xenium values if not found in metadata
         #get image shape in pixels
         y_px, x_px = img.pages[0].shape
         #calculate image shape in um
