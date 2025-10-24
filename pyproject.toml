@@ -7,10 +7,10 @@ license = {text = "CC BY-NC 4.0"}
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    "numpy", "pandas",
+    "numpy", "pandas", "pyarrow",
     "scipy", "scikit-learn",
     "joblib",
-    "matplotlib", "Pillow", "Jinja2", "opencv-python",
+    "matplotlib", "Pillow", "Jinja2", "opencv-python",tifffile,
     "shapely", "geojson", "geopandas",
     "ete3", "PyQt5"
 ]
