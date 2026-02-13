@@ -35,13 +35,16 @@ def make_dge(_args):
     parser.add_argument('--min_ct_per_unit', type=int, default=20, help='')
     parser.add_argument('--min_density_per_unit', type=float, default=0.2, help='')
     parser.add_argument('--fractional-count', type=int, help='Set to 1 if the count columns contain float values', default = 0)
+    parser.add_argument('--seed', type=int, default=-1, help='')
 
     args = parser.parse_args(_args)
     if len(_args) == 0:
         parser.print_help()
         return
 
-    r_seed = time.time()
+    r_seed = args.seed
+    if r_seed <= 0:
+        r_seed = time.time()
     rng.seed(r_seed)
     logging.basicConfig(level= getattr(logging, "INFO", None))
     logging.info(f"Random seed {r_seed}")

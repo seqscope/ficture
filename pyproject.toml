@@ -10,7 +10,7 @@ dependencies = [
     "numpy", "pandas", "pyarrow",
     "scipy", "scikit-learn",
     "joblib",
-    "matplotlib", "Pillow", "Jinja2", "opencv-python",tifffile,
+    "matplotlib", "Pillow", "Jinja2", "opencv-python",
     "shapely", "geojson", "geopandas",
     "ete3", "PyQt5"
 ]

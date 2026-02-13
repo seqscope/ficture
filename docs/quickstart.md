@@ -32,7 +32,7 @@ ficture run_together --in-tsv examples/data/transcripts.tsv.gz \
     --in-minmax examples/data/coordinate_minmax.tsv \
     --in-feature examples/data/feature.clean.tsv.gz \
     --major-axis Y \
-    --out-dir output1 --all
+    --out-dir output1 --seed 1 --all
 ```
 
 This command will create a GNU makefile and run the FICTURE local pipeline.

@@ -28,6 +28,7 @@ def run_together(_args):
     run_params.add_argument('--restart', action='store_true', default=False, help='Restart the run. Ignore all intermediate files and start from the beginning')
     run_params.add_argument('--threads', type=int, default=1, help='Maximum number of threads to use in each process')
     run_params.add_argument('--n-jobs', type=int, default=1, help='Number of jobs (processes) to run in parallel')
+    run_params.add_argument('--seed', type=int, default=-1, help='Random seed for reproducibility')
 
     key_params = parser.add_argument_group("Key Parameters", "Key parameters that requires user's attention")
     key_params.add_argument('--in-tsv', required=True, type=str, help='Input TSV file (e.g. transcript.tsv.gz)')
@@ -110,6 +111,8 @@ def run_together(_args):
     batch_tsv = f"{args.out_dir}/batched.matrix.tsv"
     batch_out = f"{args.out_dir}/batched.matrix.tsv.gz"
     minmax_out = args.in_minmax if args.in_minmax is not None else f"{args.out_dir}/coordinate_minmax.tsv"
+    
+    seed_arg = f" --seed {args.seed}" if args.seed > 0 else ""
 
     ## create output directory
     os.makedirs(args.out_dir, exist_ok=True)
@@ -132,7 +135,7 @@ def run_together(_args):
         cmds.append(rf"$(info Creating minibatch from {args.in_tsv}...)")
         cmds.append(rf"$(info --------------------------------------------------------------)")
         ## create minibatch
-        cmds.append(f"ficture make_spatial_minibatch --input {args.in_tsv} --output {batch_tsv} --mu_scale {args.mu_scale} --batch_size {args.minibatch_size} --batch_buff {args.minibatch_buffer} --major_axis {args.major_axis}")
+        cmds.append(f"ficture make_spatial_minibatch --input {args.in_tsv} --output {batch_tsv} --mu_scale {args.mu_scale} --batch_size {args.minibatch_size} --batch_buff {args.minibatch_buffer} --major_axis {args.major_axis}{seed_arg}")
         # cmds.append(f"{args.sort} -k 2,2n -k 1,1g {batch_tsv} | {args.gzip} -c > {batch_out}")
         cmds.append(f"{args.gzip} -f {batch_tsv}")
         # cmds.append(f"rm {batch_tsv}")
@@ -162,7 +165,7 @@ gzip -cd ${input} | awk 'BEGIN{FS=OFS="\t"} NR==1{for(i=1;i<=NF;i++){if($i=="X")
             cmds.append(rf"$(info --------------------------------------------------------------)")
             cmds.append(rf"$(info Creating DGE for {train_width}um...)")
             cmds.append(rf"$(info --------------------------------------------------------------)")
-            cmds.append(f"ficture make_dge --key {args.key_col} --input {args.in_tsv} --output {dge_out} --hex_width {train_width} --n_move {args.train_n_move} --min_ct_per_unit {args.min_ct_unit_dge} --mu_scale {args.mu_scale} --precision {args.dge_precision} --major_axis {args.major_axis} --fractional-count {args.fractional_count}")
+            cmds.append(f"ficture make_dge --key {args.key_col} --input {args.in_tsv} --output {dge_out} --hex_width {train_width} --n_move {args.train_n_move} --min_ct_per_unit {args.min_ct_unit_dge} --mu_scale {args.mu_scale} --precision {args.dge_precision} --major_axis {args.major_axis} --fractional-count {args.fractional_count}{seed_arg}")
             cmds.append(f"{args.sort} -k 1,1n {dge_out} | {args.gzip} -c > {dge_out}.gz")
             cmds.append(f"rm {dge_out}")
             mm.add_target(f"{dge_out}.gz", [args.in_tsv], cmds)
@@ -193,12 +196,12 @@ gzip -cd ${input} | awk 'BEGIN{FS=OFS="\t"} NR==1{for(i=1;i<=NF;i++){if($i=="X")
                 cmds.append(rf"$(info Creating LDA for {train_width}um and {n_factor} factors...)")
                 cmds.append(rf"$(info --------------------------------------------------------------)")
                 cmds.append(f"mkdir -p {model_path}/figure")
-                cmds.append(f"ficture fit_model --input {hexagon} --output {model_prefix} {feature_arg} --nFactor {n_factor} --epoch {args.train_epoch} --epoch_id_length {args.train_epoch_id_len} --unit_attr X Y --key {args.key_col} --min_ct_per_feature {args.min_ct_feature} --test_split 0.5 --R {args.lda_rand_init} --fractional-count {args.fractional_count} --thread {args.threads}")
+                cmds.append(f"ficture fit_model --input {hexagon} --output {model_prefix} {feature_arg} --nFactor {n_factor} --epoch {args.train_epoch} --epoch_id_length {args.train_epoch_id_len} --unit_attr X Y --key {args.key_col} --min_ct_per_feature {args.min_ct_feature} --test_split 0.5 --R {args.lda_rand_init} --fractional-count {args.fractional_count} --thread {args.threads}{seed_arg}")
 
                 fit_tsv=f"{model_path}/{model_id}.fit_result.tsv.gz"
                 fig_prefix=f"{figure_path}/{model_id}"
                 cmap=f"{figure_path}/{model_id}.rgb.tsv"
-                cmds.append(f"ficture choose_color --input {fit_tsv} --output {fig_prefix} --cmap_name {args.cmap_name}")
+                cmds.append(f"ficture choose_color --input {fit_tsv} --output {fig_prefix} --cmap_name {args.cmap_name}{seed_arg}")
 
                 fillr = (train_width / 2 + 1)
                 cmds.append(f"ficture plot_base --input {fit_tsv} --output {fig_prefix}.coarse --fill_range {fillr} --color_table {cmap} --plot_um_per_pixel {args.lda_plot_um_per_pixel} --plot_discretized")
@@ -281,7 +284,7 @@ rm ${input}
             cmds.append(rf"$(info --------------------------------------------------------------)")
             cmds.append(rf"$(info Creating projection for {fit_width}um at {fit_width}um)")
             cmds.append(rf"$(info --------------------------------------------------------------)")
-            cmds.append(f"ficture transform --input {args.in_tsv} --output_pref {prj_prefix} --model {model} --key {args.key_col} --major_axis {args.major_axis} --hex_width {fit_width} --n_move {fit_nmove} --min_ct_per_unit {args.min_ct_unit_fit} --mu_scale {args.mu_scale} --thread {args.threads} --precision {args.fit_precision}")
+            cmds.append(f"ficture transform --input {args.in_tsv} --output_pref {prj_prefix} --model {model} --key {args.key_col} --major_axis {args.major_axis} --hex_width {fit_width} --n_move {fit_nmove} --min_ct_per_unit {args.min_ct_unit_fit} --mu_scale {args.mu_scale} --thread {args.threads} --precision {args.fit_precision}{seed_arg}")
 
             anchor=f"{prj_prefix}.fit_result.tsv.gz"
             decode_basename=f"{model_id}.decode.{anchor_info}_{radius}"
@@ -290,7 +293,7 @@ rm ${input}
             cmds.append(rf"$(info --------------------------------------------------------------)")
             cmds.append(rf"$(info Performing pixel-level decoding..)")
             cmds.append(rf"$(info --------------------------------------------------------------)")
-            cmds.append(f"ficture slda_decode --input {batch_in} --output {decode_prefix} --model {model} --anchor {anchor} --anchor_in_um --neighbor_radius {radius} --mu_scale {args.mu_scale} --key {args.key_col} --precision {args.decode_precision} --lite_topk_output_pixel {args.decode_top_k} --lite_topk_output_anchor {args.decode_top_k} --thread {args.threads}")
+            cmds.append(f"ficture slda_decode --input {batch_in} --output {decode_prefix} --model {model} --anchor {anchor} --anchor_in_um --neighbor_radius {radius} --mu_scale {args.mu_scale} --key {args.key_col} --precision {args.decode_precision} --lite_topk_output_pixel {args.decode_top_k} --lite_topk_output_anchor {args.decode_top_k} --thread {args.threads}{seed_arg}")
 
             cmds.append(rf"$(info --------------------------------------------------------------)")
             cmds.append(rf"$(info Sorting and reformatting the pixel-level output..)")
@@ -349,7 +352,7 @@ rm ${input}
                     cmds.append(rf"$(info --------------------------------------------------------------)")
                     cmds.append(rf"$(info Creating projection for {fit_width}um and {n_factor} factors, at {fit_width}um)")
                     cmds.append(rf"$(info --------------------------------------------------------------)")
-                    cmds.append(f"ficture transform --input {args.in_tsv} --output_pref {prj_prefix} --model {model} --key {args.key_col} --major_axis {args.major_axis} --hex_width {fit_width} --n_move {fit_nmove} --min_ct_per_unit {args.min_ct_unit_fit} --mu_scale {args.mu_scale} --thread {args.threads} --precision {args.fit_precision}")
+                    cmds.append(f"ficture transform --input {args.in_tsv} --output_pref {prj_prefix} --model {model} --key {args.key_col} --major_axis {args.major_axis} --hex_width {fit_width} --n_move {fit_nmove} --min_ct_per_unit {args.min_ct_unit_fit} --mu_scale {args.mu_scale} --thread {args.threads} --precision {args.fit_precision}{seed_arg}")
 
                     anchor=f"{prj_prefix}.fit_result.tsv.gz"
                     decode_basename=f"{model_id}.decode.{anchor_info}_{radius}"
@@ -358,7 +361,7 @@ rm ${input}
                     cmds.append(rf"$(info --------------------------------------------------------------)")
                     cmds.append(rf"$(info Performing pixel-level decoding..)")
                     cmds.append(rf"$(info --------------------------------------------------------------)")
-                    cmds.append(f"ficture slda_decode --input {batch_in} --output {decode_prefix} --model {model} --anchor {anchor} --anchor_in_um --neighbor_radius {radius} --mu_scale {args.mu_scale} --key {args.key_col} --precision {args.decode_precision} --lite_topk_output_pixel {args.decode_top_k} --lite_topk_output_anchor {args.decode_top_k} --thread {args.threads}")
+                    cmds.append(f"ficture slda_decode --input {batch_in} --output {decode_prefix} --model {model} --anchor {anchor} --anchor_in_um --neighbor_radius {radius} --mu_scale {args.mu_scale} --key {args.key_col} --precision {args.decode_precision} --lite_topk_output_pixel {args.decode_top_k} --lite_topk_output_anchor {args.decode_top_k} --thread {args.threads}{seed_arg}")
 
                     cmds.append(rf"$(info --------------------------------------------------------------)")
                     cmds.append(rf"$(info Sorting and reformatting the pixel-level output..)")

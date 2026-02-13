@@ -38,12 +38,19 @@ def transform(_args):
     parser.add_argument('--log_norm_size_factor', action='store_true', help='')
     parser.add_argument('--scale_const', type=float, default=-1, help='')
     parser.add_argument('--unit_sum_mean', type=float, default=-1, help='')
+    parser.add_argument('--seed', type=int, default=-1, help='')
     parser.add_argument('--debug', type=int, default=0, help='')
 
     args = parser.parse_args(_args)
     if len(_args) == 0:
         parser.print_help()
         return
+
+    seed = args.seed
+    if seed <= 0:
+        seed = int(time.time())
+    rng.seed(seed)
+    np.random.seed(seed)
 
     if not os.path.exists(args.input):
         sys.exit("ERROR: cannot find input file.")
@@ -79,12 +86,13 @@ def transform(_args):
         factor_header = list(model_mtx.columns)
         feature_kept =list(model_mtx.index)
         M, K = model_mtx.shape
-        model = LDA(n_components=K, learning_method='online', batch_size=512, n_jobs = args.thread, verbose = 0)
+        model = LDA(n_components=K, learning_method='online', batch_size=512, n_jobs = args.thread, verbose = 0, random_state=seed)
         init_latent_vars(model, n_features = M, gamma = np.array(model_mtx).T)
     else:
         try:
             model = pickle.load(open(args.model, 'rb'))
             model.n_jobs = args.thread
+            model.random_state = seed
             feature_kept = model.feature_names_in_
             K, M = model.components_.shape
             model.feature_names_in_ = None
