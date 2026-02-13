@@ -150,11 +150,13 @@ def make_dge(_args):
                     mid_ct = np.median(ct.loc[ct.tot >= min_ct_per_unit, 'tot'].values)
                     ct = set(ct.loc[(ct.tot >= min_ct_per_unit) & (ct[mj] > st + diam/2) & (ct[mj] < ed - diam/2), 'hex_id'].values)
                     ct = ct - last_batch[(offs_x,offs_y,l)]
+                    # Keep deterministic order for reproducible random-index assignment.
+                    ct = sorted(ct, key=lambda p: (p[0], p[1]))
                     if len(ct) < 2:
                         offs_y += 1
                         continue
-                    last_batch[(offs_x,offs_y,l)] = ct
-                    hex_list = list(ct)
+                    last_batch[(offs_x,offs_y,l)] = set(ct)
+                    hex_list = ct
                     suff = [str(x[0])[-1]+str(x[1])[-1] for x in hex_list]
                     hex_dict = {x: str(rng.randint(1, random_index_max)).zfill(random_index_length) + suff[i] for i,x in enumerate(hex_list)}
                     brc["hex_id"] = hex_crd

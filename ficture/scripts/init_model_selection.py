@@ -244,12 +244,12 @@ def fit_model(_args):
     brc['topP'] = np.max(theta, axis = 1)
     brc = pd.concat((brc, pd.DataFrame(theta, columns = factor_header )), axis = 1)
     brc = brc.astype(dtp)
-    brc[oheader].to_csv(res_f, sep='\t', float_format="%.4e", index=False, header=True, compression={"method":"gzip"})
+    brc[oheader].to_csv(res_f, sep='\t', float_format="%.4e", index=False, header=True, compression={"method":"gzip", "mtime":0})
 
     out_f = args.output+".posterior.count.tsv.gz"
     pd.concat([pd.DataFrame({gene_key: feature.gene.values}),\
             pd.DataFrame(post_count.T, columns = factor_header, dtype='float64')],\
-        axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.2f', compression={"method":"gzip"})
+        axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.2f', compression={"method":"gzip", "mtime":0})
 
     model.feature_names_in_ = feature.gene.values
     model.log_norm_scaling_const_ = scale_const
@@ -259,7 +259,7 @@ def fit_model(_args):
     out_f = args.output + ".model_matrix.tsv.gz"
     pd.concat([pd.DataFrame({gene_key: feature.gene.values }),\
             pd.DataFrame(model.components_.T, columns = factor_header, dtype='float64')], \
-        axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.4e', compression={"method":"gzip"})
+        axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.4e', compression={"method":"gzip", "mtime":0})
 
 if __name__ == "__main__":
     fit_model(sys.argv[1:])

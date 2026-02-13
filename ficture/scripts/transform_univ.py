@@ -3,7 +3,7 @@ Transform into factor space based on input model
 Model contains gene names and either Dirichlet parameters (or probabilities for more general use?)
 Input pixel level data will be grouped into (overlapping) hexagons
 '''
-import sys, os, copy, gzip, time, logging, pickle, argparse
+import sys, os, copy, gzip, time, logging, pickle, argparse, io
 import numpy as np
 import pandas as pd
 import random as rng
@@ -144,8 +144,10 @@ def transform(_args):
     n_batch= 0
     oheader = ["unit",key,"x","y","topK","topP"]+[str(x) for x in range(K)]
     out_f = args.output + ".fit_result.tsv.gz"
-    with gzip.open(out_f, 'wt') as wf:
+    with gzip.GzipFile(filename=out_f, mode='wb', mtime=0) as gz:
+        wf = io.TextIOWrapper(gz, encoding='utf-8')
         wf.write('\t'.join(oheader) + '\n')
+        wf.flush()
     t0 = time.time()
     last_batch = set()
     while batch_obj.read_chunk(min_size=b_size):
@@ -173,7 +175,7 @@ def transform(_args):
         if len(last_batch) > 0:
             batch_obj.brc.drop(index = batch_obj.brc.index[batch_obj.brc.unit.isin(last_batch)], inplace=True)
         last_batch = set(batch_obj.brc.unit.values)
-        batch_obj.brc[oheader].to_csv(out_f, sep='\t', index=False, header=False, float_format='%.3e', mode='a', compression={"method":"gzip"})
+        batch_obj.brc[oheader].to_csv(out_f, sep='\t', index=False, header=False, float_format='%.3e', mode='a', compression={"method":"gzip", "mtime":0})
         logging.info(f"Transformed {n_batch} batches with total {n_unit} units, {t1/60:2f}min")
         if (args.debug > 0) and (n_unit >= args.debug):
             break
@@ -182,7 +184,7 @@ def transform(_args):
     pd.concat([pd.DataFrame({'gene': feature_kept}),\
             pd.DataFrame(post_count.T, dtype='float64',\
                             columns = factor_header)],\
-                axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.2f', compression={"method":"gzip"})
+                axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.2f', compression={"method":"gzip", "mtime":0})
 
 if __name__ == '__main__':
     transform(sys.argv[1:])

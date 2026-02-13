@@ -81,7 +81,7 @@ def make_sge_by_hexagon(_args):
         feature.gene_id = prefix + feature.gene_id.values
     feature['dummy'] = "Gene Expression"
     f = args.output_path + "/features.tsv.gz"
-    feature[['gene_id','gene','dummy']].to_csv(f, sep='\t', index=False, header=False)
+    feature[['gene_id','gene','dummy']].to_csv(f, sep='\t', index=False, header=False, compression={"method":"gzip", "mtime":0})
 
     feature_kept = list(feature.gene.values)
     ft_dict = {x:i for i,x in enumerate( feature_kept ) }
@@ -214,7 +214,7 @@ def make_sge_by_hexagon(_args):
             offs_x += 1
         df_buff = copy.copy(left)
 
-    _ = os.system("gzip -f " + brc_f)
+    _ = os.system("gzip -n -f " + brc_f)
 
     mtx_header = args.output_path + "/matrix.header"
     with open(mtx_header, 'w') as wf:
@@ -222,7 +222,7 @@ def make_sge_by_hexagon(_args):
         line += " ".join([str(x) for x in [M, n_unit, T]]) + "\n"
         wf.write(line)
 
-    arg = " ".join(["cat",mtx_header,mtx_f,"| gzip -c > ", mtx_f+".gz"])
+    arg = " ".join(["cat",mtx_header,mtx_f,"| gzip -n -c > ", mtx_f+".gz"])
     if os.system(arg) == 0:
         _ = os.system("rm " + mtx_f)
         _ = os.system("rm " + mtx_header)

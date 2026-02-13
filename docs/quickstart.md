@@ -35,9 +35,7 @@ ficture run_together --in-tsv examples/data/transcripts.tsv.gz \
     --out-dir output1 --seed 1 --all
 ```
 
-This command will create a GNU makefile and run the FICTURE local pipeline.
-
-This will run FICTURE on the example datasets and save the results in the `output1` directory.
+This command will create a GNU makefile that runs the FICTURE local pipeline. When executed (`make -j 4 -f output1/Makefile`), it will run FICTURE on the example datasets and save the results to the `output1` directory.
 
 ## Running FICTURE with multiple parameter settings
 

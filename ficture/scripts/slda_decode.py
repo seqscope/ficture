@@ -154,7 +154,7 @@ def slda_decode(_args):
             pixel.drop(columns = factor_header, inplace=True)
         write_mode = 'w' if n_batch == 0 else 'a'
         header_include = True if n_batch == 0 else False
-        pixel.to_csv(args.output+".pixel.tsv.gz", sep='\t', index=False, header=header_include, mode=write_mode, float_format="%.2e", compression={"method":"gzip"})
+        pixel.to_csv(args.output+".pixel.tsv.gz", sep='\t', index=False, header=header_include, mode=write_mode, float_format="%.2e", compression={"method":"gzip", "mtime":0})
         logging.info(f"Output {pixel.shape[0]} pixels and {anchor.shape[0]} anchors")
         anchor.X = anchor.X.map('{:.2f}'.format)
         anchor.Y = anchor.Y.map('{:.2f}'.format)
@@ -169,7 +169,7 @@ def slda_decode(_args):
             for k in range(args.lite_topk_output_anchor):
                 anchor[f"P{k+1}"] = np.clip(top_values[:, k], 0, 1)
             anchor.drop(columns = factor_header, inplace=True)
-        anchor.to_csv(args.output+".anchor.tsv.gz", sep='\t', index=False, header=header_include, mode=write_mode, float_format="%.2e", compression={"method":"gzip"})
+        anchor.to_csv(args.output+".anchor.tsv.gz", sep='\t', index=False, header=header_include, mode=write_mode, float_format="%.2e", compression={"method":"gzip", "mtime":0})
         n_batch += read_n_batch
         post_count += pcount
         if not pixel_obj.file_is_open:
@@ -182,7 +182,7 @@ def slda_decode(_args):
     pd.concat([pd.DataFrame({'gene': feature_kept}),\
             pd.DataFrame(post_count.T, dtype='float64',\
                             columns = factor_header)],\
-            axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.2f', compression={"method":"gzip"})
+            axis = 1).to_csv(out_f, sep='\t', index=False, float_format='%.2f', compression={"method":"gzip", "mtime":0})
 
 if __name__ == "__main__":
     slda_decode(sys.argv[1:])
