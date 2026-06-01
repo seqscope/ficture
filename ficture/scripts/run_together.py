@@ -47,7 +47,7 @@ def run_together(_args):
     aux_params.add_argument('--train-epoch-id-len', type=int, default=2, help='Training epoch ID length')
     aux_params.add_argument('--train-n-move', type=int, default=2, help='Level of hexagonal sliding during training')
     aux_params.add_argument('--sge-n-move', type=int, default=1, help='Level of hexagonal sliding during SGE generation')
-    aux_params.add_argument('--fit-width', type=float, help='Hexagon flat-to-flat width (in um) during model fitting (default: same to train-width)')
+    aux_params.add_argument('--fit-width', type=str, help='Hexagon flat-to-flat width (in um) during model fitting (default: same to train-width)')
     aux_params.add_argument('--key-col', type=str, default="Count", help='Columns from the input file to be used as key')
     aux_params.add_argument('--minibatch-size', type=int, default=500, help='Batch size used in minibatch processing')
     aux_params.add_argument('--minibatch-buffer', type=int, default=30, help='Batch buffer used in minibatch processing')
@@ -111,7 +111,7 @@ def run_together(_args):
     batch_tsv = f"{args.out_dir}/batched.matrix.tsv"
     batch_out = f"{args.out_dir}/batched.matrix.tsv.gz"
     minmax_out = args.in_minmax if args.in_minmax is not None else f"{args.out_dir}/coordinate_minmax.tsv"
-    
+
     seed_arg = f" --seed {args.seed}" if args.seed > 0 else ""
     env_items = []
     if args.seed > 0:

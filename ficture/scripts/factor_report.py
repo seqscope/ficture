@@ -72,7 +72,7 @@ def factor_report(_args):
 
     # Posterior count
     f=path+"/"+pref+".posterior.count.tsv.gz"
-    post = pd.read_csv(f, sep='\t')
+    post = pd.read_csv(f, sep='\t', dtype={'gene':str})
     logging.info(f"Read posterior count from {f}")
     recol = {}
     for u in post.columns:
@@ -106,7 +106,7 @@ def factor_report(_args):
         f=path+"/"+pref+".bulk_chisq.tsv"
         if not os.path.exists(f):
             sys.exit(f"Cannot find DE file")
-    de = pd.read_csv(f, sep='\t', dtype={'factor':str})
+    de = pd.read_csv(f, sep='\t', dtype={'factor':str, 'gene':str})
     logging.info(f"Read DE genes from {f}")
     # de.factor = de.factor.astype(int)
     top_gene = []

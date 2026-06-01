@@ -83,6 +83,7 @@ def transform(_args):
     factor_header = []
     if args.model.endswith('.tsv.gz') or args.model.endswith('tsv'):
         model_mtx = pd.read_csv(args.model, sep='\t', index_col = 0)
+        model_mtx.index = model_mtx.index.astype(str)
         factor_header = list(model_mtx.columns)
         feature_kept =list(model_mtx.index)
         M, K = model_mtx.shape

@@ -78,7 +78,7 @@ def slda_decode(_args):
         # If input is a gzip tsv file
         model = pd.read_csv(args.model, sep='\t')
         factor_names = list(model.columns)[1:]
-        feature_kept = model.gene.values
+        feature_kept = model.iloc[:, 0].astype(str).values
         model = np.array(model.iloc[:,1:]).T
         model = np.clip(model, 0.5, None)
     else:
