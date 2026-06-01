@@ -1,6 +1,6 @@
 # FICTURE
 
-2025-05: we implemented [a new version](https://github.com/Yichen-Si/punkst) in a c++ command line tool that is substantially more efficiency and (hopefully) easier to use. If you are interested in applying FICTURE to large datasets we would love to have you try it out.
+2026-05: this repo is replaced by [our new software](https://github.com/Yichen-Si/punkst) that is substantially more efficiency and (hopefully) easier to use. We strongly recommend you to use the new software as we cannot guarantee the maintenance of this repo.
 
 ---
 
